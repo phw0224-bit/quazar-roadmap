@@ -1,11 +1,10 @@
 import { supabase } from '../lib/supabase';
 
-// 환경 변수 설정 (기본값 true로 설정하여 바로 연동)
-const USE_SUPABASE = true;
+const normalizeNameKey = (value) => (value || '').trim().toLowerCase();
 
 const supabaseAPI = {
   getBoardData: async () => {
-    // 1. 페이즈 가져오기 (order_index 순)
+    // 1. 페이즈 가져오기
     const { data: phases, error: pError } = await supabase
       .from('phases')
       .select('*')
@@ -13,10 +12,16 @@ const supabaseAPI = {
     
     if (pError) throw pError;
 
-    // 2. 아이템 가져오기 (order_index 순)
+    // 2. 아이템과 댓글(작성자 이름 포함) 가져오기
     const { data: items, error: iError } = await supabase
       .from('items')
-      .select('*, comments(*)')
+      .select(`
+        *,
+        comments (
+          *,
+          profiles (name, department)
+        )
+      `)
       .order('order_index', { ascending: true });
 
     if (iError) throw iError;
@@ -24,26 +29,135 @@ const supabaseAPI = {
     // 3. 트리 구조로 조립
     const formattedPhases = phases.map(phase => ({
       ...phase,
+      assignees: Array.isArray(phase.assignees) ? phase.assignees : [],
       items: items
         .filter(item => item.phase_id === phase.id)
         .sort((a, b) => a.order_index - b.order_index)
         .map(item => ({
           ...item,
-          comments: item.comments || []
+          related_items: Array.isArray(item.related_items) ? item.related_items : [],
+          comments: (item.comments || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
         }))
     }));
 
     return { phases: formattedPhases };
   },
 
-  addPhase: async (title) => {
-    // 마지막 order_index 확인
+  getPeopleData: async () => {
+    const { data: profiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, name, department')
+      .order('name', { ascending: true });
+
+    if (profileError) throw profileError;
+
+    const { data: phases, error: phaseError } = await supabase
+      .from('phases')
+      .select('id, title, board_type');
+
+    if (phaseError) throw phaseError;
+
+    const { data: items, error: itemError } = await supabase
+      .from('items')
+      .select('id, title, status, assignees, phase_id')
+      .order('order_index', { ascending: true });
+
+    if (itemError) throw itemError;
+
+    const phaseMap = new Map((phases || []).map((phase) => [phase.id, phase]));
+    const membersByName = new Map();
+    const teamsByName = new Map();
+    const unassignedTeamName = '미분류';
+
+    (profiles || []).forEach((profile) => {
+      const memberName = (profile.name || '').trim();
+      if (!memberName) return;
+
+      const key = normalizeNameKey(memberName);
+      const department = (profile.department || '').trim() || unassignedTeamName;
+
+      const member = {
+        id: profile.id,
+        name: memberName,
+        department,
+        tasks: [],
+      };
+
+      if (!membersByName.has(key)) {
+        membersByName.set(key, []);
+      }
+      membersByName.get(key).push(member);
+
+      if (!teamsByName.has(department)) {
+        teamsByName.set(department, []);
+      }
+      teamsByName.get(department).push(member);
+    });
+
+    (items || []).forEach((item) => {
+      const assignees = Array.isArray(item.assignees) ? item.assignees : [];
+      if (assignees.length === 0) return;
+
+      const phase = phaseMap.get(item.phase_id);
+      const task = {
+        id: item.id,
+        title: item.title || '제목 없음',
+        status: item.status || 'none',
+        phaseId: item.phase_id,
+        phaseTitle: phase?.title || '미지정 단계',
+        boardType: phase?.board_type || 'main',
+      };
+
+      assignees.forEach((assigneeName) => {
+        const cleanName = (assigneeName || '').trim();
+        if (!cleanName) return;
+
+        const key = normalizeNameKey(cleanName);
+        const linkedMembers = membersByName.get(key);
+
+        if (linkedMembers && linkedMembers.length > 0) {
+          linkedMembers.forEach((member) => {
+            member.tasks.push(task);
+          });
+          return;
+        }
+
+        if (!teamsByName.has(unassignedTeamName)) {
+          teamsByName.set(unassignedTeamName, []);
+        }
+
+        const fallbackMembers = teamsByName.get(unassignedTeamName);
+        let fallbackMember = fallbackMembers.find((m) => m.id === `name:${cleanName}`);
+        if (!fallbackMember) {
+          fallbackMember = {
+            id: `name:${cleanName}`,
+            name: cleanName,
+            department: unassignedTeamName,
+            tasks: [],
+          };
+          fallbackMembers.push(fallbackMember);
+        }
+        fallbackMember.tasks.push(task);
+      });
+    });
+
+    const teams = Array.from(teamsByName.entries())
+      .map(([teamName, members]) => ({
+        teamName,
+        members: [...members].sort((a, b) => a.name.localeCompare(b.name, 'ko-KR')),
+      }))
+      .sort((a, b) => a.teamName.localeCompare(b.teamName, 'ko-KR'));
+
+    return { teams };
+  },
+
+  addPhase: async (title, boardType = 'main') => {
     const { data: existingPhases } = await supabase.from('phases').select('order_index').order('order_index', { ascending: false }).limit(1);
     const nextOrder = existingPhases?.[0] ? existingPhases[0].order_index + 1 : 0;
 
     const { data, error } = await supabase
       .from('phases')
-      .insert([{ title, order_index: nextOrder }])
+      .insert([{ title, order_index: nextOrder, board_type: boardType, assignees: [] }])
       .select();
     
     if (error) throw error;
@@ -67,7 +181,6 @@ const supabaseAPI = {
   },
 
   movePhase: async (phaseId, targetIndex) => {
-    // 전체 페이즈 목록을 가져와서 메모리에서 재정렬 후 전체 업데이트 (가장 단순한 방식)
     const { data: phases } = await supabase.from('phases').select('id, order_index').order('order_index', { ascending: true });
     const movingPhaseIdx = phases.findIndex(p => p.id === phaseId);
     const [movingPhase] = phases.splice(movingPhaseIdx, 1);
@@ -95,7 +208,8 @@ const supabaseAPI = {
         status: 'none',
         teams: [],
         assignees: [],
-        tags: []
+        tags: [],
+        related_items: []
       }])
       .select();
     
@@ -104,7 +218,6 @@ const supabaseAPI = {
   },
 
   updateItem: async (phaseId, itemId, updates) => {
-    // phase_id는 조건절에서만 사용하거나 무시 (Supabase는 PK로 업데이트)
     const { data, error } = await supabase
       .from('items')
       .update(updates)
@@ -121,27 +234,22 @@ const supabaseAPI = {
   },
 
   moveItem: async (sourcePhaseId, targetPhaseId, itemId, targetIndex) => {
-    // 1. 타겟 페이즈의 아이템들을 가져와서 순서 조정
     const { data: targetItems } = await supabase
       .from('items')
       .select('id, order_index')
       .eq('phase_id', targetPhaseId)
       .order('order_index', { ascending: true });
 
-    // 2. 이동할 아이템이 타겟 페이즈에 이미 있는지 확인
     const movingItemIdx = targetItems.findIndex(i => i.id === itemId);
     let newItems = [...targetItems];
 
     if (movingItemIdx !== -1) {
-      // 동일 페이즈 내 이동
       const [movingItem] = newItems.splice(movingItemIdx, 1);
       newItems.splice(targetIndex, 0, movingItem);
     } else {
-      // 다른 페이즈로 이동
       newItems.splice(targetIndex, 0, { id: itemId });
     }
 
-    // 3. 전체 아이템의 phase_id와 order_index 일괄 업데이트
     const updatePromises = newItems.map((item, idx) => 
       supabase.from('items').update({
         phase_id: targetPhaseId,
@@ -165,7 +273,10 @@ const supabaseAPI = {
         user_id: userData.user.id,
         content 
       }])
-      .select();
+      .select(`
+        *,
+        profiles (name, department)
+      `);
     
     if (error) throw error;
     return data[0];
@@ -176,7 +287,10 @@ const supabaseAPI = {
       .from('comments')
       .update(updates)
       .eq('id', commentId)
-      .select();
+      .select(`
+        *,
+        profiles (name, department)
+      `);
     
     if (error) throw error;
     return data[0];
@@ -188,5 +302,4 @@ const supabaseAPI = {
   }
 };
 
-const API = USE_SUPABASE ? supabaseAPI : supabaseAPI; // 로컬 스토리지 코드는 제거하거나 유지
-export default API;
+export default supabaseAPI;

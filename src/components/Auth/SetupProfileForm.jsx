@@ -35,11 +35,11 @@ export default function SetupProfileForm({ onComplete }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#fcfbf7] flex items-center justify-center p-6">
-      <div className="w-full max-w-lg bg-white rounded-xl shadow-2xl border border-gray-100 p-10 flex flex-col gap-8">
+    <div className="min-h-screen bg-[#191919] flex items-center justify-center p-6">
+      <div className="w-full max-w-lg bg-[#252525] rounded-xl shadow-2xl border border-[#373737] p-10 flex flex-col gap-8">
         <div className="text-center flex flex-col gap-2">
-          <div className="text-4xl font-serif font-bold tracking-widest text-[#c5a059]">LD</div>
-          <h1 className="text-xl font-bold text-gray-800 uppercase tracking-tight">Setup Your Account</h1>
+          <div className="text-4xl font-serif font-bold tracking-widest text-gray-200">LD</div>
+          <h1 className="text-xl font-bold text-gray-100 uppercase tracking-tight">Setup Your Account</h1>
           <p className="text-xs text-gray-400 font-medium">최초 로그인 시 비밀번호와 프로필을 설정해야 합니다.</p>
         </div>
 
@@ -49,7 +49,7 @@ export default function SetupProfileForm({ onComplete }) {
             <input
               type="text"
               required
-              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c5a059]/20"
+              className="w-full p-3 bg-[#1f1f1f] border border-[#3a3a3a] rounded-lg text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/25"
               placeholder="성함 입력"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -64,7 +64,7 @@ export default function SetupProfileForm({ onComplete }) {
                   key={dept}
                   type="button"
                   onClick={() => setDepartment(dept)}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all border ${department === dept ? 'bg-[#c5a059] border-[#c5a059] text-white shadow-md' : 'bg-white border-gray-200 text-gray-400 hover:border-[#c5a059]'}`}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all border ${department === dept ? 'bg-[#3a4b60] border-[#4a6079] text-white shadow-md' : 'bg-[#1f1f1f] border-[#3a3a3a] text-gray-300 hover:border-[#4f6b88]'}`}
                 >
                   {dept}
                 </button>
@@ -77,7 +77,7 @@ export default function SetupProfileForm({ onComplete }) {
             <input
               type="password"
               required
-              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c5a059]/20"
+              className="w-full p-3 bg-[#1f1f1f] border border-[#3a3a3a] rounded-lg text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/25"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -89,7 +89,7 @@ export default function SetupProfileForm({ onComplete }) {
             <input
               type="password"
               required
-              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c5a059]/20"
+              className="w-full p-3 bg-[#1f1f1f] border border-[#3a3a3a] rounded-lg text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/25"
               placeholder="••••••••"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
@@ -101,7 +101,7 @@ export default function SetupProfileForm({ onComplete }) {
           <button
             type="submit"
             disabled={loading}
-            className="md:col-span-2 py-4 bg-gray-900 text-white rounded-lg font-bold text-sm uppercase tracking-[0.2em] shadow-lg hover:bg-black transition-all active:scale-[0.98] disabled:opacity-50"
+            className="md:col-span-2 py-4 bg-gray-100 text-gray-900 rounded-lg font-bold text-sm uppercase tracking-[0.2em] shadow-lg hover:bg-white transition-all active:scale-[0.98] disabled:opacity-50"
           >
             {loading ? 'Saving Settings...' : 'Complete Registration'}
           </button>

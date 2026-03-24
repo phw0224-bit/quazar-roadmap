@@ -1,22 +1,33 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --font-sans: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-serif: "Georgia", "Times New Roman", serif;
   
-  --color-brand-gold: #c5a059;
+  --color-brand-accent: #4f6b88;
   --color-brand-dark: #1a1a1a;
   --color-bg-main: #fcfbf7;
   --color-bg-column: #ffffff;
   --color-bg-header: #f8f8f8;
 }
 
+html {
+  font-size: 120%; /* Increased from 110% to 120% */
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
 body {
   margin: 0;
-  background-color: var(--color-bg-main);
-  color: var(--color-brand-dark);
+  @apply bg-white text-[#37352f] dark:bg-[#191919] dark:text-[#D1D1D1] transition-colors duration-200;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
 }
 
 /* 스크롤바 커스텀 */
@@ -28,9 +39,84 @@ body {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #d1d1d1;
+  background: #edece9;
   border-radius: 10px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
+  background: #d3d1cb;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #373737; 
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #454545;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Notion-like focus styles */
+input:focus, textarea:focus {
+  outline: none;
+}
+
+/* Item detail markdown overflow guards */
+.detail-markdown {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.detail-markdown :where(p, li, blockquote, td, th) {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.detail-markdown :where(img, svg, video, iframe) {
+  max-width: 100%;
+  height: auto;
+}
+
+.detail-markdown-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.detail-markdown-table {
+  min-width: 100%;
+  width: max-content;
+  border-collapse: collapse;
+}
+
+.detail-markdown-table :where(th, td) {
+  white-space: nowrap;
+}
+
+.detail-markdown-pre {
+  margin: 0;
+  min-width: 100%;
+  width: max-content;
+}
+
+.detail-markdown-codeblock {
+  display: block;
+  background: #111827;
+  color: #e5e7eb;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  white-space: pre;
 }

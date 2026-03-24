@@ -8,10 +8,33 @@ export const useAuth = () => {
 
   useEffect(() => {
     // 현재 세션 가져오기
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      handleUser(session?.user ?? null);
+    const initializeAuth = async () => {
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        const message = String(error.message || '');
+        const isInvalidRefreshToken =
+          message.includes('Invalid Refresh Token') || message.includes('Refresh Token Not Found');
+
+        if (isInvalidRefreshToken) {
+          // Stale local session: clear and continue as logged-out user.
+          await supabase.auth.signOut({ scope: 'local' });
+          handleUser(null);
+          setLoading(false);
+          return;
+        }
+
+        console.error('Failed to initialize auth session:', error);
+        handleUser(null);
+        setLoading(false);
+        return;
+      }
+
+      handleUser(data.session?.user ?? null);
       setLoading(false);
-    });
+    };
+
+    initializeAuth();
 
     // 상태 변경 감시
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {

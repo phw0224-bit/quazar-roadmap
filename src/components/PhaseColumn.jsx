@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -8,35 +8,60 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import KanbanCard from './KanbanCard';
 
-const colorThemeMap = {
-  blue: { bg: 'bg-[#f0f7ff]', border: 'border-[#bcd9ff]', accent: 'text-[#1a73e8]', headerBg: 'border-t-[#1a73e8]' },
-  green: { bg: 'bg-[#f0fff4]', border: 'border-[#c6f6d5]', accent: 'text-[#2f855a]', headerBg: 'border-t-[#2f855a]' },
-  purple: { bg: 'bg-[#faf5ff]', border: 'border-[#e9d8fd]', accent: 'text-[#6b46c1]', headerBg: 'border-t-[#6b46c1]' },
-  gold: { bg: 'bg-[#fffaf0]', border: 'border-[#feebc8]', accent: 'text-[#c05621]', headerBg: 'border-t-[#c05621]' },
-  pink: { bg: 'bg-[#fff5f7]', border: 'border-[#fed7e2]', accent: 'text-[#b83280]', headerBg: 'border-t-[#b83280]' },
-  rose: { bg: 'bg-[#fff1f2]', border: 'border-[#fecdd3]', accent: 'text-[#e11d48]', headerBg: 'border-t-[#e11d48]' },
-  emerald: { bg: 'bg-[#ecfdf5]', border: 'border-[#a7f3d0]', accent: 'text-[#059669]', headerBg: 'border-t-[#059669]' },
-  indigo: { bg: 'bg-[#eef2ff]', border: 'border-[#c7d2fe]', accent: 'text-[#4f46e5]', headerBg: 'border-t-[#4f46e5]' },
-  teal: { bg: 'bg-[#f0fdfa]', border: 'border-[#99f6e4]', accent: 'text-[#0d9488]', headerBg: 'border-t-[#0d9488]' },
-};
-
 const TEAM_COLORS = {
-  '감정팀': 'bg-[#ffcc00] text-black',
+  '감정팀': 'bg-slate-200 text-slate-800',
   '개발팀': 'bg-[#e2e8f0] text-gray-700',
   'AI팀': 'bg-[#c6f6d5] text-green-800',
   '기획팀': 'bg-[#e9d8fd] text-purple-800',
   '지원팀': 'bg-[#fed7e2] text-pink-800',
 };
 
-const TEAMS = ['감정팀', '개발팀', 'AI팀', '기획팀', '지원팀'];
+const PHASE_TINTS = [
+  {
+    column: 'bg-sky-50/45 dark:bg-[#202b35]/72 border-sky-100/80 dark:border-[#30404f]',
+    header: 'bg-sky-100/55 dark:bg-[#293847]/82',
+    headerHover: 'hover:bg-sky-100/75 dark:hover:bg-[#324557]',
+    body: 'bg-sky-50/25 dark:bg-[#1d2730]/58',
+  },
+  {
+    column: 'bg-violet-50/45 dark:bg-[#2a2435]/72 border-violet-100/80 dark:border-[#403751]',
+    header: 'bg-violet-100/55 dark:bg-[#332c43]/82',
+    headerHover: 'hover:bg-violet-100/75 dark:hover:bg-[#3d3550]',
+    body: 'bg-violet-50/25 dark:bg-[#241f2f]/58',
+  },
+  {
+    column: 'bg-emerald-50/45 dark:bg-[#1f2f2a]/72 border-emerald-100/80 dark:border-[#32453f]',
+    header: 'bg-emerald-100/55 dark:bg-[#2a3d36]/82',
+    headerHover: 'hover:bg-emerald-100/75 dark:hover:bg-[#33493f]',
+    body: 'bg-emerald-50/25 dark:bg-[#1c2924]/58',
+  },
+  {
+    column: 'bg-slate-50/45 dark:bg-[#252a2f]/72 border-slate-100/80 dark:border-[#3a414a]',
+    header: 'bg-slate-100/55 dark:bg-[#2f3640]/82',
+    headerHover: 'hover:bg-slate-100/75 dark:hover:bg-[#38424e]',
+    body: 'bg-slate-50/25 dark:bg-[#20262e]/58',
+  },
+];
+
+function getPhaseTint(phaseId, phaseIndex) {
+  if (Number.isInteger(phaseIndex)) {
+    return PHASE_TINTS[Math.abs(phaseIndex) % PHASE_TINTS.length];
+  }
+
+  const hash = String(phaseId || '')
+    .split('')
+    .reduce((acc, char) => acc + char.charCodeAt(0), 0);
+
+  return PHASE_TINTS[hash % PHASE_TINTS.length];
+}
 
 export default function PhaseColumn({
   phase, phaseIndex, selectedTeam, selectedTag, selectedStatus, isDragging: isDraggingProp = false,
   onAddItem, onUpdateItem, onDeleteItem, onUpdatePhase, onDeletePhase,
   onAddComment, onUpdateComment, onDeleteComment,
+  onOpenDetail, onShowConfirm, onShowToast,
   isReadOnly = false,
 }) {
-  const theme = colorThemeMap[phase.color] || colorThemeMap.blue;
   const { setNodeRef: setDroppableRef } = useDroppable({ id: phase.id });
   const { attributes, listeners, setNodeRef: setSortableRef, transform, transition, isDragging: isSortableDragging } = useSortable({
     id: phase.id, data: { type: 'Phase', phase },
@@ -44,117 +69,211 @@ export default function PhaseColumn({
   });
 
   const isDragging = isDraggingProp || isSortableDragging;
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.6 : 1 };
+  const style = { 
+    transform: CSS.Transform.toString(transform), 
+    transition, 
+    opacity: isDragging ? 0.3 : 1,
+    zIndex: isDragging ? 100 : 1,
+  };
   const setNodeRef = (node) => { setDroppableRef(node); setSortableRef(node); };
 
   const [showAddItem, setShowAddItem] = useState(false);
   const [newItemTitle, setNewItemTitle] = useState('');
-  const [newItemContent, setNewItemContent] = useState('');
   const [showEditPhase, setShowEditPhase] = useState(false);
-  const [editedPhase, setEditedPhase] = useState({ title: phase.title, color: phase.color || 'blue', assignees: phase.assignees || [], teams: phase.teams || [] });
+  const [editedPhase, setEditedPhase] = useState({ title: phase.title });
+  const [isEditingAssignees, setIsEditingAssignees] = useState(false);
   const [assigneeInput, setAssigneeInput] = useState((phase.assignees || []).join(', '));
+
+  useEffect(() => {
+    setEditedPhase({ title: phase.title });
+    setAssigneeInput((phase.assignees || []).join(', '));
+    setIsEditingAssignees(false);
+  }, [phase.id, phase.title, phase.assignees]);
+
+  const handleSaveAssignees = async () => {
+    const updated = assigneeInput.split(',').map((s) => s.trim()).filter((s) => s !== '');
+    await onUpdatePhase(phase.id, { assignees: updated });
+    setIsEditingAssignees(false);
+    onShowToast?.('페이즈 담당자가 업데이트되었습니다.');
+  };
 
   // 필터링 강조 로직
   const isTeamMatch = selectedTeam && (phase.teams || []).includes(selectedTeam);
   const isTagMatch = selectedTag && phase.items.some(item => (item.tags || []).includes(selectedTag));
   const isHighlighted = isTeamMatch || isTagMatch;
-
-  const handleUpdatePhase = async () => {
-    const updatedAssignees = assigneeInput.split(',').map(s => s.trim()).filter(s => s !== '');
-    await onUpdatePhase(phase.id, { ...editedPhase, assignees: updatedAssignees });
-    setShowEditPhase(false);
-  };
-
-  const handleToggleTeam = (teamName) => {
-    const newTeams = editedPhase.teams.includes(teamName) ? editedPhase.teams.filter(t => t !== teamName) : [...editedPhase.teams, teamName];
-    setEditedPhase({ ...editedPhase, teams: newTeams });
-  };
+  const phaseTint = getPhaseTint(phase.id, phaseIndex);
 
   const stopProp = (e) => e.stopPropagation();
 
   return (
     <div 
+      id={`phase-${phase.id}`}
       ref={setNodeRef} style={style}
-      className={`flex flex-col min-w-[320px] max-w-[320px] rounded-t-lg transition-all border-x border-b ${theme.bg} ${theme.border} 
-      ${isHighlighted ? 'ring-4 ring-brand-gold shadow-[0_20px_50px_rgba(197,160,89,0.3)] z-10 scale-[1.02] !border-brand-gold' : 'shadow-sm'} 
-      ${isDragging ? 'z-50 shadow-2xl scale-105' : ''}`}
+      className={`flex flex-col min-w-[320px] max-w-[320px] h-full transition-all rounded-2xl border ${phaseTint.column}
+      ${isHighlighted ? 'ring-2 ring-blue-500/35' : ''}
+      ${isDragging ? 'shadow-2xl ring-2 ring-blue-500 border-blue-500 bg-white dark:bg-[#252525] rotate-1 scale-[1.02]' : ''}`}
     >
-      <div {...attributes} {...listeners} className={`p-4 mb-2 border-t-4 ${theme.headerBg} group ${isReadOnly ? '' : 'cursor-grab active:cursor-grabbing'} relative`}>
-        {!showEditPhase ? (
-          <div className="flex flex-col gap-2">
-            <div className="flex justify-between items-start">
-              <span className={`text-[10px] font-bold uppercase tracking-tighter ${theme.accent}`}>PHASE {phaseIndex.toString().padStart(2, '0')}</span>
-              <div className="flex flex-wrap gap-1 justify-end max-w-[70%]">
-                {(phase.teams || []).map(team => <span key={team} className={`px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm ${TEAM_COLORS[team]}`}>{team}</span>)}
-                {(phase.assignees || []).map(person => <span key={person} className="bg-[#f3e8ff] text-purple-900 px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm">👤 {person}</span>)}
-              </div>
-            </div>
-            <div className="flex justify-between items-center group/title">
-              <h2 className={`text-[15px] font-extrabold leading-tight transition-colors ${isHighlighted ? 'text-brand-gold' : 'text-gray-900'}`}>{phase.title}</h2>
-              {!isReadOnly && (
-                <div className="flex gap-1 opacity-0 group-hover/title:opacity-100" onPointerDown={stopProp}>
-                  <button className="text-[9px] text-gray-400 hover:text-brand-gold font-bold cursor-pointer" onClick={(e) => { e.stopPropagation(); setShowEditPhase(true); }}>Edit</button>
-                  <button className="text-[9px] text-gray-400 hover:text-red-500 font-bold cursor-pointer" onClick={(e) => { e.stopPropagation(); if (window.confirm('Delete?')) onDeletePhase(phase.id); }}>Del</button>
-                </div>
-              )}
-            </div>
-            <div className={`text-[10px] font-bold ${theme.accent}`}>{phase.items.length} 단계</div>
+      {/* Column Header */}
+      <div
+        {...attributes}
+        {...listeners}
+        className={`group p-4 flex flex-col gap-2 rounded-t-2xl border-b border-white/45 dark:border-[#3a3a3a] ${phaseTint.header} backdrop-blur-sm ${
+          isReadOnly ? '' : `cursor-grab active:cursor-grabbing transition-colors ${phaseTint.headerHover}`
+        }`}
+      >
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-3 overflow-hidden">
+            {!showEditPhase ? (
+              <h2 className="text-[15px] font-black text-gray-900 dark:text-[#F1F1F1] truncate uppercase tracking-tight">
+                {phase.title}
+              </h2>
+            ) : (
+              <input 
+                autoFocus
+                className="text-[15px] font-black text-gray-900 dark:text-[#F5F5F5] bg-gray-100 dark:bg-[#353535] border-none rounded px-1 focus:ring-0 w-full p-0"
+                value={editedPhase.title}
+                onChange={e => setEditedPhase({title: e.target.value})}
+                onBlur={() => { onUpdatePhase(phase.id, editedPhase); setShowEditPhase(false); }}
+                onKeyDown={e => e.key === 'Enter' && (onUpdatePhase(phase.id, editedPhase) || setShowEditPhase(false))}
+              />
+            )}
+            <span className="px-2 py-0.5 bg-gray-200 dark:bg-[#3a3a3a] text-[11px] font-black text-gray-700 dark:text-[#D2D2D2] rounded-full shrink-0 leading-none">
+              {phase.items.length}
+            </span>
           </div>
-        ) : (
-          <div className="flex flex-col gap-2 py-1" onPointerDown={stopProp}>
-            <input type="text" className="w-full p-1.5 border border-brand-gold rounded text-xs focus:outline-none" value={editedPhase.title} onChange={e => setEditedPhase({...editedPhase, title: e.target.value})} placeholder="Title" />
-            <input type="text" className="w-full p-1.5 border border-gray-200 rounded text-xs focus:outline-none" value={assigneeInput} onChange={e => setAssigneeInput(e.target.value)} placeholder="Assignees" />
-            <div className="flex flex-wrap gap-1">
-              {TEAMS.map(t => <button key={t} onClick={() => handleToggleTeam(t)} className={`px-2 py-0.5 rounded text-[9px] font-bold transition-all ${editedPhase.teams.includes(t) ? TEAM_COLORS[t] : 'bg-gray-100 text-gray-400'}`}>{t}</button>)}
-            </div>
-            {/* Color Picker */}
-            <div className="flex flex-wrap gap-1.5 mt-1">
-              {Object.keys(colorThemeMap).map(c => (
+
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={stopProp} onPointerDown={stopProp}>
+            {!isReadOnly && (
+              <>
                 <button 
-                  key={c} 
-                  onClick={() => setEditedPhase({...editedPhase, color: c})}
-                  className={`w-4 h-4 rounded-full border ${editedPhase.color === c ? 'ring-2 ring-offset-1 ring-gray-400' : 'border-gray-200'} ${colorThemeMap[c].bg.replace('bg-', 'bg')}`}
-                  style={{ backgroundColor: colorThemeMap[c].accent.match(/\[(.*?)\]/)?.[1] }}
-                />
-              ))}
-            </div>
-            <div className="flex gap-1">
-              <button onClick={handleUpdatePhase} className="flex-1 py-1 bg-brand-gold text-white rounded text-[10px] font-bold cursor-pointer">SAVE</button>
-              <button onClick={() => setShowEditPhase(false)} className="flex-1 py-1 bg-gray-200 text-gray-600 rounded text-[10px] font-bold cursor-pointer">CANCEL</button>
-            </div>
+                  className="p-1 hover:bg-gray-100 dark:hover:bg-[#3a3a3a] rounded text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 cursor-pointer" 
+                  onClick={() => setShowEditPhase(true)}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 5v14M5 12h14"/></svg>
+                </button>
+                <button 
+                  className="p-1 hover:bg-gray-100 dark:hover:bg-[#3a3a3a] rounded text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 cursor-pointer" 
+                  onClick={() => onShowConfirm?.('단계 삭제', `${phase.title} 단계를 삭제할까요? 관련 아이템도 모두 삭제됩니다.`, () => {
+                    onDeletePhase(phase.id);
+                    onShowToast?.(`${phase.title} 단계가 삭제되었습니다.`);
+                  })}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+              </>
+            )}
           </div>
-        )}
+        </div>
+
+        <div className="px-1" onClick={stopProp} onPointerDown={stopProp}>
+          <div
+            className={`flex items-center gap-2 min-h-[30px] px-2 py-1 rounded-lg border border-gray-100 dark:border-[#363636] bg-gray-50/80 dark:bg-[#262626]/90 transition-colors ${
+              !isReadOnly ? 'hover:bg-gray-100 dark:hover:bg-[#323232] cursor-pointer' : ''
+            } ${isEditingAssignees ? 'bg-gray-100 dark:bg-[#353535]' : ''}`}
+            onClick={() => !isReadOnly && setIsEditingAssignees(true)}
+          >
+            <span className="text-[11px] font-black text-gray-600 dark:text-[#BCBCBC] shrink-0">담당</span>
+            {!isEditingAssignees ? (
+              <div className="flex flex-wrap gap-1.5">
+                {(phase.assignees || []).length > 0 ? (
+                  (phase.assignees || []).map((assignee) => (
+                    <span
+                      key={assignee}
+                      className="px-2 py-0.5 rounded-full text-[11px] font-black bg-gray-200 dark:bg-[#414141] text-gray-800 dark:text-[#F0F0F0]"
+                    >
+                      @{assignee}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-[11px] font-bold text-gray-500 dark:text-[#9D9D9D]">비어 있음</span>
+                )}
+              </div>
+            ) : (
+              <input
+                autoFocus
+                className="w-full bg-transparent border-none p-0 text-[12px] font-bold text-gray-800 dark:text-[#EFEFEF] placeholder:text-gray-400 dark:placeholder:text-[#989898] focus:ring-0 outline-none"
+                placeholder="이름 입력 (쉼표로 구분)..."
+                value={assigneeInput}
+                onChange={(e) => setAssigneeInput(e.target.value)}
+                onBlur={handleSaveAssignees}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveAssignees();
+                  if (e.key === 'Escape') {
+                    setAssigneeInput((phase.assignees || []).join(', '));
+                    setIsEditingAssignees(false);
+                  }
+                }}
+              />
+            )}
+          </div>
+        </div>
       </div>
 
-      <SortableContext items={phase.items.map(i => i.id)} strategy={verticalListSortingStrategy} disabled={isReadOnly}>
-        <div ref={setNodeRef} className="flex-1 flex flex-col gap-1.5 p-3 min-h-[100px]">
+      {/* Cards Area */}
+      <div className={`flex-1 flex flex-col gap-3 p-2 min-h-[50px] overflow-y-auto no-scrollbar pb-10 rounded-b-2xl ${phaseTint.body}`}>
+        <SortableContext items={phase.items.map(i => i.id)} strategy={verticalListSortingStrategy} disabled={isReadOnly}>
           {phase.items.map((item, idx) => (
             <KanbanCard
-              key={item.id} item={item} itemIndex={idx + 1} phaseId={phase.id} accentColor={theme.accent}
+              key={item.id} item={item} itemIndex={idx + 1} phaseId={phase.id}
               selectedTeam={selectedTeam} selectedTag={selectedTag} selectedStatus={selectedStatus}
-              onUpdateItem={onUpdateItem} onDeleteItem={onDeleteItem} onAddComment={onAddComment} onUpdateComment={onUpdateComment} onDeleteComment={onDeleteComment}
+              onUpdateItem={onUpdateItem} onDeleteItem={onDeleteItem}
+              onOpenDetail={onOpenDetail}
+              onShowConfirm={onShowConfirm}
+              onShowToast={onShowToast}
               isReadOnly={isReadOnly}
             />
           ))}
-        </div>
-      </SortableContext>
+        </SortableContext>
 
-      {!isReadOnly && (
-        <div className="p-3 pt-1">
-          {!showAddItem ? (
-            <button className="w-full py-2 text-[10px] text-gray-400 font-bold uppercase tracking-widest hover:text-brand-gold transition-colors text-center border border-dashed border-transparent hover:border-gray-300 rounded cursor-pointer" onClick={() => setShowAddItem(true)}>+ Add Step</button>
-          ) : (
-            <div className="flex flex-col gap-2 bg-white p-3 rounded shadow-lg border border-gray-100" onPointerDown={e => e.stopPropagation()}>
-              <input type="text" placeholder="Step title..." className="w-full p-2 border border-gray-200 rounded text-xs font-bold focus:outline-none" value={newItemTitle} onChange={e => setNewItemTitle(e.target.value)} autoFocus />
-              <textarea placeholder="Step content..." className="w-full p-2 border border-gray-200 rounded text-xs focus:outline-none min-h-[50px]" value={newItemContent} onChange={e => setNewItemContent(e.target.value)} />
-              <div className="flex gap-1.5">
-                <button onClick={async () => { if(newItemTitle.trim()) { await onAddItem(phase.id, newItemTitle, newItemContent); setNewItemTitle(''); setNewItemContent(''); setShowAddItem(false); } }} className="flex-1 py-1.5 bg-brand-gold text-white rounded text-[10px] font-bold cursor-pointer">ADD</button>
-                <button onClick={() => setShowAddItem(false)} className="flex-1 py-1.5 bg-gray-100 text-gray-400 rounded text-[10px] font-bold cursor-pointer">CANCEL</button>
+        {!isReadOnly && (
+          <div className="mt-1" onPointerDown={stopProp}>
+            {!showAddItem ? (
+              <button 
+                className="w-full py-2 flex items-center gap-2 text-[13px] text-gray-400 dark:text-gray-500 font-bold hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors px-2 cursor-pointer"
+                onClick={() => setShowAddItem(true)}
+              >
+                <span className="text-lg">+</span> New
+              </button>
+            ) : (
+              <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#2f2f2f] rounded-xl shadow-xl p-4 flex flex-col gap-3 animate-in fade-in zoom-in duration-200">
+                <input 
+                  autoFocus
+                  placeholder="제목 입력..." 
+                  className="w-full text-[14px] font-bold text-gray-800 dark:text-gray-200 border-none bg-transparent focus:ring-0 p-0"
+                  value={newItemTitle} 
+                  onChange={e => setNewItemTitle(e.target.value)} 
+                  onKeyDown={async e => {
+                    if (e.key === 'Enter' && newItemTitle.trim()) {
+                      await onAddItem(phase.id, newItemTitle);
+                      setNewItemTitle('');
+                      setShowAddItem(false);
+                      onShowToast?.('업무가 추가되었습니다.');
+                    } else if (e.key === 'Escape') {
+                      setShowAddItem(false);
+                    }
+                  }}
+                />
+                <div className="flex justify-end gap-2 border-t border-gray-50 dark:border-gray-800 pt-2">
+                  <button className="px-2 py-1 text-[11px] font-black text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer" onClick={() => setShowAddItem(false)}>취소</button>
+                  <button 
+                    className="px-3 py-1 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg text-[11px] font-black hover:bg-black dark:hover:bg-gray-200 transition-colors cursor-pointer"
+                    onClick={async () => {
+                      if (newItemTitle.trim()) {
+                        await onAddItem(phase.id, newItemTitle);
+                        setNewItemTitle('');
+                        setShowAddItem(false);
+                        onShowToast?.('업무가 추가되었습니다.');
+                      }
+                    }}
+                  >
+                    추가
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

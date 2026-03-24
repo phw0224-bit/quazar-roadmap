@@ -11,7 +11,7 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#fcfbf7] flex items-center justify-center font-serif text-[#c5a059] tracking-widest uppercase">
+      <div className="min-h-screen bg-[#191919] flex items-center justify-center font-serif text-gray-300 tracking-widest uppercase">
         Verifying Session...
       </div>
     );
