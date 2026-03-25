@@ -87,7 +87,7 @@ const kanbanReducer = (state, action) => {
           }
           if (p.id === targetPhaseId) {
             const newItems = [...p.items];
-            newItems.splice(targetIndex, 0, { ...movingItem, phase_id: targetPhaseId });
+            newItems.splice(targetIndex, 0, { ...movingItem, project_id: targetPhaseId });
             return { ...p, items: newItems.map((item, idx) => ({ ...item, order_index: idx })) };
           }
           return p;
@@ -183,8 +183,8 @@ export const useKanbanData = () => {
       })
       .subscribe();
 
-    const phasesChannel = supabase.channel('phases-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'phases' }, () => fetchData())
+    const phasesChannel = supabase.channel('projects-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => fetchData())
       .subscribe();
 
     return () => {

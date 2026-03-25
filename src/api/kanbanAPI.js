@@ -4,12 +4,12 @@ const normalizeNameKey = (value) => (value || '').trim().toLowerCase();
 
 const supabaseAPI = {
   getBoardData: async () => {
-    // 1. 페이즈 가져오기
-    const { data: phases, error: pError } = await supabase
-      .from('phases')
+    // 1. 프로젝트 가져오기
+    const { data: projects, error: pError } = await supabase
+      .from('projects')
       .select('*')
       .order('order_index', { ascending: true });
-    
+
     if (pError) throw pError;
 
     // 2. 아이템과 댓글(작성자 이름 포함) 가져오기
@@ -27,11 +27,11 @@ const supabaseAPI = {
     if (iError) throw iError;
 
     // 3. 트리 구조로 조립
-    const formattedPhases = phases.map(phase => ({
-      ...phase,
-      assignees: Array.isArray(phase.assignees) ? phase.assignees : [],
+    const formattedProjects = projects.map(project => ({
+      ...project,
+      assignees: Array.isArray(project.assignees) ? project.assignees : [],
       items: items
-        .filter(item => item.phase_id === phase.id)
+        .filter(item => item.project_id === project.id)
         .sort((a, b) => a.order_index - b.order_index)
         .map(item => ({
           ...item,
@@ -40,7 +40,7 @@ const supabaseAPI = {
         }))
     }));
 
-    return { phases: formattedPhases };
+    return { phases: formattedProjects };
   },
 
   getPeopleData: async () => {
@@ -51,20 +51,20 @@ const supabaseAPI = {
 
     if (profileError) throw profileError;
 
-    const { data: phases, error: phaseError } = await supabase
-      .from('phases')
+    const { data: projects, error: projectError } = await supabase
+      .from('projects')
       .select('id, title, board_type');
 
-    if (phaseError) throw phaseError;
+    if (projectError) throw projectError;
 
     const { data: items, error: itemError } = await supabase
       .from('items')
-      .select('id, title, status, assignees, phase_id')
+      .select('id, title, status, assignees, project_id')
       .order('order_index', { ascending: true });
 
     if (itemError) throw itemError;
 
-    const phaseMap = new Map((phases || []).map((phase) => [phase.id, phase]));
+    const phaseMap = new Map((projects || []).map((project) => [project.id, project]));
     const membersByName = new Map();
     const teamsByName = new Map();
     const unassignedTeamName = '미분류';
@@ -98,14 +98,14 @@ const supabaseAPI = {
       const assignees = Array.isArray(item.assignees) ? item.assignees : [];
       if (assignees.length === 0) return;
 
-      const phase = phaseMap.get(item.phase_id);
+      const project = phaseMap.get(item.project_id);
       const task = {
         id: item.id,
         title: item.title || '제목 없음',
         status: item.status || 'none',
-        phaseId: item.phase_id,
-        phaseTitle: phase?.title || '미지정 단계',
-        boardType: phase?.board_type || 'main',
+        projectId: item.project_id,
+        projectTitle: project?.title || '미지정 프로젝트',
+        boardType: project?.board_type || 'main',
       };
 
       assignees.forEach((assigneeName) => {
@@ -152,42 +152,42 @@ const supabaseAPI = {
   },
 
   addPhase: async (title, boardType = 'main') => {
-    const { data: existingPhases } = await supabase.from('phases').select('order_index').order('order_index', { ascending: false }).limit(1);
-    const nextOrder = existingPhases?.[0] ? existingPhases[0].order_index + 1 : 0;
+    const { data: existingProjects } = await supabase.from('projects').select('order_index').order('order_index', { ascending: false }).limit(1);
+    const nextOrder = existingProjects?.[0] ? existingProjects[0].order_index + 1 : 0;
 
     const { data, error } = await supabase
-      .from('phases')
+      .from('projects')
       .insert([{ title, order_index: nextOrder, board_type: boardType, assignees: [] }])
       .select();
-    
+
     if (error) throw error;
     return data[0];
   },
 
   updatePhase: async (phaseId, updates) => {
     const { data, error } = await supabase
-      .from('phases')
+      .from('projects')
       .update(updates)
       .eq('id', phaseId)
       .select();
-    
+
     if (error) throw error;
     return data[0];
   },
 
   deletePhase: async (phaseId) => {
-    const { error } = await supabase.from('phases').delete().eq('id', phaseId);
+    const { error } = await supabase.from('projects').delete().eq('id', phaseId);
     if (error) throw error;
   },
 
   movePhase: async (phaseId, targetIndex) => {
-    const { data: phases } = await supabase.from('phases').select('id, order_index').order('order_index', { ascending: true });
-    const movingPhaseIdx = phases.findIndex(p => p.id === phaseId);
-    const [movingPhase] = phases.splice(movingPhaseIdx, 1);
-    phases.splice(targetIndex, 0, movingPhase);
+    const { data: projects } = await supabase.from('projects').select('id, order_index').order('order_index', { ascending: true });
+    const movingProjectIdx = projects.findIndex(p => p.id === phaseId);
+    const [movingProject] = projects.splice(movingProjectIdx, 1);
+    projects.splice(targetIndex, 0, movingProject);
 
-    const updatePromises = phases.map((p, idx) => 
-      supabase.from('phases').update({ order_index: idx }).eq('id', p.id)
+    const updatePromises = projects.map((p, idx) =>
+      supabase.from('projects').update({ order_index: idx }).eq('id', p.id)
     );
     const results = await Promise.all(updatePromises);
     const errors = results.filter(r => r.error);
@@ -195,14 +195,14 @@ const supabaseAPI = {
   },
 
   addItem: async (phaseId, title, content = '') => {
-    const { data: existingItems } = await supabase.from('items').select('order_index').eq('phase_id', phaseId).order('order_index', { ascending: false }).limit(1);
+    const { data: existingItems } = await supabase.from('items').select('order_index').eq('project_id', phaseId).order('order_index', { ascending: false }).limit(1);
     const nextOrder = existingItems?.[0] ? existingItems[0].order_index + 1 : 0;
 
     const { data, error } = await supabase
       .from('items')
-      .insert([{ 
-        phase_id: phaseId, 
-        title, 
+      .insert([{
+        project_id: phaseId,
+        title,
         content,
         order_index: nextOrder,
         status: 'none',
@@ -212,7 +212,7 @@ const supabaseAPI = {
         related_items: []
       }])
       .select();
-    
+
     if (error) throw error;
     return data[0];
   },
@@ -237,7 +237,7 @@ const supabaseAPI = {
     const { data: targetItems } = await supabase
       .from('items')
       .select('id, order_index')
-      .eq('phase_id', targetPhaseId)
+      .eq('project_id', targetPhaseId)
       .order('order_index', { ascending: true });
 
     const movingItemIdx = targetItems.findIndex(i => i.id === itemId);
@@ -250,9 +250,9 @@ const supabaseAPI = {
       newItems.splice(targetIndex, 0, { id: itemId });
     }
 
-    const updatePromises = newItems.map((item, idx) => 
+    const updatePromises = newItems.map((item, idx) =>
       supabase.from('items').update({
-        phase_id: targetPhaseId,
+        project_id: targetPhaseId,
         order_index: idx
       }).eq('id', item.id)
     );

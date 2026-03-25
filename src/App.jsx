@@ -3,7 +3,6 @@ import { useAuth } from './hooks/useAuth';
 import KanbanBoard from './components/KanbanBoard';
 import LoginForm from './components/Auth/LoginForm';
 import SetupProfileForm from './components/Auth/SetupProfileForm';
-import './App.css';
 
 function App() {
   const { user, loading, needsPasswordSetup, login, updateProfileAndStep } = useAuth();
@@ -11,8 +10,11 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#191919] flex items-center justify-center font-serif text-gray-300 tracking-widest uppercase">
-        Verifying Session...
+      <div className="min-h-screen bg-white dark:bg-bg-base flex items-center justify-center font-sans">
+        <div className="flex flex-col items-center gap-4 animate-fade-in">
+          <div className="w-12 h-12 border-4 border-gray-100 dark:border-border-subtle border-t-gray-900 dark:border-t-white rounded-full animate-spin"></div>
+          <span className="text-label text-gray-400 dark:text-text-secondary tracking-[0.2em]">세션 확인 중...</span>
+        </div>
       </div>
     );
   }
@@ -28,9 +30,9 @@ function App() {
       <div className="relative">
         <button 
           onClick={() => setShowLogin(false)}
-          className="absolute top-8 left-8 z-50 px-4 py-2 bg-white border border-gray-200 rounded-lg text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-gray-800 transition-all shadow-sm cursor-pointer"
+          className="absolute top-8 left-8 z-50 px-5 py-2.5 bg-white dark:bg-bg-elevated border border-gray-200 dark:border-border-subtle rounded-xl text-sm font-bold uppercase tracking-widest text-gray-500 dark:text-text-secondary hover:text-gray-900 dark:hover:text-text-primary hover:border-gray-400 dark:hover:border-border-strong transition-all shadow-sm cursor-pointer"
         >
-          ← Back to Board
+          ← 보드로 돌아가기
         </button>
         <LoginForm onLogin={async (email, password) => {
           await login(email, password);

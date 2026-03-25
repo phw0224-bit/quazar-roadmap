@@ -24,7 +24,6 @@ export const useAuth = () => {
           return;
         }
 
-        console.error('Failed to initialize auth session:', error);
         handleUser(null);
         setLoading(false);
         return;
