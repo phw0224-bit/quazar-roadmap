@@ -23,12 +23,13 @@ const kanbanReducer = (state, action) => {
       };
     case 'DELETE_PHASE':
       return { ...state, phases: state.phases.filter(p => p.id !== action.payload) };
-    case 'MOVE_PHASE':
+    case 'MOVE_PHASE': {
       const newPhases = [...state.phases];
       const movingIdx = newPhases.findIndex(p => p.id === action.payload.phaseId);
       const [movingPhase] = newPhases.splice(movingIdx, 1);
       newPhases.splice(action.payload.targetIndex, 0, movingPhase);
       return { ...state, phases: newPhases };
+    }
     case 'ADD_ITEM':
       return {
         ...state,
@@ -56,9 +57,9 @@ const kanbanReducer = (state, action) => {
             : p
         )
       };
-    case 'MOVE_ITEM':
+    case 'MOVE_ITEM': {
       const { sourcePhaseId, targetPhaseId, itemId, targetIndex } = action.payload;
-      
+
       const sourcePhase = state.phases.find(p => p.id === sourcePhaseId);
       const movingItem = sourcePhase.items.find(i => i.id === itemId);
       if (!movingItem) return state;
@@ -93,7 +94,7 @@ const kanbanReducer = (state, action) => {
           return p;
         })
       };
-    
+    }
     case 'ADD_COMMENT':
       return {
         ...state,

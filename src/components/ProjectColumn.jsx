@@ -25,7 +25,6 @@ function getProjectTint(projectId, projectIndex) {
 export default function ProjectColumn({
   phase: project, phaseIndex: projectIndex, selectedTeam, selectedTag, selectedStatus, isDragging: isDraggingProp = false,
   onAddItem, onUpdateItem, onDeleteItem, onUpdatePhase: onUpdateProject, onDeletePhase: onDeleteProject,
-  onAddComment, onUpdateComment, onDeleteComment,
   onOpenDetail, onShowConfirm, onShowToast,
   isReadOnly = false,
 }) {
@@ -54,8 +53,10 @@ export default function ProjectColumn({
   const [assigneeInput, setAssigneeInput] = useState((project.assignees || []).join(', '));
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     setEditedProject({ title: project.title });
     setAssigneeInput((project.assignees || []).join(', '));
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [project.id, project.title, project.assignees]);
 
   const handleSaveTitle = async () => {

@@ -1,12 +1,11 @@
-import { useState, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { 
-  X, Maximize2, Minimize2, ChevronRight, CheckCircle2, 
-  Circle, Clock, Users, Building2, Tag, Link2, FileText, 
-  MessageSquare, Edit3, Save, Search, ExternalLink, ArrowUpRight
+import { useState, useEffect, useRef } from 'react';
+import {
+  ChevronsRight, Maximize2, Minimize2, ChevronRight, CheckCircle2,
+  Clock, Users, Building2, Tag, Link2, FileText, Plus, X,
+  MessageSquare, Search, ArrowUpRight, AlignCenter, AlignJustify
 } from 'lucide-react';
 import CommentSection from './CommentSection';
+import TiptapEditor from './TiptapEditor';
 import { TEAMS, STATUS_MAP } from '../lib/constants';
 
 function ItemDetailPanel({ 
@@ -16,6 +15,7 @@ function ItemDetailPanel({
   onAddComment, onUpdateComment, onDeleteComment, onOpenDetail,
   onShowConfirm, onShowToast
 }) {
+  const stopProp = (e) => e.stopPropagation();
   const [description, setDescription] = useState(item?.description || '');
   const [isEditingAssignees, setIsEditingAssignees] = useState(false);
   const [assigneeInput, setAssigneeInput] = useState((item?.assignees || []).join(', '));
@@ -26,8 +26,11 @@ function ItemDetailPanel({
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(item?.title || item?.content || '');
   const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [isWideView, setIsWideView] = useState(false);
+  const isCancellingDescriptionRef = useRef(false);
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     setDescription(item?.description || '');
     setAssigneeInput((item?.assignees || []).join(', '));
     setTitleInput(item?.title || item?.content || '');
@@ -35,14 +38,23 @@ function ItemDetailPanel({
     setRelationSearchQuery('');
     setIsEditingTitle(false);
     setIsEditingDescription(false);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [item]);
 
   const handleSaveDescription = async () => {
     if (description !== (item.description || '')) {
       await onUpdateItem(phase.id, item.id, { description });
+      onShowToast?.('상세 설명이 저장되었습니다.');
     }
     setIsEditingDescription(false);
   };
+
+  const handleDescriptionBlur = () => {
+    if (isCancellingDescriptionRef.current) return;
+    handleSaveDescription();
+  };
+
+
 
   const handleSaveAssignees = async () => {
     const updated = assigneeInput.split(',').map(s => s.trim()).filter(s => s !== '');
@@ -121,13 +133,13 @@ function ItemDetailPanel({
   if (!item) return null;
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-bg-base relative animate-slide-in shadow-2xl transition-colors duration-200 ease-notion">
+    <div className="flex flex-col h-full bg-white dark:bg-bg-base relative animate-slide-in">
       {/* Top Header */}
       <div className="px-8 py-4 flex justify-between items-start gap-4 bg-white/80 dark:bg-bg-base/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-border-subtle">
         <div className="flex items-start gap-4 min-w-0">
           <div className="flex items-center gap-1.5">
             <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-bg-hover rounded-xl text-gray-400 hover:text-gray-900 dark:hover:text-text-primary transition-all duration-200 cursor-pointer">
-              <X size={20} strokeWidth={2.5} />
+              <ChevronsRight size={20} strokeWidth={2.5} />
             </button>
             <button
               onClick={onToggleFullscreen}
@@ -136,6 +148,13 @@ function ItemDetailPanel({
               title={isFullscreen ? '창 모드로 전환' : '전체 화면으로 전환'}
             >
               {isFullscreen ? <Minimize2 size={20} strokeWidth={2.5} /> : <Maximize2 size={20} strokeWidth={2.5} />}
+            </button>
+            <button
+              onClick={() => setIsWideView(v => !v)}
+              className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${isWideView ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
+              title={isWideView ? '기본 너비로 보기' : '넓게 보기'}
+            >
+              {isWideView ? <AlignCenter size={20} strokeWidth={2.5} /> : <AlignJustify size={20} strokeWidth={2.5} />}
             </button>
           </div>
 
@@ -177,29 +196,20 @@ function ItemDetailPanel({
             <button
               onClick={handleQuickToggleDone}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-md hover:shadow-lg active:scale-95 border ${
-                item.status === 'done' 
-                  ? 'bg-emerald-500 border-emerald-600 text-white hover:bg-emerald-600' 
+                item.status === 'done'
+                  ? 'bg-emerald-500 border-emerald-600 text-white hover:bg-emerald-600'
                   : 'bg-white dark:bg-bg-elevated border-gray-200 dark:border-border-subtle text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
               }`}
             >
               <CheckCircle2 size={16} strokeWidth={3} />
               {item.status === 'done' ? '완료 취소' : '완료 처리'}
             </button>
-            {!isEditingDescription && (
-              <button
-                onClick={() => setIsEditingDescription(true)}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-black uppercase tracking-widest bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-black dark:hover:bg-gray-100 transition-all cursor-pointer shadow-md hover:shadow-lg active:scale-95"
-              >
-                <Edit3 size={16} strokeWidth={3} />
-                설명 편집
-              </button>
-            )}
           </div>
         )}
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar bg-white dark:bg-bg-base transition-colors duration-200">
-        <div className="max-w-4xl mx-auto px-12 py-16 flex flex-col gap-16">
+        <div className={`${isWideView ? 'px-24' : 'max-w-4xl mx-auto px-12'} py-16 flex flex-col gap-16 transition-all duration-300`}>
           
           {/* Title */}
           <div className="flex flex-col gap-4">
@@ -251,7 +261,7 @@ function ItemDetailPanel({
                   <div className={`w-3 h-3 rounded-full ${item.status === 'done' ? 'bg-emerald-500' : item.status === 'in-progress' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
                   <select
                     disabled={isReadOnly}
-                    className="bg-transparent border-none p-0 text-sm font-black text-gray-800 dark:text-text-primary focus:ring-0 cursor-pointer appearance-none w-full"
+                    className="bg-white dark:bg-bg-elevated border-none p-0 text-sm font-black text-gray-800 dark:text-text-primary focus:ring-0 cursor-pointer appearance-none w-full relative z-10 dark:color-scheme-dark"
                     value={item.status || 'none'}
                     onChange={(e) => {
                       const newStatus = e.target.value;
@@ -452,54 +462,19 @@ function ItemDetailPanel({
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> EDITING MODE
                 </span>}
               </div>
-              {!isReadOnly && !isEditingDescription && (
-                <button 
-                  onClick={() => setIsEditingDescription(true)}
-                  className="flex items-center gap-1.5 text-[11px] font-black text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 uppercase tracking-widest transition-colors cursor-pointer"
-                >
-                  <Edit3 size={12} />
-                  마크다운 편집
-                </button>
-              )}
             </div>
             
             {!isEditingDescription || isReadOnly ? (
-              <div 
+              <div
                 onClick={() => !isReadOnly && setIsEditingDescription(true)}
-                className={`detail-markdown prose prose-slate dark:prose-invert max-w-none text-base text-gray-800 dark:text-text-primary min-h-[400px] p-8 -m-8 rounded-3xl transition-all duration-300 ease-notion ${!isReadOnly ? 'hover:bg-gray-50 dark:hover:bg-bg-elevated/40 cursor-pointer' : ''}`}
+                className={`min-h-[400px] p-8 -m-8 rounded-3xl transition-all duration-300 ease-notion ${!isReadOnly ? 'hover:bg-gray-50 dark:hover:bg-bg-elevated/40 cursor-pointer' : ''}`}
               >
                 {description ? (
-                  <ReactMarkdown 
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      a: ({...props}) => <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 font-bold underline decoration-2 underline-offset-4 hover:text-blue-700 transition-colors" onClick={e => e.stopPropagation()} />,
-                      h1: ({...props}) => <h1 {...props} className="text-3xl font-black mt-12 mb-6 tracking-tight" />,
-                      h2: ({...props}) => <h2 {...props} className="text-2xl font-black mt-10 mb-5 tracking-tight border-b border-gray-100 dark:border-border-subtle pb-2" />,
-                      h3: ({...props}) => <h3 {...props} className="text-xl font-bold mt-8 mb-4 tracking-tight" />,
-                      ul: ({...props}) => <ul {...props} className="list-disc pl-6 my-6 space-y-3" />,
-                      ol: ({...props}) => <ol {...props} className="list-decimal pl-6 my-6 space-y-3" />,
-                      blockquote: ({...props}) => <blockquote {...props} className="border-l-4 border-blue-500 bg-blue-50/30 dark:bg-blue-900/10 px-6 py-4 rounded-r-2xl italic my-8 text-gray-700 dark:text-text-secondary" />,
-                      table: ({...props}) => (
-                        <div className="detail-markdown-scroll my-8 border border-gray-100 dark:border-border-subtle rounded-2xl overflow-hidden shadow-sm">
-                          <table {...props} className="detail-markdown-table text-sm" />
-                        </div>
-                      ),
-                      th: ({...props}) => <th {...props} className="bg-gray-50 dark:bg-bg-hover p-4 text-left font-black uppercase tracking-widest text-gray-500 dark:text-text-tertiary border-b border-gray-100 dark:border-border-subtle" />,
-                      td: ({...props}) => <td {...props} className="p-4 border-b border-gray-50 dark:border-border-subtle/50" />,
-                      pre: ({...props}) => (
-                        <div className="detail-markdown-scroll my-8 shadow-2xl rounded-2xl overflow-hidden ring-1 ring-white/10">
-                          <pre {...props} className="detail-markdown-pre font-mono p-6 bg-gray-900 text-gray-100" />
-                        </div>
-                      ),
-                      code: ({inline, ...props}) => (
-                        inline 
-                          ? <code {...props} className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-md font-mono text-sm font-black border border-red-100 dark:border-red-900/30" />
-                          : <code {...props} className="detail-markdown-codeblock font-mono bg-transparent p-0" />
-                      )
-                    }}
-                  >
-                    {description}
-                  </ReactMarkdown>
+                  <TiptapEditor
+                    key={`view-${item.id}`}
+                    content={description}
+                    editable={false}
+                  />
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full py-20 text-center animate-fade-in">
                     <div className="w-16 h-16 bg-gray-50 dark:bg-bg-hover rounded-2xl flex items-center justify-center text-2xl mb-6 shadow-inner ring-1 ring-gray-100 dark:ring-border-subtle">✍️</div>
@@ -510,29 +485,27 @@ function ItemDetailPanel({
               </div>
             ) : (
               <div className="flex flex-col gap-4 animate-in fade-in duration-300 ease-notion">
-                <textarea
-                  autoFocus
-                  className="w-full min-h-[500px] text-base font-medium leading-relaxed text-gray-900 dark:text-text-primary focus:outline-none resize-none bg-gray-50 dark:bg-bg-elevated/50 p-8 rounded-3xl placeholder-gray-300 dark:placeholder-text-tertiary border-none ring-2 ring-gray-100 dark:ring-border-subtle focus:ring-blue-500/30 shadow-inner transition-all"
-                  placeholder="업무 지침, 레퍼런스, 상세 내용을 자유롭게 기록하세요... (마크다운 지원)"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                <TiptapEditor
+                  key={`edit-${item.id}`}
+                  content={description}
+                  onChange={setDescription}
+                  editable={true}
+                  itemId={item.id}
+                  onShowToast={onShowToast}
+                  onBlur={handleDescriptionBlur}
                 />
+
                 <div className="flex justify-end gap-3">
-                  <button 
+                  <button
+                    onMouseDown={() => { isCancellingDescriptionRef.current = true; }}
                     onClick={() => {
+                      isCancellingDescriptionRef.current = false;
                       setDescription(item.description || '');
                       setIsEditingDescription(false);
                     }}
                     className="px-6 py-2.5 text-[13px] font-black text-gray-400 hover:text-gray-900 dark:hover:text-text-primary uppercase tracking-widest transition-colors cursor-pointer"
                   >
                     취소
-                  </button>
-                  <button 
-                    onClick={handleSaveDescription}
-                    className="flex items-center gap-2 px-8 py-2.5 bg-emerald-500 text-white rounded-xl text-[13px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg active:scale-95 cursor-pointer"
-                  >
-                    <Save size={16} strokeWidth={3} />
-                    설명 저장
                   </button>
                 </div>
               </div>

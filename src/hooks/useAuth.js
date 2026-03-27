@@ -6,6 +6,15 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
   const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
 
+  const handleUser = (user) => {
+    setUser(user);
+    if (user) {
+      setNeedsPasswordSetup(user.user_metadata?.needs_password_setup !== false);
+    } else {
+      setNeedsPasswordSetup(false);
+    }
+  };
+
   useEffect(() => {
     // 현재 세션 가져오기
     const initializeAuth = async () => {
@@ -43,16 +52,6 @@ export const useAuth = () => {
 
     return () => subscription.unsubscribe();
   }, []);
-
-  const handleUser = (user) => {
-    setUser(user);
-    if (user) {
-      // 명시적으로 false가 아닌 경우(새 유저 등)는 모두 설정이 필요한 것으로 간주
-      setNeedsPasswordSetup(user.user_metadata?.needs_password_setup !== false);
-    } else {
-      setNeedsPasswordSetup(false);
-    }
-  };
 
   const login = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });

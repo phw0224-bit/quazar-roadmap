@@ -31,7 +31,7 @@ const DISPLAY_BOARDS = ['main', '개발팀', 'AI팀', '지원팀'];
 
 export default function KanbanBoard({ onShowLogin }) {
   const {
-    phases, loading, error, addPhase, addItem, updateItem, deleteItem,
+    phases, loading, addPhase, addItem, updateItem, deleteItem,
     moveItem, updatePhase, deletePhase, movePhase, addComment, updateComment, deleteComment,
   } = useKanbanData();
 
@@ -62,8 +62,7 @@ export default function KanbanBoard({ onShowLogin }) {
         if (!isMounted) return;
         setPeopleError(err.message || '인원관리 데이터를 불러오지 못했습니다.');
       } finally {
-        if (!isMounted) return;
-        setPeopleLoading(false);
+        if (isMounted) setPeopleLoading(false);
       }
     };
 
@@ -78,10 +77,8 @@ export default function KanbanBoard({ onShowLogin }) {
   const [panelWidth, setPanelWidth] = useState(50); // percentage width
   const [isResizing, setIsResizing] = useState(false);
   const [isMainBoardCollapsed, setIsMainBoardCollapsed] = useState(true);
-  const [showAddPhase, setShowAddPhase] = useState(false);
-  const [newPhaseName, setNewPhaseName] = useState('');
   const [selectedTeam, setSelectedTeam] = useState(null);
-  const [selectedTag, setSelectedTag] = useState(null);
+  const [selectedTag] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState(null);
 
   // Global UI Feedback State
@@ -162,20 +159,13 @@ export default function KanbanBoard({ onShowLogin }) {
     e.preventDefault();
   };
 
-  const stopResizing = () => {
-    setIsResizing(false);
-  };
-
-  const resize = (e) => {
-    if (isResizing) {
-      const newWidth = ((window.innerWidth - e.clientX) / window.innerWidth) * 100;
-      if (newWidth > 20 && newWidth < 80) {
-        setPanelWidth(newWidth);
-      }
-    }
-  };
-
   useEffect(() => {
+    const resize = (e) => {
+      const newWidth = ((window.innerWidth - e.clientX) / window.innerWidth) * 100;
+      if (newWidth > 20 && newWidth < 80) setPanelWidth(newWidth);
+    };
+    const stopResizing = () => setIsResizing(false);
+
     if (isResizing) {
       window.addEventListener('mousemove', resize);
       window.addEventListener('mouseup', stopResizing);
@@ -185,13 +175,6 @@ export default function KanbanBoard({ onShowLogin }) {
       window.removeEventListener('mouseup', stopResizing);
     };
   }, [isResizing]);
-
-  const handleAddPhase = async () => {
-    if (!newPhaseName.trim()) return;
-    await addPhase(newPhaseName);
-    setNewPhaseName('');
-    setShowAddPhase(false);
-  };
 
   if (loading) {
     return (
@@ -204,13 +187,11 @@ export default function KanbanBoard({ onShowLogin }) {
     );
   }
   
-  const totalItems = phases.reduce((acc, p) => acc + p.items.length, 0);
   const activeItem = phases.flatMap(p => p.items).find(i => i.id === activeId);
   const activePhase = phases.find(p => p.id === activeId);
 
   const detailItem = detailItemId ? phases.flatMap(p => p.items).find(i => i.id === detailItemId) : null;
   const detailPhase = detailItem ? phases.find(p => p.items.some(i => i.id === detailItemId)) : null;
-  const totalMembers = peopleTeams.reduce((acc, team) => acc + team.members.length, 0);
   const closeDetailPanel = () => {
     setUrlState({ itemId: null, fullscreen: false });
   };
