@@ -10,10 +10,11 @@ import {
   useSensors,
   DragOverlay,
 } from '@dnd-kit/core';
-import { 
+import {
   sortableKeyboardCoordinates,
   SortableContext,
   horizontalListSortingStrategy,
+  verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { useKanbanData } from '../hooks/useKanbanData';
 import { useUrlState } from '../hooks/useUrlState';
@@ -34,7 +35,7 @@ export default function KanbanBoard({ onShowLogin }) {
   const {
     phases, sections, loading, addPhase, addItem, updateItem, deleteItem,
     moveItem, updatePhase, deletePhase, movePhase, addComment, updateComment, deleteComment,
-    addSection, updateSection, deleteSection,
+    addSection, updateSection, deleteSection, moveSection,
   } = useKanbanData();
 
   const { user, logout } = useAuth();
@@ -76,7 +77,8 @@ export default function KanbanBoard({ onShowLogin }) {
   }, []);
 
   const [activeId, setActiveId] = useState(null);
-  const [collapsedSections, setCollapsedSections] = useState(new Set());
+  // expandedSections: 펼쳐진 섹션 ID 목록 (기본값 empty = 모든 섹션 접힘)
+  const [expandedSections, setExpandedSections] = useState(new Set());
   const [panelWidth, setPanelWidth] = useState(50); // percentage width
   const [isResizing, setIsResizing] = useState(false);
   const [isMainBoardCollapsed, setIsMainBoardCollapsed] = useState(true);
@@ -119,9 +121,44 @@ export default function KanbanBoard({ onShowLogin }) {
     const activeId = active.id;
     const overId = over.id;
 
+    // Section 이동 (섹션 순서 변경)
+    if (active.data.current?.type === 'Section') {
+      if (activeId !== overId) {
+        const activeSec = sections.find(s => s.id === activeId);
+        const boardType = activeSec?.board_type;
+        const boardSections = sections
+          .filter(s => s.board_type === boardType)
+          .sort((a, b) => a.order_index - b.order_index);
+        const newIndex = boardSections.findIndex(s => s.id === overId);
+        if (newIndex !== -1) await moveSection(activeId, newIndex, boardType);
+      }
+      return;
+    }
+
     // Phase 이동 (가로 이동)
     if (active.data.current?.type === 'Phase') {
+      const overIsSection = sections.some(s => s.id === overId);
+
+      if (overIsSection) {
+        // 섹션 헤더/바디 위에 직접 드롭 → section_id 변경
+        const activePhase = phases.find(p => p.id === activeId);
+        if (activePhase?.section_id !== overId) {
+          await updatePhase(activeId, { section_id: overId });
+        }
+        return;
+      }
+
       if (activeId !== overId) {
+        const overPhase = phases.find(p => p.id === overId);
+        const activePhase = phases.find(p => p.id === activeId);
+
+        if (overPhase && overPhase.section_id !== activePhase?.section_id) {
+          // 섹션이 다른 Phase 위에 드롭 → section_id만 변경 (순서 변경 없음)
+          await updatePhase(activeId, { section_id: overPhase.section_id });
+          return;
+        }
+
+        // 같은 섹션/standalone 내 순서 변경
         const newIndex = phases.findIndex((p) => p.id === overId);
         if (newIndex !== -1) await movePhase(activeId, newIndex);
       }
@@ -192,6 +229,7 @@ export default function KanbanBoard({ onShowLogin }) {
   
   const activeItem = phases.flatMap(p => p.items).find(i => i.id === activeId);
   const activePhase = phases.find(p => p.id === activeId);
+  const activeSection = sections.find(s => s.id === activeId);
 
   const detailItem = detailItemId ? phases.flatMap(p => p.items).find(i => i.id === detailItemId) : null;
   const detailPhase = detailItem ? phases.find(p => p.items.some(i => i.id === detailItemId)) : null;
@@ -373,25 +411,34 @@ export default function KanbanBoard({ onShowLogin }) {
                       </div>
                     </div>
                     {user && !isCollapsed && (
-                      <button 
-                        onClick={() => {
-                          showPrompt(
-                            `${boardDisplayName} 프로젝트 추가`,
-                            '새 프로젝트의 이름을 입력하세요',
-                            (title) => {
-                              if (title) {
-                                addPhase(title, boardName.toLowerCase());
-                                showToast(`'${title}' 프로젝트가 생성되었습니다.`);
-                                setPrompt(null);
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => showPrompt('새 섹션 추가', '섹션 이름을 입력하세요', (title) => { if (title) { addSection(boardName.toLowerCase(), title); showToast(`'${title}' 섹션이 생성되었습니다.`); setPrompt(null); } })}
+                          className="px-5 py-2.5 bg-gray-50 dark:bg-bg-elevated text-gray-400 dark:text-text-tertiary rounded-xl text-sm font-bold hover:bg-gray-100 dark:hover:bg-bg-hover border border-dashed border-gray-200 dark:border-border-strong transition-all flex items-center gap-2 cursor-pointer hover:text-gray-600 dark:hover:text-text-secondary"
+                        >
+                          <span className="text-xl">+</span>
+                          새 섹션 추가
+                        </button>
+                        <button
+                          onClick={() => {
+                            showPrompt(
+                              `${boardDisplayName} 프로젝트 추가`,
+                              '새 프로젝트의 이름을 입력하세요',
+                              (title) => {
+                                if (title) {
+                                  addPhase(title, boardName.toLowerCase());
+                                  showToast(`'${title}' 프로젝트가 생성되었습니다.`);
+                                  setPrompt(null);
+                                }
                               }
-                            }
-                          );
-                        }}
-                        className="px-5 py-2.5 bg-gray-50 dark:bg-bg-elevated text-gray-500 dark:text-text-secondary rounded-xl text-sm font-bold hover:bg-gray-100 dark:hover:bg-bg-hover border border-dashed border-gray-300 dark:border-border-strong transition-all flex items-center gap-2 group/add cursor-pointer hover:shadow-md"
-                      >
-                        <span className="text-xl group-hover/add:text-blue-500 transition-colors">+</span>
-                        새 프로젝트 추가
-                      </button>
+                            );
+                          }}
+                          className="px-5 py-2.5 bg-gray-50 dark:bg-bg-elevated text-gray-500 dark:text-text-secondary rounded-xl text-sm font-bold hover:bg-gray-100 dark:hover:bg-bg-hover border border-dashed border-gray-300 dark:border-border-strong transition-all flex items-center gap-2 group/add cursor-pointer hover:shadow-md"
+                        >
+                          <span className="text-xl group-hover/add:text-blue-500 transition-colors">+</span>
+                          새 프로젝트 추가
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -429,6 +476,29 @@ export default function KanbanBoard({ onShowLogin }) {
                           </div>
                         ) : (
                           <>
+                            {boardSections.length > 0 && (
+                              <SortableContext items={boardSections.map(s => s.id)} strategy={verticalListSortingStrategy}>
+                                {boardSections.map(section => (
+                                  <BoardSection
+                                    key={section.id}
+                                    section={section}
+                                    phases={boardPhases.filter(p => p.section_id === section.id)}
+                                    isCollapsed={!expandedSections.has(section.id)}
+                                    onToggleCollapse={() => setExpandedSections(prev => {
+                                      const next = new Set(prev);
+                                      next.has(section.id) ? next.delete(section.id) : next.add(section.id);
+                                      return next;
+                                    })}
+                                    onUpdateSection={updateSection}
+                                    onDeleteSection={deleteSection}
+                                    onAddPhase={addPhase}
+                                    onShowPrompt={showPrompt}
+                                    {...projectColumnProps}
+                                  />
+                                ))}
+                              </SortableContext>
+                            )}
+
                             {standalonePhases.length > 0 && (
                               <div className="flex gap-12 overflow-x-auto pb-6 custom-scrollbar min-h-[350px] px-2">
                                 <SortableContext items={standalonePhases.map(p => p.id)} strategy={horizontalListSortingStrategy}>
@@ -437,32 +507,6 @@ export default function KanbanBoard({ onShowLogin }) {
                                   ))}
                                 </SortableContext>
                               </div>
-                            )}
-
-                            {boardSections.map(section => (
-                              <BoardSection
-                                key={section.id}
-                                section={section}
-                                phases={boardPhases.filter(p => p.section_id === section.id)}
-                                isCollapsed={collapsedSections.has(section.id)}
-                                onToggleCollapse={() => setCollapsedSections(prev => {
-                                  const next = new Set(prev);
-                                  next.has(section.id) ? next.delete(section.id) : next.add(section.id);
-                                  return next;
-                                })}
-                                onUpdateSection={updateSection}
-                                onDeleteSection={deleteSection}
-                                {...projectColumnProps}
-                              />
-                            ))}
-
-                            {user && (
-                              <button
-                                onClick={() => showPrompt('새 섹션 추가', '섹션 이름을 입력하세요', (title) => { if (title) { addSection(boardName.toLowerCase(), title); showToast(`'${title}' 섹션이 생성되었습니다.`); setPrompt(null); } })}
-                                className="self-start px-5 py-2.5 bg-gray-50 dark:bg-bg-elevated text-gray-400 dark:text-text-tertiary rounded-xl text-sm font-bold hover:bg-gray-100 dark:hover:bg-bg-hover border border-dashed border-gray-200 dark:border-border-strong transition-all flex items-center gap-2 cursor-pointer hover:text-gray-600 dark:hover:text-text-secondary"
-                              >
-                                <span className="text-lg">+</span> 새 섹션 추가
-                              </button>
                             )}
                           </>
                         )}
@@ -534,8 +578,15 @@ export default function KanbanBoard({ onShowLogin }) {
           duration: 250,
           easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
         }}>
-          {activeItem ? <KanbanCard item={activeItem} isDragging /> : null}
-          {activePhase ? <ProjectColumn phase={activePhase} phaseIndex={phases.findIndex(p => p.id === activePhase.id) + 1} isDragging /> : null}
+          {activeSection ? (
+            <div className="bg-white dark:bg-bg-elevated border border-gray-200 dark:border-border-strong rounded-2xl px-6 py-4 shadow-2xl opacity-90 cursor-grabbing">
+              <span className="text-base font-black text-gray-900 dark:text-text-primary">{activeSection.title}</span>
+            </div>
+          ) : activeItem ? (
+            <KanbanCard item={activeItem} isDragging />
+          ) : activePhase ? (
+            <ProjectColumn phase={activePhase} phaseIndex={phases.findIndex(p => p.id === activePhase.id) + 1} isDragging />
+          ) : null}
         </DragOverlay>
 
         {/* Global Feedback Components */}

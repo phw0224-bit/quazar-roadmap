@@ -19,6 +19,21 @@ export default defineConfig({
     strictPort: true,
     allowedHosts: [
       'roadmap.ai-quazar.uk'
-    ]
+    ],
+    proxy: {
+      '/upload': 'http://localhost:3001',
+      '/uploads': 'http://localhost:3001'
+    }
+  },
+  preview: {
+    port: 1234,
+    strictPort: true,
+    allowedHosts: [
+      'roadmap.ai-quazar.uk'
+    ],
+    proxy: {
+      '/upload': 'http://localhost:3001',
+      '/uploads': 'http://localhost:3001'
+    }
   }
 })

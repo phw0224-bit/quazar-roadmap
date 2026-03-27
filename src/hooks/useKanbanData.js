@@ -30,6 +30,19 @@ const kanbanReducer = (state, action) => {
           p.section_id === action.payload ? { ...p, section_id: null } : p
         ),
       };
+    case 'MOVE_SECTION': {
+      const { sectionId, targetIndex, boardType } = action.payload;
+      const boardSections = state.sections
+        .filter(s => s.board_type === boardType)
+        .sort((a, b) => a.order_index - b.order_index);
+      const otherSections = state.sections.filter(s => s.board_type !== boardType);
+      const movingIdx = boardSections.findIndex(s => s.id === sectionId);
+      const newBoardSections = [...boardSections];
+      const [moving] = newBoardSections.splice(movingIdx, 1);
+      newBoardSections.splice(targetIndex, 0, moving);
+      const reordered = newBoardSections.map((s, idx) => ({ ...s, order_index: idx }));
+      return { ...state, sections: [...otherSections, ...reordered] };
+    }
     case 'SET_ERROR':
       return { ...state, error: action.payload, loading: false };
     case 'ADD_PHASE':
@@ -213,8 +226,8 @@ export const useKanbanData = () => {
     };
   }, [fetchData]);
 
-  const addPhase = async (title, boardType = 'main') => {
-    const newPhase = await API.addPhase(title, boardType);
+  const addPhase = async (title, boardType = 'main', sectionId = null) => {
+    const newPhase = await API.addPhase(title, boardType, sectionId);
     dispatch({ type: 'ADD_PHASE', payload: newPhase });
   };
 
@@ -284,6 +297,11 @@ export const useKanbanData = () => {
     dispatch({ type: 'DELETE_SECTION', payload: sectionId });
   };
 
+  const moveSection = async (sectionId, targetIndex, boardType) => {
+    dispatch({ type: 'MOVE_SECTION', payload: { sectionId, targetIndex, boardType } });
+    await API.moveSection(sectionId, targetIndex, boardType);
+  };
+
   return {
     phases: state.phases,
     sections: state.sections,
@@ -303,5 +321,6 @@ export const useKanbanData = () => {
     addSection,
     updateSection,
     deleteSection,
+    moveSection,
   };
 };

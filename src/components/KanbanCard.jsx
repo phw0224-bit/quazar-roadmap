@@ -60,7 +60,7 @@ export default function KanbanCard({
             <div className="flex-1 flex flex-col gap-1.5">
               <h3
                 onPointerDown={stopProp}
-                onClick={handleOpenDetail}
+                onClick={(e) => { e.stopPropagation(); handleOpenDetail(e); }}
                 className={`m-0 text-lg font-black leading-tight transition-colors cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 ${
                   isCompleted ? 'text-gray-500 dark:text-text-secondary line-through' : 'text-gray-900 dark:text-text-primary'
                 }`}

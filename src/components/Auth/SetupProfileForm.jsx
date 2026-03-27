@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ShieldCheck, User, Check, Loader2 } from 'lucide-react';
 
 const DEPARTMENTS = ['감정팀', '개발팀', 'AI팀', '기획팀', '지원팀'];
 

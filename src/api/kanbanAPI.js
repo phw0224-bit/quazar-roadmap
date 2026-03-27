@@ -158,13 +158,13 @@ const supabaseAPI = {
     return { teams };
   },
 
-  addPhase: async (title, boardType = 'main') => {
+  addPhase: async (title, boardType = 'main', sectionId = null) => {
     const { data: existingProjects } = await supabase.from('projects').select('order_index').order('order_index', { ascending: false }).limit(1);
     const nextOrder = existingProjects?.[0] ? existingProjects[0].order_index + 1 : 0;
 
     const { data, error } = await supabase
       .from('projects')
-      .insert([{ title, order_index: nextOrder, board_type: boardType, assignees: [] }])
+      .insert([{ title, order_index: nextOrder, board_type: boardType, assignees: [], section_id: sectionId }])
       .select();
 
     if (error) throw error;
@@ -339,6 +339,24 @@ const supabaseAPI = {
     await supabase.from('projects').update({ section_id: null }).eq('section_id', sectionId);
     const { error } = await supabase.from('sections').delete().eq('id', sectionId);
     if (error) throw error;
+  },
+
+  moveSection: async (sectionId, targetIndex, boardType) => {
+    const { data: secs } = await supabase
+      .from('sections')
+      .select('id, order_index')
+      .eq('board_type', boardType)
+      .order('order_index', { ascending: true });
+
+    const movingIdx = secs.findIndex(s => s.id === sectionId);
+    const [moving] = secs.splice(movingIdx, 1);
+    secs.splice(targetIndex, 0, moving);
+
+    const results = await Promise.all(
+      secs.map((s, idx) => supabase.from('sections').update({ order_index: idx }).eq('id', s.id))
+    );
+    const errors = results.filter(r => r.error);
+    if (errors.length > 0) throw errors[0].error;
   },
 };
 
