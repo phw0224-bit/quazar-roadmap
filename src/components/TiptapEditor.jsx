@@ -3,11 +3,15 @@ import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import { marked } from 'marked';
+import TurndownService from 'turndown';
+import { DOMSerializer } from '@tiptap/pm/model';
 import { useRef, useEffect } from 'react';
 import {
   Bold, Italic, List, ListOrdered, Quote, Code, Minus,
   Heading1, Heading2, Heading3, ImagePlus
 } from 'lucide-react';
+
+const turndown = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced' });
 
 // 드래그 리사이즈 가능한 이미지 NodeView
 function ImageResizeView({ node, updateAttributes, selected, editor }) {
@@ -103,21 +107,6 @@ function convertToHTML(content) {
   return marked(content);
 }
 
-// 텍스트가 마크다운 형식인지 감지
-const MARKDOWN_PATTERNS = [
-  /^#{1,6}\s/m,          // 헤딩
-  /\*\*[^*]+\*\*/,       // 볼드
-  /^\s*[-*]\s+/m,        // 글머리 기호
-  /^\s*\d+\.\s+/m,       // 번호 목록
-  /^>\s/m,               // 인용
-  /```[\s\S]*```/,       // 코드 블록
-  /^---+$/m,             // 수평선
-  /\[.+\]\(.+\)/,        // 링크
-];
-
-function looksLikeMarkdown(text) {
-  return MARKDOWN_PATTERNS.some(pattern => pattern.test(text));
-}
 
 function ToolbarButton({ onClick, isActive, title, children }) {
   return (
@@ -248,9 +237,38 @@ export default function TiptapEditor({ content, onChange, editable, itemId, onSh
     editorProps: {
       handlePaste: (_view, event) => {
         const text = event.clipboardData?.getData('text/plain');
-        if (!text || !looksLikeMarkdown(text)) return false;
+        if (!text) return false;
         const html = marked(text);
         editorRef.current?.commands.insertContent(html);
+        return true;
+      },
+      handleCopy: (view, event) => {
+        const { from, to } = view.state.selection;
+        if (from === to) return false;
+        const fragment = view.state.doc.slice(from, to).content;
+        const serializer = DOMSerializer.fromSchema(view.state.schema);
+        const div = document.createElement('div');
+        div.appendChild(serializer.serializeFragment(fragment));
+        const html = div.innerHTML;
+        const markdown = turndown.turndown(html);
+        event.clipboardData?.setData('text/plain', markdown);
+        event.clipboardData?.setData('text/html', html);
+        event.preventDefault();
+        return true;
+      },
+      handleCut: (view, event) => {
+        const { from, to } = view.state.selection;
+        if (from === to) return false;
+        const fragment = view.state.doc.slice(from, to).content;
+        const serializer = DOMSerializer.fromSchema(view.state.schema);
+        const div = document.createElement('div');
+        div.appendChild(serializer.serializeFragment(fragment));
+        const html = div.innerHTML;
+        const markdown = turndown.turndown(html);
+        event.clipboardData?.setData('text/plain', markdown);
+        event.clipboardData?.setData('text/html', html);
+        event.preventDefault();
+        view.dispatch(view.state.tr.deleteSelection());
         return true;
       },
     },
