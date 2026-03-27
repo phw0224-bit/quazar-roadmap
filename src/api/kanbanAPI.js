@@ -26,7 +26,14 @@ const supabaseAPI = {
 
     if (iError) throw iError;
 
-    // 3. 트리 구조로 조립
+    // 3. 섹션 가져오기
+    const { data: sections, error: sError } = await supabase
+      .from('sections')
+      .select('*')
+      .order('order_index', { ascending: true });
+    if (sError) throw sError;
+
+    // 4. 트리 구조로 조립
     const formattedProjects = projects.map(project => ({
       ...project,
       assignees: Array.isArray(project.assignees) ? project.assignees : [],
@@ -40,7 +47,7 @@ const supabaseAPI = {
         }))
     }));
 
-    return { phases: formattedProjects };
+    return { phases: formattedProjects, sections: sections || [] };
   },
 
   getPeopleData: async () => {
@@ -299,7 +306,40 @@ const supabaseAPI = {
   deleteComment: async (phaseId, itemId, commentId) => {
     const { error } = await supabase.from('comments').delete().eq('id', commentId);
     if (error) throw error;
-  }
+  },
+
+  addSection: async (boardType, title) => {
+    const { data: existing } = await supabase
+      .from('sections')
+      .select('order_index')
+      .eq('board_type', boardType)
+      .order('order_index', { ascending: false })
+      .limit(1);
+    const nextOrder = existing?.[0] ? existing[0].order_index + 1 : 0;
+
+    const { data, error } = await supabase
+      .from('sections')
+      .insert([{ board_type: boardType, title, order_index: nextOrder }])
+      .select();
+    if (error) throw error;
+    return data[0];
+  },
+
+  updateSection: async (sectionId, updates) => {
+    const { data, error } = await supabase
+      .from('sections')
+      .update(updates)
+      .eq('id', sectionId)
+      .select();
+    if (error) throw error;
+    return data[0];
+  },
+
+  deleteSection: async (sectionId) => {
+    await supabase.from('projects').update({ section_id: null }).eq('section_id', sectionId);
+    const { error } = await supabase.from('sections').delete().eq('id', sectionId);
+    if (error) throw error;
+  },
 };
 
 export default supabaseAPI;
