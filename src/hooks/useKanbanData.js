@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 
 const INITIAL_STATE = {
   phases: [],
+  sections: [],
   loading: true,
   error: null,
 };
@@ -11,7 +12,24 @@ const INITIAL_STATE = {
 const kanbanReducer = (state, action) => {
   switch (action.type) {
     case 'SET_DATA':
-      return { ...state, phases: action.payload, loading: false };
+      return { ...state, phases: action.payload.phases, sections: action.payload.sections, loading: false };
+    case 'ADD_SECTION':
+      return { ...state, sections: [...state.sections, action.payload] };
+    case 'UPDATE_SECTION':
+      return {
+        ...state,
+        sections: state.sections.map(s =>
+          s.id === action.payload.id ? { ...s, ...action.payload.updates } : s
+        ),
+      };
+    case 'DELETE_SECTION':
+      return {
+        ...state,
+        sections: state.sections.filter(s => s.id !== action.payload),
+        phases: state.phases.map(p =>
+          p.section_id === action.payload ? { ...p, section_id: null } : p
+        ),
+      };
     case 'SET_ERROR':
       return { ...state, error: action.payload, loading: false };
     case 'ADD_PHASE':
@@ -142,7 +160,7 @@ export const useKanbanData = () => {
   const fetchData = useCallback(async () => {
     try {
       const data = await API.getBoardData();
-      dispatch({ type: 'SET_DATA', payload: data.phases });
+      dispatch({ type: 'SET_DATA', payload: { phases: data.phases, sections: data.sections } });
     } catch (err) {
       dispatch({ type: 'SET_ERROR', payload: err.message });
     }
@@ -251,8 +269,24 @@ export const useKanbanData = () => {
     dispatch({ type: 'DELETE_COMMENT', payload: { itemId, commentId } });
   };
 
+  const addSection = async (boardType, title) => {
+    const newSection = await API.addSection(boardType, title);
+    dispatch({ type: 'ADD_SECTION', payload: newSection });
+  };
+
+  const updateSection = async (sectionId, updates) => {
+    const updated = await API.updateSection(sectionId, updates);
+    dispatch({ type: 'UPDATE_SECTION', payload: { id: sectionId, updates: updated } });
+  };
+
+  const deleteSection = async (sectionId) => {
+    await API.deleteSection(sectionId);
+    dispatch({ type: 'DELETE_SECTION', payload: sectionId });
+  };
+
   return {
     phases: state.phases,
+    sections: state.sections,
     loading: state.loading,
     error: state.error,
     addPhase,
@@ -266,5 +300,8 @@ export const useKanbanData = () => {
     addComment,
     updateComment,
     deleteComment,
+    addSection,
+    updateSection,
+    deleteSection,
   };
 };
