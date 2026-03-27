@@ -23,6 +23,7 @@ import ProjectColumn from './ProjectColumn';
 import KanbanCard from './KanbanCard';
 import ItemDetailPanel from './ItemDetailPanel';
 import PeopleBoard from './PeopleBoard';
+import BoardSection from './BoardSection';
 import { TEAMS, GLOBAL_TAGS } from '../lib/constants';
 
 import { Toast, ConfirmModal, InputModal } from './UI/Feedback';
@@ -31,8 +32,9 @@ const DISPLAY_BOARDS = ['main', '개발팀', 'AI팀', '지원팀'];
 
 export default function KanbanBoard({ onShowLogin }) {
   const {
-    phases, loading, addPhase, addItem, updateItem, deleteItem,
+    phases, sections, loading, addPhase, addItem, updateItem, deleteItem,
     moveItem, updatePhase, deletePhase, movePhase, addComment, updateComment, deleteComment,
+    addSection, updateSection, deleteSection,
   } = useKanbanData();
 
   const { user, logout } = useAuth();
@@ -74,6 +76,7 @@ export default function KanbanBoard({ onShowLogin }) {
   }, []);
 
   const [activeId, setActiveId] = useState(null);
+  const [collapsedSections, setCollapsedSections] = useState(new Set());
   const [panelWidth, setPanelWidth] = useState(50); // percentage width
   const [isResizing, setIsResizing] = useState(false);
   const [isMainBoardCollapsed, setIsMainBoardCollapsed] = useState(true);
@@ -392,51 +395,80 @@ export default function KanbanBoard({ onShowLogin }) {
                     )}
                   </div>
 
-                  {!isCollapsed && (
-                    <div className="flex gap-12 overflow-x-auto pb-6 custom-scrollbar min-h-[350px] px-2">
-                      {boardPhases.length > 0 ? (
-                        <SortableContext items={boardPhases.map(p => p.id)} strategy={horizontalListSortingStrategy}>
-                          {boardPhases.map((phase, idx) => (
-                            <ProjectColumn
-                              key={phase.id} phase={phase} phaseIndex={idx + 1}
-                              selectedTeam={selectedTeam} selectedTag={selectedTag} selectedStatus={selectedStatus}
-                              onAddItem={addItem} onUpdateItem={updateItem} onDeleteItem={deleteItem} onUpdatePhase={updatePhase} onDeletePhase={deletePhase}
-                              onAddComment={addComment} onUpdateComment={updateComment} onDeleteComment={deleteComment}
-                              onOpenDetail={(itemId) => setUrlState({ itemId })}
-                              onShowConfirm={showConfirm}
-                              onShowToast={showToast}
-                              isReadOnly={!user}
-                            />
-                          ))}
-                        </SortableContext>
-                      ) : (
-                        <div className="flex-1 flex items-center justify-center border-2 border-dashed border-gray-100 dark:border-border-subtle rounded-3xl py-24 bg-gray-50/40 dark:bg-bg-elevated/40 transition-colors duration-200">
-                          <div className="flex flex-col items-center text-center animate-fade-in">
-                            <div className="w-16 h-16 bg-white dark:bg-bg-base rounded-2xl flex items-center justify-center text-3xl shadow-sm border border-gray-100 dark:border-border-subtle mb-6">🏝️</div>
-                            <p className="text-gray-400 dark:text-text-tertiary font-black text-xl mb-6 tracking-tight">이 보드에는 아직 프로젝트가 없습니다.</p>
-                            <button
-                              onClick={() => {
-                                showPrompt(
-                                  `${boardDisplayName} 첫 프로젝트 만들기`,
-                                  '첫 번째 프로젝트의 이름을 입력하세요',
-                                  (title) => {
-                                    if (title) {
-                                      addPhase(title, boardName.toLowerCase());
-                                      showToast(`'${title}' 프로젝트가 생성되었습니다.`);
-                                      setPrompt(null);
-                                    }
-                                  }
-                                );
-                              }}
-                              className="text-sm font-black text-blue-500 bg-white dark:bg-bg-elevated px-8 py-3.5 rounded-2xl shadow-lg border border-blue-100 dark:border-blue-900/30 hover:bg-blue-50 dark:hover:bg-bg-hover transition-all flex items-center gap-2 hover:scale-105 active:scale-95 cursor-pointer uppercase tracking-widest"
-                            >
-                              + 첫 번째 프로젝트 추가하기
-                            </button>
+                  {!isCollapsed && (() => {
+                    const standalonePhases = boardPhases.filter(p => !p.section_id);
+                    const boardSections = sections
+                      .filter(s => s.board_type === boardName.toLowerCase())
+                      .sort((a, b) => a.order_index - b.order_index);
+                    const isEmpty = boardPhases.length === 0 && boardSections.length === 0;
+                    const projectColumnProps = {
+                      selectedTeam, selectedTag, selectedStatus,
+                      onAddItem: addItem, onUpdateItem: updateItem, onDeleteItem: deleteItem,
+                      onUpdatePhase: updatePhase, onDeletePhase: deletePhase,
+                      onOpenDetail: (itemId) => setUrlState({ itemId }),
+                      onShowConfirm: showConfirm, onShowToast: showToast,
+                      isReadOnly: !user,
+                    };
+
+                    return (
+                      <div className="flex flex-col gap-8">
+                        {isEmpty ? (
+                          <div className="flex-1 flex items-center justify-center border-2 border-dashed border-gray-100 dark:border-border-subtle rounded-3xl py-24 bg-gray-50/40 dark:bg-bg-elevated/40 transition-colors duration-200">
+                            <div className="flex flex-col items-center text-center animate-fade-in">
+                              <div className="w-16 h-16 bg-white dark:bg-bg-base rounded-2xl flex items-center justify-center text-3xl shadow-sm border border-gray-100 dark:border-border-subtle mb-6">🏝️</div>
+                              <p className="text-gray-400 dark:text-text-tertiary font-black text-xl mb-6 tracking-tight">이 보드에는 아직 프로젝트가 없습니다.</p>
+                              {user && (
+                                <button
+                                  onClick={() => showPrompt(`${boardDisplayName} 첫 프로젝트 만들기`, '첫 번째 프로젝트의 이름을 입력하세요', (title) => { if (title) { addPhase(title, boardName.toLowerCase()); showToast(`'${title}' 프로젝트가 생성되었습니다.`); setPrompt(null); } })}
+                                  className="text-sm font-black text-blue-500 bg-white dark:bg-bg-elevated px-8 py-3.5 rounded-2xl shadow-lg border border-blue-100 dark:border-blue-900/30 hover:bg-blue-50 dark:hover:bg-bg-hover transition-all flex items-center gap-2 hover:scale-105 active:scale-95 cursor-pointer uppercase tracking-widest"
+                                >
+                                  + 첫 번째 프로젝트 추가하기
+                                </button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                        ) : (
+                          <>
+                            {standalonePhases.length > 0 && (
+                              <div className="flex gap-12 overflow-x-auto pb-6 custom-scrollbar min-h-[350px] px-2">
+                                <SortableContext items={standalonePhases.map(p => p.id)} strategy={horizontalListSortingStrategy}>
+                                  {standalonePhases.map((phase, idx) => (
+                                    <ProjectColumn key={phase.id} phase={phase} phaseIndex={idx + 1} {...projectColumnProps} />
+                                  ))}
+                                </SortableContext>
+                              </div>
+                            )}
+
+                            {boardSections.map(section => (
+                              <BoardSection
+                                key={section.id}
+                                section={section}
+                                phases={boardPhases.filter(p => p.section_id === section.id)}
+                                isCollapsed={collapsedSections.has(section.id)}
+                                onToggleCollapse={() => setCollapsedSections(prev => {
+                                  const next = new Set(prev);
+                                  next.has(section.id) ? next.delete(section.id) : next.add(section.id);
+                                  return next;
+                                })}
+                                onUpdateSection={updateSection}
+                                onDeleteSection={deleteSection}
+                                {...projectColumnProps}
+                              />
+                            ))}
+
+                            {user && (
+                              <button
+                                onClick={() => showPrompt('새 섹션 추가', '섹션 이름을 입력하세요', (title) => { if (title) { addSection(boardName.toLowerCase(), title); showToast(`'${title}' 섹션이 생성되었습니다.`); setPrompt(null); } })}
+                                className="self-start px-5 py-2.5 bg-gray-50 dark:bg-bg-elevated text-gray-400 dark:text-text-tertiary rounded-xl text-sm font-bold hover:bg-gray-100 dark:hover:bg-bg-hover border border-dashed border-gray-200 dark:border-border-strong transition-all flex items-center gap-2 cursor-pointer hover:text-gray-600 dark:hover:text-text-secondary"
+                              >
+                                <span className="text-lg">+</span> 새 섹션 추가
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </section>
               );
             })}
