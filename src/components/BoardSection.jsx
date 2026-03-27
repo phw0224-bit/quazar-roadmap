@@ -172,7 +172,7 @@ export default function BoardSection({
 
       {/* Projects inside section */}
       {!isCollapsed && (
-        <div className="flex gap-12 overflow-x-auto pb-4 custom-scrollbar min-h-[300px] px-1">
+        <div className="flex gap-12 overflow-x-auto py-3 pb-4 custom-scrollbar min-h-[300px] px-1">
           {phases.length > 0 ? (
             <SortableContext items={phases.map(p => p.id)} strategy={horizontalListSortingStrategy}>
               {phases.map((phase, idx) => (

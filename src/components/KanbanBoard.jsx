@@ -535,7 +535,7 @@ export default function KanbanBoard({ onShowLogin }) {
                             )}
 
                             {standalonePhases.length > 0 && (
-                              <div className="flex gap-12 overflow-x-auto pb-6 custom-scrollbar min-h-[350px] px-2">
+                              <div className="flex gap-12 overflow-x-auto py-3 pb-6 custom-scrollbar min-h-[350px] px-2">
                                 <SortableContext items={standalonePhases.map(p => p.id)} strategy={horizontalListSortingStrategy}>
                                   {standalonePhases.map((phase, idx) => (
                                     <ProjectColumn key={phase.id} phase={phase} phaseIndex={idx + 1} {...projectColumnProps} />
