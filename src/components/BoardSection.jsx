@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { MoreHorizontal, GripVertical } from 'lucide-react';
+import { MoreHorizontal, GripVertical, Link } from 'lucide-react';
 import ProjectColumn from './ProjectColumn';
 
 export default function BoardSection({
@@ -49,14 +49,20 @@ export default function BoardSection({
     setIsEditingTitle(false);
   };
 
+  const handleCopyLink = () => {
+    const url = `${window.location.origin}${window.location.pathname}?scrollTo=section:${section.id}`;
+    navigator.clipboard.writeText(url).then(() => onShowToast('링크 복사됨'));
+  };
+
   return (
     <div
+      id={`section-${section.id}`}
       ref={setNodeRef}
       style={style}
       className={`flex flex-col gap-4 border border-gray-100 dark:border-border-subtle rounded-2xl p-6 bg-gray-50/50 dark:bg-bg-elevated/30 transition-colors duration-200 ${isDragging ? 'opacity-50' : ''}`}
     >
       {/* Section Header */}
-      <div className="flex items-center gap-3">
+      <div className="group flex items-center gap-3">
         {!isReadOnly && (
           <button
             {...attributes}
@@ -99,8 +105,16 @@ export default function BoardSection({
           {phases.length} 프로젝트
         </span>
 
-        {!isReadOnly && (
-          <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-2 ml-auto">
+          <button
+            onClick={handleCopyLink}
+            className="opacity-0 group-hover:opacity-100 transition-opacity w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-200 dark:hover:bg-bg-hover text-gray-400 hover:text-gray-700 dark:hover:text-text-primary cursor-pointer"
+            title="링크 복사"
+          >
+            <Link size={14} />
+          </button>
+
+          {!isReadOnly && (<>
             <button
               onClick={() => onShowPrompt(
                 `${section.title} — 프로젝트 추가`,
@@ -152,8 +166,8 @@ export default function BoardSection({
                 </>
               )}
             </div>
-          </div>
-        )}
+          </> )}
+        </div>
       </div>
 
       {/* Projects inside section */}

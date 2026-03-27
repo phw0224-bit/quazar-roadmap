@@ -6,7 +6,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { MoreHorizontal, Plus, Edit2, Trash2, User } from 'lucide-react';
+import { MoreHorizontal, Plus, Edit2, Trash2, User, Link } from 'lucide-react';
 import KanbanCard from './KanbanCard';
 import { PROJECT_TINTS } from '../lib/constants';
 
@@ -142,6 +142,16 @@ export default function ProjectColumn({
           </div>
 
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200" onClick={stopProp} onPointerDown={stopProp}>
+            <button
+              className="p-1.5 hover:bg-white/60 dark:hover:bg-bg-hover rounded-lg text-gray-400 dark:text-text-tertiary hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-all"
+              title="링크 복사"
+              onClick={() => {
+                const url = `${window.location.origin}${window.location.pathname}?scrollTo=project:${project.id}`;
+                navigator.clipboard.writeText(url).then(() => onShowToast?.('링크 복사됨'));
+              }}
+            >
+              <Link size={14} strokeWidth={2.5} />
+            </button>
             {!isReadOnly && (
               <>
                 <button

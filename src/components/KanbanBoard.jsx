@@ -39,7 +39,7 @@ export default function KanbanBoard({ onShowLogin }) {
   } = useKanbanData();
 
   const { user, logout } = useAuth();
-  const [urlState, setUrlState] = useUrlState();
+  const [urlState, setUrlState, replaceUrlState] = useUrlState();
   const activeView = urlState.view;
   const detailItemId = urlState.itemId;
   const isDetailFullscreen = urlState.fullscreen;
@@ -50,6 +50,19 @@ export default function KanbanBoard({ onShowLogin }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    if (loading || !urlState.scrollTo) return;
+    const [type, id] = urlState.scrollTo.split(':');
+    if (!type || !id) return;
+    const el = document.getElementById(`${type}-${id}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('highlight-target');
+    const timer = setTimeout(() => el.classList.remove('highlight-target'), 2000);
+    replaceUrlState({ scrollTo: null });
+    return () => clearTimeout(timer);
+  }, [loading, urlState.scrollTo, replaceUrlState]);
 
   useEffect(() => {
     let isMounted = true;
@@ -78,10 +91,24 @@ export default function KanbanBoard({ onShowLogin }) {
 
   const [activeId, setActiveId] = useState(null);
   // expandedSections: 펼쳐진 섹션 ID 목록 (기본값 empty = 모든 섹션 접힘)
-  const [expandedSections, setExpandedSections] = useState(new Set());
+  const [expandedSections, setExpandedSections] = useState(() => {
+    try {
+      const saved = localStorage.getItem('kanban-expanded-sections');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
   const [panelWidth, setPanelWidth] = useState(50); // percentage width
   const [isResizing, setIsResizing] = useState(false);
-  const [isMainBoardCollapsed, setIsMainBoardCollapsed] = useState(true);
+  const [isMainBoardCollapsed, setIsMainBoardCollapsed] = useState(() => {
+    try {
+      const saved = localStorage.getItem('kanban-main-board-collapsed');
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [selectedTag] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState(null);
@@ -198,6 +225,14 @@ export default function KanbanBoard({ onShowLogin }) {
     setIsResizing(true);
     e.preventDefault();
   };
+
+  useEffect(() => {
+    localStorage.setItem('kanban-expanded-sections', JSON.stringify([...expandedSections]));
+  }, [expandedSections]);
+
+  useEffect(() => {
+    localStorage.setItem('kanban-main-board-collapsed', JSON.stringify(isMainBoardCollapsed));
+  }, [isMainBoardCollapsed]);
 
   useEffect(() => {
     const resize = (e) => {
