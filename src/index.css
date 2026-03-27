@@ -186,6 +186,50 @@ input:focus, textarea:focus {
   outline-offset: 2px;
 }
 
+.tiptap-content .tiptap table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem 0;
+  table-layout: fixed;
+  overflow: hidden;
+}
+
+.tiptap-content .tiptap th,
+.tiptap-content .tiptap td {
+  border: 1px solid #e5e7eb;
+  padding: 0.5rem 0.75rem;
+  vertical-align: top;
+  min-width: 80px;
+}
+
+.dark .tiptap-content .tiptap th,
+.dark .tiptap-content .tiptap td {
+  border-color: #374151;
+}
+
+.tiptap-content .tiptap th {
+  background: #f9fafb;
+  font-weight: 700;
+}
+
+.dark .tiptap-content .tiptap th {
+  background: #1f2937;
+}
+
+.tiptap-content .tiptap .selectedCell::after {
+  background: rgba(59, 130, 246, 0.15);
+  content: '';
+  left: 0; right: 0; top: 0; bottom: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 2;
+}
+
+.tiptap-content .tiptap td,
+.tiptap-content .tiptap th {
+  position: relative;
+}
+
 /* Item detail markdown overflow guards */
 .detail-markdown {
   min-width: 0;
