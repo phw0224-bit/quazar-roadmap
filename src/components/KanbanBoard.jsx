@@ -16,6 +16,7 @@ import {
   horizontalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { useKanbanData } from '../hooks/useKanbanData';
+import { useUrlState } from '../hooks/useUrlState';
 import { useAuth } from '../hooks/useAuth';
 import API from '../api/kanbanAPI';
 import ProjectColumn from './ProjectColumn';
@@ -35,6 +36,10 @@ export default function KanbanBoard({ onShowLogin }) {
   } = useKanbanData();
 
   const { user, logout } = useAuth();
+  const [urlState, setUrlState] = useUrlState();
+  const activeView = urlState.view;
+  const detailItemId = urlState.itemId;
+  const isDetailFullscreen = urlState.fullscreen;
   const [peopleTeams, setPeopleTeams] = useState([]);
   const [peopleLoading, setPeopleLoading] = useState(true);
   const [peopleError, setPeopleError] = useState(null);
@@ -70,17 +75,14 @@ export default function KanbanBoard({ onShowLogin }) {
   }, []);
 
   const [activeId, setActiveId] = useState(null);
-  const [detailItemId, setDetailItemId] = useState(null);
   const [panelWidth, setPanelWidth] = useState(50); // percentage width
   const [isResizing, setIsResizing] = useState(false);
-  const [isDetailFullscreen, setIsDetailFullscreen] = useState(false);
   const [isMainBoardCollapsed, setIsMainBoardCollapsed] = useState(true);
   const [showAddPhase, setShowAddPhase] = useState(false);
   const [newPhaseName, setNewPhaseName] = useState('');
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [selectedTag, setSelectedTag] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState(null);
-  const [activeView, setActiveView] = useState('board');
 
   // Global UI Feedback State
   const [toast, setToast] = useState(null); // { message, type }
@@ -210,12 +212,10 @@ export default function KanbanBoard({ onShowLogin }) {
   const detailPhase = detailItem ? phases.find(p => p.items.some(i => i.id === detailItemId)) : null;
   const totalMembers = peopleTeams.reduce((acc, team) => acc + team.members.length, 0);
   const closeDetailPanel = () => {
-    setDetailItemId(null);
-    setIsDetailFullscreen(false);
+    setUrlState({ itemId: null, fullscreen: false });
   };
   const handleBreadcrumbNavigate = (type, payload = {}) => {
-    setActiveView('board');
-    closeDetailPanel();
+    setUrlState({ view: 'board', itemId: null, fullscreen: false });
 
     if (type !== 'project' || !payload.projectId) return;
 
@@ -233,11 +233,11 @@ export default function KanbanBoard({ onShowLogin }) {
         
         {/* Main Content Area */}
           <div 
-            className={`flex-1 flex flex-col min-w-0 ${isResizing ? 'select-none pointer-events-none' : 'transition-all duration-300 ease-notion'}`}
+            className={`flex-1 flex flex-col min-w-0 ${isResizing ? 'select-none pointer-events-none' : 'transition-all duration-300 ease-notion'} ${detailItemId && !isDetailFullscreen ? 'overflow-hidden' : ''}`}
             style={{ marginRight: detailItemId && !isDetailFullscreen ? `${panelWidth}vw` : '0' }}
           >
           {/* Notion Style Header */}
-          <header className="px-10 py-5 flex justify-between items-center bg-white dark:bg-bg-base border-b border-gray-100 dark:border-border-subtle transition-colors duration-200">
+          <header className={`pl-10 py-5 flex justify-between items-center bg-white dark:bg-bg-base border-b border-gray-100 dark:border-border-subtle transition-all duration-300 ease-notion ${detailItemId && !isDetailFullscreen ? 'pr-4' : 'pr-10'}`}>
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-3">
                 <div className="text-3xl filter drop-shadow-sm">📂</div>
@@ -248,7 +248,7 @@ export default function KanbanBoard({ onShowLogin }) {
               
               <nav className="flex items-center gap-1 p-1 rounded-xl bg-gray-50 dark:bg-bg-elevated border border-gray-100 dark:border-border-subtle transition-colors duration-200">
                 <button
-                  onClick={() => setActiveView('board')}
+                  onClick={() => setUrlState({ view: 'board' })}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${
                     activeView === 'board'
                       ? 'bg-white dark:bg-bg-hover text-gray-900 dark:text-text-primary shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.05]'
@@ -258,7 +258,7 @@ export default function KanbanBoard({ onShowLogin }) {
                   보드
                 </button>
                 <button
-                  onClick={() => setActiveView('people')}
+                  onClick={() => setUrlState({ view: 'people' })}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${
                     activeView === 'people'
                       ? 'bg-white dark:bg-bg-hover text-gray-900 dark:text-text-primary shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.05]'
@@ -298,7 +298,7 @@ export default function KanbanBoard({ onShowLogin }) {
 
           {/* Filter Bar (Notion Style) */}
           {activeView === 'board' && (
-            <div className="px-10 py-3 border-b border-gray-100 dark:border-border-subtle flex items-center gap-8 overflow-x-auto no-scrollbar bg-white dark:bg-bg-base transition-colors duration-200">
+            <div className={`pl-10 py-3 border-b border-gray-100 dark:border-border-subtle flex items-center gap-8 overflow-x-auto no-scrollbar bg-white dark:bg-bg-base transition-all duration-300 ease-notion ${detailItemId && !isDetailFullscreen ? 'pr-4' : 'pr-10'}`}>
               <div className="flex items-center gap-3">
                 <span className="text-label text-gray-400 dark:text-text-tertiary whitespace-nowrap">팀별 필터</span>
                 <div className="flex gap-2">
@@ -338,8 +338,15 @@ export default function KanbanBoard({ onShowLogin }) {
 
           {/* Board Scroll Area */}
           {activeView === 'board' ? (
-            <div className="flex-1 overflow-x-auto overflow-y-auto p-10 custom-scrollbar bg-white dark:bg-bg-base transition-colors duration-200 flex flex-col gap-20">
-            
+            <div
+              className={`flex-1 overflow-x-auto overflow-y-auto pt-10 pb-10 pl-10 custom-scrollbar bg-white dark:bg-bg-base transition-all duration-300 ease-notion flex flex-col gap-20 ${detailItemId && !isDetailFullscreen ? 'pr-4' : 'pr-10'}`}
+              onClick={(e) => {
+                if (!detailItemId) return;
+                if (e.target.closest('button, a, input, textarea, select, [contenteditable="true"], [role="button"], [data-interactive]')) return;
+                closeDetailPanel();
+              }}
+            >
+
             {/* Separate Board Sections */}
             {[...DISPLAY_BOARDS].sort((a, b) => {
               if (a === 'main') return -1;
@@ -414,7 +421,7 @@ export default function KanbanBoard({ onShowLogin }) {
                               selectedTeam={selectedTeam} selectedTag={selectedTag} selectedStatus={selectedStatus}
                               onAddItem={addItem} onUpdateItem={updateItem} onDeleteItem={deleteItem} onUpdatePhase={updatePhase} onDeletePhase={deletePhase}
                               onAddComment={addComment} onUpdateComment={updateComment} onDeleteComment={deleteComment}
-                              onOpenDetail={setDetailItemId}
+                              onOpenDetail={(itemId) => setUrlState({ itemId })}
                               onShowConfirm={showConfirm}
                               onShowToast={showToast}
                               isReadOnly={!user}
@@ -459,7 +466,7 @@ export default function KanbanBoard({ onShowLogin }) {
               teams={peopleTeams}
               loading={peopleLoading}
               error={peopleError}
-              onOpenItem={(itemId) => setDetailItemId(itemId)}
+              onOpenItem={(itemId) => setUrlState({ itemId })}
               projectAssignees={phases.reduce((acc, p) => { acc[p.title] = p.assignees || []; return acc; }, {})}
             />
           )}
@@ -468,20 +475,22 @@ export default function KanbanBoard({ onShowLogin }) {
         {/* Side Detail Panel (Fixed on the right when active) */}
         {detailItemId && detailItem && detailPhase && (
           <div 
-            className={`fixed top-0 right-0 h-full bg-white dark:bg-bg-base z-[100] transition-all duration-500 ease-notion overflow-hidden flex ${
+            className={`fixed top-0 right-0 h-full bg-white dark:bg-bg-base z-[100] overflow-hidden flex ${
+              isResizing ? '' : 'transition-all duration-500 ease-notion'
+            } ${
               isDetailFullscreen
                 ? 'w-screen border-l-0 shadow-none'
-                : 'shadow-[-20px_0_60px_rgba(0,0,0,0.1)] border-l border-gray-100 dark:border-border-subtle'
+                : 'shadow-[-10px_0_40px_rgba(0,0,0,0.06)] border-l border-gray-100 dark:border-border-subtle'
             }`}
             style={isDetailFullscreen ? undefined : { width: `${panelWidth}vw`, minWidth: '450px' }}
           >
-            {/* Resize Handle */}
+            {/* Resize Handle (Using the border as the handle) */}
             {!isDetailFullscreen && (
               <div 
-                className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-500/50 active:bg-blue-600/70 z-50 group transition-colors"
+                className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize z-50 group transition-all duration-300"
                 onMouseDown={startResizing}
               >
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-0.5 h-12 bg-gray-200 dark:bg-border-strong rounded-full group-hover:bg-blue-500 transition-colors"></div>
+                <div className="absolute inset-y-0 left-0 w-[2px] bg-gray-100 dark:bg-border-subtle group-hover:bg-blue-500/50 group-active:bg-blue-600 transition-colors"></div>
               </div>
             )}
             
@@ -492,13 +501,13 @@ export default function KanbanBoard({ onShowLogin }) {
                 allItems={phases.flatMap(p => p.items)}
                 onClose={closeDetailPanel}
                 isFullscreen={isDetailFullscreen}
-                onToggleFullscreen={() => setIsDetailFullscreen(prev => !prev)}
+                onToggleFullscreen={() => setUrlState({ fullscreen: !isDetailFullscreen })}
                 onBreadcrumbNavigate={handleBreadcrumbNavigate}
                 onUpdateItem={updateItem}
                 onAddComment={addComment}
                 onUpdateComment={updateComment}
                 onDeleteComment={deleteComment}
-                onOpenDetail={setDetailItemId}
+                onOpenDetail={(itemId) => setUrlState({ itemId })}
                 onShowConfirm={showConfirm}
                 onShowToast={showToast}
                 isReadOnly={!user}
