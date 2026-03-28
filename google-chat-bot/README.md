@@ -88,3 +88,33 @@ cloudflared tunnel run roadmap-bot
 | `OLLAMA_URL` | Mac Mini Ollama 주소 (예: http://192.168.1.10:11434) |
 | `OLLAMA_MODEL` | 사용할 모델 (기본: qwen2.5:14b) |
 | `PORT` | 봇 서버 포트 (기본: 3002) |
+
+---
+
+## Architecture (AI Reference)
+
+> 이 섹션은 AI/MCP 세션을 위한 코드 구조 요약.
+
+```
+google-chat-bot/
+├── index.js           Express 서버 (port 3002). /webhook 수신 → handleAction → handleQuery
+├── handlers/
+│   ├── action.js      NLU 기반 작업 실행 (이슈 생성, 상태 변경). Ollama 우선, 실패 시 기본 명령어 파싱
+│   └── query.js       작업 조회 (팀원별, 프로젝트별). Supabase 직접 쿼리
+└── lib/
+    ├── ollama.js      Ollama health check + chat API 호출
+    └── supabase.js    Supabase 클라이언트 (SUPABASE_SERVICE_KEY 사용 — RLS 우회)
+```
+
+**이벤트 흐름:**
+
+```
+Google Chat → POST /webhook
+  → ADDED_TO_SPACE: 환영 메시지
+  → MESSAGE: handleAction(event) → handleQuery(event) → 텍스트 응답
+```
+
+**자연어 명령 예시:**
+- `홍길동 작업 뭐야?` → handleQuery: 해당 팀원 assigned items 조회
+- `JWT 이슈 완료로 바꿔줘` → handleAction: status='done' 업데이트
+- `새 작업 추가해줘: 로그인 페이지 수정` → handleAction: items 테이블 INSERT
