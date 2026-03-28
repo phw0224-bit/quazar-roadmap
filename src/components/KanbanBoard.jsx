@@ -28,6 +28,7 @@ import BoardSection from './BoardSection';
 import { TEAMS, GLOBAL_TAGS } from '../lib/constants';
 import FilterBar from './FilterBar';
 import SearchModal from './SearchModal';
+import AppLayout from './AppLayout';
 import { useFilterState, applyFilterSort } from '../hooks/useFilterState';
 
 import { Toast, ConfirmModal, InputModal } from './UI/Feedback';
@@ -318,8 +319,19 @@ export default function KanbanBoard({ onShowLogin }) {
   };
 
   return (
+    <AppLayout
+      sections={sections}
+      phases={phases}
+      activeView={activeView}
+      activeItemId={detailItemId}
+      onNavigate={(view) => setUrlState({ view })}
+      onOpenItem={(itemId) => setUrlState({ itemId })}
+      onAddChildPage={addChildPage}
+      onShowPrompt={showPrompt}
+      isReadOnly={!user}
+    >
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="w-full h-screen bg-white dark:bg-bg-base font-sans flex overflow-hidden transition-colors duration-200">
+      <div className="w-full h-full bg-white dark:bg-bg-base font-sans flex overflow-hidden transition-colors duration-200">
         
         {/* Main Content Area */}
           <div 
@@ -668,5 +680,6 @@ export default function KanbanBoard({ onShowLogin }) {
         )}
       </div>
     </DndContext>
+    </AppLayout>
   );
 }
