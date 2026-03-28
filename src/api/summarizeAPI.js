@@ -1,4 +1,15 @@
 /**
+ * @fileoverview AI 요약 API 호출. Express 서버가 Ollama(qwen2.5:14b) 프록시.
+ *
+ * 입력: Tiptap HTML 문자열
+ * 서버 처리: extractTextBlocks(html) → 번호 부여 → Ollama 프롬프트
+ * 출력: { summary: string[], blocks: string[], generatedAt: ISO8601 }
+ *
+ * summary의 [N] 인용 번호는 blocks 배열의 인덱스와 대응.
+ * Ollama 미실행 시 503. 이 경우 ItemDetailPanel에서 에러 메시지 표시.
+ */
+
+/**
  * 본문 HTML 내용을 서버로 보내 AI 요약을 받아옵니다.
  * 서버는 Ollama 로컬 LLM을 호출합니다.
  *

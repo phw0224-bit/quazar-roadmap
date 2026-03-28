@@ -1,3 +1,12 @@
+/**
+ * @fileoverview Express 서버(:3001) 파일 업로드/삭제 클라이언트. axios 사용.
+ *
+ * 서버 저장 경로: server/uploads/{itemId}/{sanitized-filename}
+ * 허용 타입: 이미지(image/*), PDF, Office 문서. 최대 10MB.
+ * 클라이언트 측에서도 MIME 사전 검증 (서버 검증과 이중 체크).
+ *
+ * uploadFile 반환: { url, filename, originalName, mimetype, size }
+ */
 import axios from 'axios';
 
 const FILE_SERVER_URL = '';

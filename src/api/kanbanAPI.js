@@ -1,8 +1,24 @@
+/**
+ * @fileoverview Supabase PostgreSQL CRUD 레이어. 모든 함수는 Supabase JS Client 직접 호출.
+ *
+ * 패턴: const { data, error } = await supabase.from('table').method()
+ *       if (error) throw error;
+ *
+ * order_index 관리: 이동 시 영향받는 배열 전체를 재계산하여 upsert. gap 없이 0부터 연속.
+ * cross-phase moveItem: source/target 두 phase 배열 모두 갱신.
+ * related_items: A→B 추가 시 B→A도 자동 추가 (양방향).
+ */
 import { supabase } from '../lib/supabase';
 
 const normalizeNameKey = (value) => (value || '').trim().toLowerCase();
 
 const supabaseAPI = {
+  /**
+   * @description 전체 보드 데이터를 단일 조회로 로드. projects + items(with comments) + sections.
+   * page_type='page' 아이템은 포함됨 (useKanbanData reducer에서 필터링).
+   * @returns {Promise<{ phases: Array, sections: Array }>}
+   * phases: 각 project에 items 배열 내장, items에 comments(with profiles) 배열 내장
+   */
   getBoardData: async () => {
     // 1. 프로젝트 가져오기
     const { data: projects, error: pError } = await supabase
@@ -240,6 +256,14 @@ const supabaseAPI = {
     if (error) throw error;
   },
 
+  /**
+   * @description 아이템을 다른 phase로 이동하거나 같은 phase 내에서 재정렬.
+   * source와 target phase 양쪽의 order_index 전체를 재계산하여 upsert.
+   * @param {string} sourcePhaseId
+   * @param {string} targetPhaseId - sourcePhaseId와 같으면 재정렬
+   * @param {string} itemId
+   * @param {number} targetIndex - 0-based 삽입 위치
+   */
   moveItem: async (sourcePhaseId, targetPhaseId, itemId, targetIndex) => {
     const { data: targetItems } = await supabase
       .from('items')
@@ -362,6 +386,14 @@ const supabaseAPI = {
 
 export default supabaseAPI;
 
+/**
+ * @description page_type='page' 아이템 생성 + 부모 아이템의 related_items에 양방향 연결.
+ * 칸반 카드가 아닌 문서 페이지 생성. 사이드바 트리에만 표시됨.
+ * @param {string} projectId - 속할 project(phase) ID
+ * @param {string} parentItemId - 부모 아이템 (related_items 양방향 연결)
+ * @param {string} title
+ * @returns {Promise<Object>} 생성된 item 객체
+ */
 export async function createChildPage(projectId, parentItemId, title) {
   const { data: existing } = await supabase
     .from('items')
