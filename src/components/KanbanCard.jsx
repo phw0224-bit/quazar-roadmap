@@ -4,7 +4,7 @@ import { MessageSquare, FileText, ExternalLink, Trash2, CheckCircle2 } from 'luc
 import { STATUS_MAP, TEAM_COLORS, GLOBAL_TAGS } from '../lib/constants';
 
 export default function KanbanCard({
-  item, itemIndex, phaseId, accentColor, selectedTeam, selectedTag, selectedStatus,
+  item, itemIndex, phaseId, accentColor,
   onUpdateItem, onDeleteItem, onOpenDetail, onShowConfirm, onShowToast,
   isDragging = false, isReadOnly = false,
 }) {
@@ -25,10 +25,6 @@ export default function KanbanCard({
     } : {})
   };
 
-  const isTeamMatch = selectedTeam && (item.teams || []).includes(selectedTeam);
-  const isTagMatch = selectedTag && (item.tags || []).includes(selectedTag);
-  const isStatusMatch = selectedStatus && item.status === selectedStatus;
-  const isHighlighted = isTeamMatch || isTagMatch || isStatusMatch;
   const isCompleted = item.status === 'done';
 
   const stopProp = (e) => e.stopPropagation();
@@ -45,13 +41,13 @@ export default function KanbanCard({
       className={`group relative border rounded-2xl p-5 transition-all duration-300 ease-notion flex flex-col gap-4
       ${isReadOnly ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}
       ${isCompleted ? 'border-emerald-500 bg-emerald-50/30 dark:bg-emerald-900/10 ring-2 ring-emerald-500/20 opacity-60 saturate-50' : 'bg-white dark:bg-bg-elevated border-gray-100 dark:border-border-subtle shadow-sm dark:shadow-none'}
-      ${isHighlighted ? 'border-2 !border-blue-500 shadow-xl ring-4 ring-blue-500/10 scale-[1.02] z-10' : 'hover:border-gray-300 dark:hover:border-border-strong hover:shadow-md dark:hover:bg-bg-hover'}
+      hover:border-gray-300 dark:hover:border-border-strong hover:shadow-md dark:hover:bg-bg-hover
       ${isSortableDragging ? 'opacity-20 border-2 border-dashed border-gray-300 dark:border-border-strong bg-gray-50 dark:bg-bg-base shadow-none pointer-events-none' : ''}
       ${isDragging ? 'shadow-2xl dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] !bg-white dark:!bg-bg-hover ring-2 ring-blue-500/30 opacity-100 z-[1000]' : ''}`}
       {...attributes} {...listeners}
     >
       <div className="flex items-start gap-4">
-        <div className={`font-mono text-[13px] font-black min-w-[32px] text-right pt-1 leading-none tabular-nums tracking-tighter ${isHighlighted ? 'text-blue-500' : (accentColor || 'text-gray-300 dark:text-text-tertiary')}`}>
+        <div className={`font-mono text-[13px] font-black min-w-[32px] text-right pt-1 leading-none tabular-nums tracking-tighter ${accentColor || 'text-gray-300 dark:text-text-tertiary'}`}>
           {itemIndex?.toString().padStart(2, '0')}
         </div>
 

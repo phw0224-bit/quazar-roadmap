@@ -23,7 +23,7 @@ function getProjectTint(projectId, projectIndex) {
 }
 
 export default function ProjectColumn({
-  phase: project, phaseIndex: projectIndex, selectedTeam, selectedTag, selectedStatus, isDragging: isDraggingProp = false,
+  phase: project, phaseIndex: projectIndex, isDragging: isDraggingProp = false,
   onAddItem, onUpdateItem, onDeleteItem, onUpdatePhase: onUpdateProject, onDeletePhase: onDeleteProject,
   onOpenDetail, onShowConfirm, onShowToast,
   isReadOnly = false,
@@ -83,10 +83,6 @@ export default function ProjectColumn({
     onShowToast?.('프로젝트 담당자가 업데이트되었습니다.');
   };
 
-  // 필터링 강조 로직
-  const isTeamMatch = selectedTeam && (project.teams || []).includes(selectedTeam);
-  const isTagMatch = selectedTag && project.items.some(item => (item.tags || []).includes(selectedTag));
-  const isHighlighted = isTeamMatch || isTagMatch;
   const projectTint = getProjectTint(project.id, projectIndex);
 
   const stopProp = (e) => {
@@ -99,7 +95,6 @@ export default function ProjectColumn({
       id={`project-${project.id}`}
       ref={setNodeRef} style={style}
       className={`flex flex-col min-w-[340px] max-w-[340px] h-full transition-all duration-300 ease-notion rounded-3xl border ${projectTint.column}
-      ${isHighlighted ? 'ring-4 ring-blue-500/20 border-blue-500/50' : ''}
       ${isDragging ? 'shadow-2xl ring-2 ring-blue-500 border-blue-500 bg-white dark:bg-bg-elevated scale-[1.02] z-[1000]' : ''}`}
     >
       {/* Column Header */}
@@ -227,7 +222,6 @@ export default function ProjectColumn({
           {project.items.map((item, idx) => (
             <KanbanCard
               key={item.id} item={item} itemIndex={idx + 1} phaseId={project.id}
-              selectedTeam={selectedTeam} selectedTag={selectedTag} selectedStatus={selectedStatus}
               onUpdateItem={onUpdateItem} onDeleteItem={onDeleteItem}
               onOpenDetail={onOpenDetail}
               onShowConfirm={onShowConfirm}

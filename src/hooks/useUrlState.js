@@ -1,5 +1,32 @@
 import { useState, useEffect, useCallback } from 'react';
 
+// filter 파라미터 형식: "status:done,teams:AI팀"
+// sort 파라미터 형식: "title:asc"
+// group 파라미터 형식: "status"
+
+function parseFilters(str) {
+  if (!str) return [];
+  return str.split(',').map(s => {
+    const idx = s.indexOf(':');
+    if (idx === -1) return null;
+    return { field: s.slice(0, idx).trim(), value: s.slice(idx + 1).trim() };
+  }).filter(Boolean).filter(f => f.field && f.value);
+}
+
+function serializeFilters(filters) {
+  if (!filters || filters.length === 0) return null;
+  return filters.map(f => `${f.field}:${f.value}`).join(',');
+}
+
+function parseSort(str) {
+  if (!str) return null;
+  const idx = str.lastIndexOf(':');
+  if (idx === -1) return null;
+  const field = str.slice(0, idx);
+  const dir = str.slice(idx + 1);
+  return field ? { field, dir: dir === 'desc' ? 'desc' : 'asc' } : null;
+}
+
 function parseUrlState() {
   const params = new URLSearchParams(window.location.search);
   return {
@@ -7,6 +34,9 @@ function parseUrlState() {
     itemId: params.get('item') || null,
     fullscreen: params.get('fullscreen') === '1',
     scrollTo: params.get('scrollTo') || null,
+    filters: parseFilters(params.get('filter')),
+    sort: parseSort(params.get('sort')),
+    group: params.get('group') || null,
   };
 }
 
@@ -16,6 +46,10 @@ function buildSearch(state) {
   if (state.itemId) params.set('item', state.itemId);
   if (state.fullscreen) params.set('fullscreen', '1');
   if (state.scrollTo) params.set('scrollTo', state.scrollTo);
+  const filterStr = serializeFilters(state.filters);
+  if (filterStr) params.set('filter', filterStr);
+  if (state.sort) params.set('sort', `${state.sort.field}:${state.sort.dir}`);
+  if (state.group) params.set('group', state.group);
   const search = params.toString();
   return search ? `?${search}` : window.location.pathname;
 }

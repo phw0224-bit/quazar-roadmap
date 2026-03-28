@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTheme } from 'next-themes';
 import { Moon, Sun } from 'lucide-react';
 import {
@@ -26,6 +26,8 @@ import ItemDetailPanel from './ItemDetailPanel';
 import PeopleBoard from './PeopleBoard';
 import BoardSection from './BoardSection';
 import { TEAMS, GLOBAL_TAGS } from '../lib/constants';
+import FilterBar from './FilterBar';
+import { useFilterState, applyFilterSort } from '../hooks/useFilterState';
 
 import { Toast, ConfirmModal, InputModal } from './UI/Feedback';
 
@@ -109,9 +111,10 @@ export default function KanbanBoard({ onShowLogin }) {
       return true;
     }
   });
-  const [selectedTeam, setSelectedTeam] = useState(null);
-  const [selectedTag] = useState(null);
-  const [selectedStatus, setSelectedStatus] = useState(null);
+  const {
+    filters, sort, group, hasActiveFilters,
+    addFilter, removeFilter, reset: resetFilters, setSort, setGroup,
+  } = useFilterState();
 
   // Global UI Feedback State
   const [toast, setToast] = useState(null); // { message, type }
@@ -126,6 +129,15 @@ export default function KanbanBoard({ onShowLogin }) {
     useSensor(PointerSensor, { distance: 8 }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+
+  // 필터/정렬 적용된 phases 파생
+  const filteredPhases = useMemo(() => {
+    if (!filters.length && !sort) return phases;
+    return phases.map(phase => ({
+      ...phase,
+      items: applyFilterSort(phase.items || [], filters, sort),
+    }));
+  }, [phases, filters, sort]);
 
   const findContainer = (id) => {
     if (phases.find((p) => p.id === id)) return id;
@@ -353,44 +365,19 @@ export default function KanbanBoard({ onShowLogin }) {
             </div>
           </header>
 
-          {/* Filter Bar (Notion Style) */}
+          {/* Filter Bar */}
           {activeView === 'board' && (
-            <div className={`pl-10 py-3 border-b border-gray-100 dark:border-border-subtle flex items-center gap-8 overflow-x-auto no-scrollbar bg-white dark:bg-bg-base transition-all duration-300 ease-notion ${detailItemId && !isDetailFullscreen ? 'pr-4' : 'pr-10'}`}>
-              <div className="flex items-center gap-3">
-                <span className="text-label text-gray-400 dark:text-text-tertiary whitespace-nowrap">팀별 필터</span>
-                <div className="flex gap-2">
-                  {TEAMS.map(team => (
-                    <button
-                      key={team.name}
-                      onClick={() => setSelectedTeam(selectedTeam === team.name ? null : team.name)}
-                      className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all border ${selectedTeam === team.name ? 'bg-gray-900 dark:bg-white border-gray-900 dark:border-white text-white dark:text-gray-900 shadow-md' : 'bg-white dark:bg-bg-elevated border-gray-200 dark:border-border-subtle text-gray-500 dark:text-text-secondary hover:border-gray-400 dark:hover:border-border-strong cursor-pointer'}`}
-                    >
-                      {team.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="h-4 w-[1px] bg-gray-200 dark:bg-border-subtle"></div>
-
-              <div className="flex items-center gap-3">
-                <span className="text-label text-gray-400 dark:text-text-tertiary whitespace-nowrap">상태</span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setSelectedStatus(selectedStatus === 'in-progress' ? null : 'in-progress')}
-                    className={`px-4 py-1.5 rounded-lg text-sm font-bold border transition-all cursor-pointer ${selectedStatus === 'in-progress' ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white dark:bg-bg-elevated border-gray-200 dark:border-border-subtle text-gray-500 dark:text-text-secondary hover:border-gray-400 dark:hover:border-border-strong'}`}
-                  >
-                    진행 중
-                  </button>
-                  <button
-                    onClick={() => setSelectedStatus(selectedStatus === 'done' ? null : 'done')}
-                    className={`px-4 py-1.5 rounded-lg text-sm font-bold border transition-all cursor-pointer ${selectedStatus === 'done' ? 'bg-green-600 border-green-600 text-white shadow-md' : 'bg-white dark:bg-bg-elevated border-gray-200 dark:border-border-subtle text-gray-500 dark:text-text-secondary hover:border-gray-400 dark:hover:border-border-strong'}`}
-                  >
-                    완료
-                  </button>
-                </div>
-              </div>
-            </div>
+            <FilterBar
+              filters={filters}
+              sort={sort}
+              group={group}
+              hasActiveFilters={hasActiveFilters}
+              onAddFilter={addFilter}
+              onRemoveFilter={removeFilter}
+              onClearFilters={resetFilters}
+              onSetSort={setSort}
+              onSetGroup={setGroup}
+            />
           )}
 
           {/* Board Scroll Area */}
@@ -413,7 +400,7 @@ export default function KanbanBoard({ onShowLogin }) {
               if (userDept === b) return 1;
               return 0;
             }).map(boardName => {
-              const boardPhases = phases.filter(p => (p.board_type || 'main') === boardName.toLowerCase()); // phases = projects
+              const boardPhases = filteredPhases.filter(p => (p.board_type || 'main') === boardName.toLowerCase());
               const boardDisplayName = boardName === 'main' ? '전체 프로젝트 보드' : `${boardName} 보드`;
               const boardIcon = boardName === 'main' ? '🌐' : boardName === '개발팀' ? '⚙️' : '📂';
               const isMain = boardName === 'main';
@@ -484,7 +471,6 @@ export default function KanbanBoard({ onShowLogin }) {
                       .sort((a, b) => a.order_index - b.order_index);
                     const isEmpty = boardPhases.length === 0 && boardSections.length === 0;
                     const projectColumnProps = {
-                      selectedTeam, selectedTag, selectedStatus,
                       onAddItem: addItem, onUpdateItem: updateItem, onDeleteItem: deleteItem,
                       onUpdatePhase: updatePhase, onDeletePhase: deletePhase,
                       onOpenDetail: (itemId) => setUrlState({ itemId }),
