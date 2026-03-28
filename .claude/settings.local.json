@@ -13,7 +13,13 @@
       "Bash(cmd.exe)",
       "Bash(cmd.exe /c 'where node 2>&1')",
       "Bash(export PATH=\"/c/Program Files/nodejs:$PATH\")",
-      "Bash(cat \"/c/Users/uguls/Documents/quazar-roadmap-main/.superpowers/brainstorm/\"*/state/server-info)"
+      "Bash(cat \"/c/Users/uguls/Documents/quazar-roadmap-main/.superpowers/brainstorm/\"*/state/server-info)",
+      "Bash(yarn add:*)",
+      "Bash(export 'PATH=/c/Program Files/nodejs:$PATH')",
+      "Bash(node '/c/Program Files/nodejs/node_modules/yarn/bin/yarn.js' --version)",
+      "Read(//c/Users/uguls/AppData/Roaming/**)",
+      "Bash('/c/Program Files/nodejs/npm.cmd' list -g yarn)",
+      "Bash(node -e \"const {execSync}=require\\(''child_process''\\);console.log\\(execSync\\(''npm root -g''\\).toString\\(\\).trim\\(\\)\\)\")"
     ]
   }
 }

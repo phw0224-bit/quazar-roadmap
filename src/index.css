@@ -292,3 +292,106 @@ input:focus, textarea:focus {
   border: 1px solid transparent;
   @apply dark:border-border-subtle;
 }
+
+/* ── TaskList (체크리스트) ── */
+.tiptap-content ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.tiptap-content ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.tiptap-content ul[data-type="taskList"] li > label {
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+  display: flex;
+  align-items: center;
+}
+
+.tiptap-content ul[data-type="taskList"] li > label input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #3b82f6;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.tiptap-content ul[data-type="taskList"] li[data-checked="true"] > div {
+  opacity: 0.6;
+  text-decoration: line-through;
+}
+
+/* ── CodeBlock (lowlight 하이라이팅) ── */
+.tiptap-content pre {
+  background: #1e1e2e !important;
+  color: #cdd6f4;
+  border-radius: 0.5rem;
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.tiptap-content pre code {
+  background: none !important;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+/* lowlight token colors (Catppuccin Mocha palette) */
+.tiptap-content .hljs-comment,
+.tiptap-content .hljs-quote { color: #6c7086; font-style: italic; }
+.tiptap-content .hljs-keyword,
+.tiptap-content .hljs-selector-tag,
+.tiptap-content .hljs-built_in { color: #cba6f7; }
+.tiptap-content .hljs-string,
+.tiptap-content .hljs-attr { color: #a6e3a1; }
+.tiptap-content .hljs-number,
+.tiptap-content .hljs-literal { color: #fab387; }
+.tiptap-content .hljs-title,
+.tiptap-content .hljs-class,
+.tiptap-content .hljs-function { color: #89b4fa; }
+.tiptap-content .hljs-type { color: #f38ba8; }
+.tiptap-content .hljs-variable,
+.tiptap-content .hljs-name { color: #cdd6f4; }
+.tiptap-content .hljs-tag { color: #f38ba8; }
+.tiptap-content .hljs-params { color: #fab387; }
+.tiptap-content .hljs-meta { color: #f9e2af; }
+
+/* ── 블록 드래그 핸들 (편집 모드, 호버 시 왼쪽 표시) ── */
+.tiptap-wrapper:has(.ProseMirror[contenteditable="true"]) .ProseMirror > * {
+  position: relative;
+}
+
+.tiptap-wrapper:has(.ProseMirror[contenteditable="true"]) .ProseMirror > *::before {
+  content: '⠿';
+  position: absolute;
+  left: -1.5rem;
+  top: 0.15em;
+  color: transparent;
+  font-size: 0.875rem;
+  cursor: grab;
+  user-select: none;
+  transition: color 0.15s;
+  line-height: 1.5;
+  pointer-events: none;
+}
+
+.tiptap-wrapper:has(.ProseMirror[contenteditable="true"]) .ProseMirror > *:hover::before {
+  color: #d1d5db;
+}
+
+.dark .tiptap-wrapper:has(.ProseMirror[contenteditable="true"]) .ProseMirror > *:hover::before {
+  color: #4b5563;
+}
+
+/* 편집 모드에서 왼쪽 여백 확보 (드래그 핸들 공간) */
+.tiptap-wrapper:has(.ProseMirror[contenteditable="true"]) .ProseMirror {
+  padding-left: 1.75rem;
+}

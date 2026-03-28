@@ -1,113 +1,37 @@
-import { useEditor, EditorContent, NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
+import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table';
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import { createLowlight, common } from 'lowlight';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
 import { marked } from 'marked';
 import TurndownService from 'turndown';
 import { DOMSerializer } from '@tiptap/pm/model';
 import { useRef, useEffect } from 'react';
 import {
   Bold, Italic, List, ListOrdered, Quote, Code, Minus,
-  Heading1, Heading2, Heading3, ImagePlus
+  Heading1, Heading2, Heading3, ImagePlus, CheckSquare
 } from 'lucide-react';
 
-const turndown = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced' });
+import ResizableImage from './extensions/ResizableImage';
+import Callout from './extensions/Callout';
+import Toggle from './extensions/Toggle';
+import SlashCommand from './extensions/SlashCommand';
 
-// 드래그 리사이즈 가능한 이미지 NodeView
-function ImageResizeView({ node, updateAttributes, selected, editor }) {
-  const imgRef = useRef(null);
-  const isEditable = editor.isEditable;
-
-  const handleMouseDown = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const startX = e.clientX;
-    const startWidth = imgRef.current.offsetWidth;
-
-    const onMouseMove = (e) => {
-      const newWidth = Math.max(50, startWidth + (e.clientX - startX));
-      imgRef.current.style.width = `${newWidth}px`;
-    };
-
-    const onMouseUp = () => {
-      updateAttributes({ width: `${imgRef.current.offsetWidth}px` });
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-    };
-
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  };
-
-  return (
-    <NodeViewWrapper style={{ display: 'inline-block', position: 'relative', maxWidth: '100%' }}>
-      <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%' }}>
-        <img
-          ref={imgRef}
-          src={node.attrs.src}
-          alt={node.attrs.alt || ''}
-          style={{
-            width: node.attrs.width || 'auto',
-            maxWidth: '100%',
-            height: 'auto',
-            display: 'block',
-            borderRadius: '0.5rem',
-            outline: selected ? '2px solid #3b82f6' : 'none',
-            outlineOffset: '2px',
-          }}
-          draggable={false}
-        />
-        {isEditable && selected && (
-          <div
-            onMouseDown={handleMouseDown}
-            style={{
-              position: 'absolute',
-              right: -5,
-              bottom: -5,
-              width: 14,
-              height: 14,
-              background: '#3b82f6',
-              border: '2px solid white',
-              borderRadius: '50%',
-              cursor: 'se-resize',
-              zIndex: 10,
-            }}
-          />
-        )}
-      </div>
-    </NodeViewWrapper>
-  );
-}
-
-// 이미지 width 속성 + 드래그 리사이즈 NodeView 확장
-const ResizableImage = Image.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      width: {
-        default: null,
-        parseHTML: element => element.style.width || element.getAttribute('width') || null,
-        renderHTML: attributes => {
-          if (!attributes.width) return {};
-          return { style: `width: ${attributes.width}` };
-        },
-      },
-    };
-  },
-  addNodeView() {
-    return ReactNodeViewRenderer(ImageResizeView);
-  },
+const lowlight = createLowlight(common);
+const turndown = new TurndownService({
+  headingStyle: 'atx',
+  bulletListMarker: '-',
+  codeBlockStyle: 'fenced',
 });
 
-// 기존 markdown 또는 HTML 콘텐츠를 Tiptap용 HTML로 변환
 function convertToHTML(content) {
   if (!content) return '';
   if (content.trimStart().startsWith('<')) return content;
   return marked(content);
 }
-
 
 function ToolbarButton({ onClick, isActive, title, children }) {
   return (
@@ -136,23 +60,16 @@ function Toolbar({ editor, itemId, onShowToast }) {
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (file.size > 10 * 1024 * 1024) {
       onShowToast?.('파일 크기는 10MB를 초과할 수 없습니다.');
       return;
     }
-
     const formData = new FormData();
     formData.append('file', file);
-
     try {
-      const response = await fetch(`/upload/${itemId}`, {
-        method: 'POST',
-        body: formData,
-      });
+      const response = await fetch(`/upload/${itemId}`, { method: 'POST', body: formData });
       if (!response.ok) throw new Error('업로드 실패');
       const result = await response.json();
-
       if (result.mimetype?.startsWith('image/')) {
         editor.chain().focus().setImage({ src: result.url, alt: result.originalName, width: null }).run();
       } else {
@@ -164,7 +81,6 @@ function Toolbar({ editor, itemId, onShowToast }) {
     } catch (err) {
       onShowToast?.('파일 업로드 실패: ' + err.message);
     }
-
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -193,6 +109,9 @@ function Toolbar({ editor, itemId, onShowToast }) {
       <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} isActive={editor.isActive('orderedList')} title="번호 목록">
         <ListOrdered size={15} />
       </ToolbarButton>
+      <ToolbarButton onClick={() => editor.chain().focus().toggleTaskList().run()} isActive={editor.isActive('taskList')} title="체크리스트">
+        <CheckSquare size={15} />
+      </ToolbarButton>
       <Divider />
       <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} isActive={editor.isActive('blockquote')} title="인용">
         <Quote size={15} />
@@ -218,27 +137,31 @@ function Toolbar({ editor, itemId, onShowToast }) {
   );
 }
 
-export default function TiptapEditor({ content, onChange, editable, itemId, onShowToast, onBlur }) {
+export default function Editor({ content, onChange, editable, itemId, onShowToast, onBlur }) {
   const lastEmittedHTML = useRef(null);
   const editorRef = useRef(null);
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({ codeBlock: false }),
+      CodeBlockLowlight.configure({ lowlight }),
+      TaskList,
+      TaskItem.configure({ nested: true }),
       ResizableImage.configure({ inline: false }),
       Table.configure({ resizable: false }),
       TableRow,
       TableHeader,
       TableCell,
       Placeholder.configure({
-        placeholder: '내용을 입력하세요... (# 헤더, **볼드**, - 목록)',
+        placeholder: '내용을 입력하세요... (/ 로 블록 추가, # 헤더, **볼드**, - 목록)',
       }),
+      Callout,
+      Toggle,
+      SlashCommand,
     ],
     content: convertToHTML(content),
     editable,
-    onCreate: ({ editor }) => {
-      editorRef.current = editor;
-    },
+    onCreate: ({ editor }) => { editorRef.current = editor; },
     editorProps: {
       handlePaste: (_view, event) => {
         const text = event.clipboardData?.getData('text/plain');
@@ -255,8 +178,7 @@ export default function TiptapEditor({ content, onChange, editable, itemId, onSh
         const div = document.createElement('div');
         div.appendChild(serializer.serializeFragment(fragment));
         const html = div.innerHTML;
-        const markdown = turndown.turndown(html);
-        event.clipboardData?.setData('text/plain', markdown);
+        event.clipboardData?.setData('text/plain', turndown.turndown(html));
         event.clipboardData?.setData('text/html', html);
         event.preventDefault();
         return true;
@@ -269,8 +191,7 @@ export default function TiptapEditor({ content, onChange, editable, itemId, onSh
         const div = document.createElement('div');
         div.appendChild(serializer.serializeFragment(fragment));
         const html = div.innerHTML;
-        const markdown = turndown.turndown(html);
-        event.clipboardData?.setData('text/plain', markdown);
+        event.clipboardData?.setData('text/plain', turndown.turndown(html));
         event.clipboardData?.setData('text/html', html);
         event.preventDefault();
         view.dispatch(view.state.tr.deleteSelection());
@@ -282,28 +203,22 @@ export default function TiptapEditor({ content, onChange, editable, itemId, onSh
       lastEmittedHTML.current = html;
       onChange?.(html);
     },
-    onBlur: ({ event }) => {
-      onBlur?.(event);
-    },
+    onBlur: ({ event }) => { onBlur?.(event); },
   });
 
-  // editable prop 변경 시 editor에 반영
   useEffect(() => {
     if (editor && editor.isEditable !== editable) {
       editor.setEditable(editable);
     }
   }, [editor, editable]);
 
-  // 외부에서 content가 바뀔 때 (취소, 아이템 변경 등) editor 내용 동기화
   useEffect(() => {
     if (!editor) return;
     const newHTML = convertToHTML(content);
-    // 방금 내가 emit한 변경이면 무시 (무한루프 방지)
     if (newHTML === lastEmittedHTML.current) {
       lastEmittedHTML.current = null;
       return;
     }
-    // 에디터 포커스 중이 아닐 때만 강제 동기화
     if (!editor.isFocused) {
       editor.commands.setContent(newHTML, false);
     }

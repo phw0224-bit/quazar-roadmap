@@ -6,7 +6,7 @@ import {
   Sparkles, RefreshCw
 } from 'lucide-react';
 import CommentSection from './CommentSection';
-import TiptapEditor from './TiptapEditor';
+import TiptapEditor from './editor/Editor';
 import { TEAMS, STATUS_MAP } from '../lib/constants';
 import { summarizeContent } from '../api/summarizeAPI';
 
