@@ -361,3 +361,46 @@ const supabaseAPI = {
 };
 
 export default supabaseAPI;
+
+export async function createChildPage(projectId, parentItemId, title) {
+  const { data: existing } = await supabase
+    .from('items')
+    .select('order_index')
+    .eq('project_id', projectId)
+    .eq('parent_item_id', parentItemId)
+    .order('order_index', { ascending: false })
+    .limit(1);
+
+  const nextOrder = existing?.length > 0 ? existing[0].order_index + 1 : 0;
+
+  const { data, error } = await supabase
+    .from('items')
+    .insert({
+      project_id: projectId,
+      parent_item_id: parentItemId,
+      title,
+      page_type: 'page',
+      status: 'none',
+      assignees: [],
+      teams: [],
+      tags: [],
+      related_items: [],
+      order_index: nextOrder,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getChildPages(parentItemId) {
+  const { data, error } = await supabase
+    .from('items')
+    .select('*')
+    .eq('parent_item_id', parentItemId)
+    .eq('page_type', 'page')
+    .order('order_index');
+  if (error) throw error;
+  return data;
+}
