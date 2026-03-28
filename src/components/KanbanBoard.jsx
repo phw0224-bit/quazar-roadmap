@@ -29,6 +29,7 @@ import TimelineView from './TimelineView';
 import { TEAMS, GLOBAL_TAGS } from '../lib/constants';
 import FilterBar from './FilterBar';
 import SearchModal from './SearchModal';
+import AppLayout from './AppLayout';
 import { useFilterState, applyFilterSort } from '../hooks/useFilterState';
 
 import { Toast, ConfirmModal, InputModal } from './UI/Feedback';
@@ -40,6 +41,7 @@ export default function KanbanBoard({ onShowLogin }) {
     phases, sections, loading, addPhase, addItem, updateItem, deleteItem,
     moveItem, updatePhase, deletePhase, movePhase, addComment, updateComment, deleteComment,
     addSection, updateSection, deleteSection, moveSection,
+    addChildPage,
   } = useKanbanData();
 
   const { user, logout } = useAuth();
@@ -152,10 +154,12 @@ export default function KanbanBoard({ onShowLogin }) {
 
   // 필터/정렬 적용된 phases 파생
   const filteredPhases = useMemo(() => {
-    if (!filters.length && !sort) return phases;
     return phases.map(phase => ({
       ...phase,
-      items: applyFilterSort(phase.items || [], filters, sort),
+      items: applyFilterSort(
+        (phase.items || []).filter(item => !item.page_type || item.page_type === 'task'),
+        filters, sort
+      ),
     }));
   }, [phases, filters, sort]);
 
@@ -317,8 +321,19 @@ export default function KanbanBoard({ onShowLogin }) {
   };
 
   return (
+    <AppLayout
+      sections={sections}
+      phases={phases}
+      activeView={activeView}
+      activeItemId={detailItemId}
+      onNavigate={(view) => setUrlState({ view })}
+      onOpenItem={(itemId) => setUrlState({ itemId })}
+      onAddChildPage={addChildPage}
+      onShowPrompt={showPrompt}
+      isReadOnly={!user}
+    >
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="w-full h-screen bg-white dark:bg-bg-base font-sans flex overflow-hidden transition-colors duration-200">
+      <div className="w-full h-full bg-white dark:bg-bg-base font-sans flex overflow-hidden transition-colors duration-200">
         
         {/* Main Content Area */}
           <div 
@@ -621,7 +636,7 @@ export default function KanbanBoard({ onShowLogin }) {
               <ItemDetailPanel
                 item={detailItem}
                 phase={detailPhase}
-                allItems={phases.filter(p => (p.board_type || 'main') !== 'main').flatMap(p => p.items)}
+                allItems={phases.flatMap(p => p.items || [])}
                 onClose={closeDetailPanel}
                 isFullscreen={isDetailFullscreen}
                 onToggleFullscreen={() => setUrlState({ fullscreen: !isDetailFullscreen })}
@@ -633,6 +648,8 @@ export default function KanbanBoard({ onShowLogin }) {
                 onOpenDetail={(itemId) => setUrlState({ itemId })}
                 onShowConfirm={showConfirm}
                 onShowToast={showToast}
+                onAddChildPage={addChildPage}
+                onShowPrompt={showPrompt}
                 isReadOnly={!user}
               />
             </div>
@@ -684,5 +701,6 @@ export default function KanbanBoard({ onShowLogin }) {
         )}
       </div>
     </DndContext>
+    </AppLayout>
   );
 }

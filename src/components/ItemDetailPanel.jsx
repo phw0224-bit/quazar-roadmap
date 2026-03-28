@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   ChevronsRight, Maximize2, Minimize2, ChevronRight, CheckCircle2,
   Clock, Users, Building2, Tag, Link2, FileText, Plus, X,
@@ -10,12 +10,14 @@ import TiptapEditor from './editor/Editor';
 import { TEAMS, STATUS_MAP, PRIORITY_MAP } from '../lib/constants';
 import { summarizeContent } from '../api/summarizeAPI';
 
-function ItemDetailPanel({ 
+function ItemDetailPanel({
   item, phase, allItems = [], onClose, onUpdateItem, isReadOnly,
   isFullscreen = false, onToggleFullscreen,
   onBreadcrumbNavigate,
   onAddComment, onUpdateComment, onDeleteComment, onOpenDetail,
-  onShowConfirm, onShowToast
+  onShowConfirm, onShowToast,
+  onAddChildPage,
+  onShowPrompt,
 }) {
   const stopProp = (e) => e.stopPropagation();
   const [description, setDescription] = useState(item?.description || '');
@@ -33,6 +35,12 @@ function ItemDetailPanel({
   const [aiSummary, setAiSummary] = useState(item?.ai_summary || null);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState(null);
+
+  // 하위 페이지: 현재 아이템의 직계 자식 page 타입 아이템
+  const childPages = useMemo(() =>
+    allItems.filter(i => i.parent_item_id === item?.id && i.page_type === 'page'),
+    [allItems, item?.id]
+  );
 
   // 본문 DOM 참조 (citation 클릭 시 해당 블록으로 스크롤)
   const descriptionRef = useRef(null);
@@ -657,6 +665,52 @@ function ItemDetailPanel({
                 onBlur={handleDescriptionBlur}
               />
             </div>
+          </div>
+
+          {/* 하위 페이지 섹션 */}
+          <div className="border-t border-[var(--color-border-subtle)] pt-4 mt-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wide">
+                하위 페이지
+              </span>
+              {!isReadOnly && onAddChildPage && (
+                <button
+                  onPointerDown={stopProp}
+                  onClick={(e) => {
+                    stopProp(e);
+                    onShowPrompt?.('하위 페이지 추가', '페이지 제목을 입력하세요', async (title) => {
+                      if (!title?.trim()) return;
+                      await onAddChildPage(phase?.id, item?.id, title.trim());
+                    });
+                  }}
+                  className="text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)]
+                             px-2 py-0.5 rounded hover:bg-[var(--color-bg-hover)] transition-colors"
+                >
+                  + 추가
+                </button>
+              )}
+            </div>
+
+            {childPages.length === 0 ? (
+              <p className="text-xs text-[var(--color-text-tertiary)] italic">하위 페이지가 없습니다.</p>
+            ) : (
+              <div className="space-y-1">
+                {childPages.map(page => (
+                  <div
+                    key={page.id}
+                    onPointerDown={stopProp}
+                    onClick={(e) => { stopProp(e); onOpenDetail?.(page.id); }}
+                    className="flex items-center gap-2 p-2 rounded cursor-pointer
+                               hover:bg-[var(--color-bg-hover)] transition-colors group"
+                  >
+                    <span className="text-sm flex-shrink-0">📄</span>
+                    <span className="text-sm text-[var(--color-text-primary)] truncate flex-1">
+                      {page.title || '제목 없음'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Comments Section */}

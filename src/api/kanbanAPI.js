@@ -361,3 +361,47 @@ const supabaseAPI = {
 };
 
 export default supabaseAPI;
+
+export async function createChildPage(projectId, parentItemId, title) {
+  const { data: existing } = await supabase
+    .from('items')
+    .select('order_index')
+    .eq('parent_item_id', parentItemId)
+    .order('order_index', { ascending: false })
+    .limit(1);
+
+  const nextOrder = existing?.length > 0 ? existing[0].order_index + 1 : 0;
+
+  const { data, error } = await supabase
+    .from('items')
+    .insert([{
+      project_id: projectId,
+      parent_item_id: parentItemId,
+      title,
+      page_type: 'page',
+      status: 'none',
+      assignees: [],
+      teams: [],
+      tags: [],
+      related_items: [],
+      order_index: nextOrder,
+    }])
+    .select();
+
+  if (error) throw error;
+  return data[0];
+}
+
+// NOTE: 현재 미사용. usePageTree 훅이 이미 로드된 phases 데이터에서
+// 하위 페이지를 파생하므로 직접 API 호출이 필요없음.
+// 향후 on-demand 로딩 시 사용 예정.
+export async function getChildPages(parentItemId) {
+  const { data, error } = await supabase
+    .from('items')
+    .select('*')
+    .eq('parent_item_id', parentItemId)
+    .eq('page_type', 'page')
+    .order('order_index');
+  if (error) throw error;
+  return data;
+}
