@@ -151,10 +151,12 @@ export default function KanbanBoard({ onShowLogin }) {
 
   // 필터/정렬 적용된 phases 파생
   const filteredPhases = useMemo(() => {
-    if (!filters.length && !sort) return phases;
     return phases.map(phase => ({
       ...phase,
-      items: applyFilterSort(phase.items || [], filters, sort),
+      items: applyFilterSort(
+        (phase.items || []).filter(item => !item.page_type || item.page_type === 'task'),
+        filters, sort
+      ),
     }));
   }, [phases, filters, sort]);
 
