@@ -364,34 +364,4 @@ input:focus, textarea:focus {
 .tiptap-content .hljs-params { color: #fab387; }
 .tiptap-content .hljs-meta { color: #f9e2af; }
 
-/* ── 블록 드래그 핸들 (편집 모드, 호버 시 왼쪽 표시) ── */
-.tiptap-wrapper:has(.ProseMirror[contenteditable="true"]) .ProseMirror > * {
-  position: relative;
-}
-
-.tiptap-wrapper:has(.ProseMirror[contenteditable="true"]) .ProseMirror > *::before {
-  content: '⠿';
-  position: absolute;
-  left: -1.5rem;
-  top: 0.15em;
-  color: transparent;
-  font-size: 0.875rem;
-  cursor: grab;
-  user-select: none;
-  transition: color 0.15s;
-  line-height: 1.5;
-  pointer-events: none;
-}
-
-.tiptap-wrapper:has(.ProseMirror[contenteditable="true"]) .ProseMirror > *:hover::before {
-  color: #d1d5db;
-}
-
-.dark .tiptap-wrapper:has(.ProseMirror[contenteditable="true"]) .ProseMirror > *:hover::before {
-  color: #4b5563;
-}
-
-/* 편집 모드에서 왼쪽 여백 확보 (드래그 핸들 공간) */
-.tiptap-wrapper:has(.ProseMirror[contenteditable="true"]) .ProseMirror {
-  padding-left: 1.75rem;
-}
+/* ── 드래그 핸들: Tiptap placeholder::before 와 충돌하므로 CSS 방식 사용 안 함 ── */

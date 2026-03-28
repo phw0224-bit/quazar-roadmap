@@ -27,9 +27,7 @@ function ItemDetailPanel({
   const [relationSearchQuery, setRelationSearchQuery] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(item?.title || item?.content || '');
-  const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [isWideView, setIsWideView] = useState(false);
-  const isCancellingDescriptionRef = useRef(false);
 
   // AI 요약 관련 state
   const [aiSummary, setAiSummary] = useState(item?.ai_summary || null);
@@ -54,27 +52,19 @@ function ItemDetailPanel({
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [item]);
 
-  // 뷰모드에서 description 블록에 id 부여 (citation 스크롤용)
-  // ex) 첫 번째 <p> → id="ai-block-1"
+  // description 블록에 id 부여 (citation 스크롤용)
   useEffect(() => {
-    if (!descriptionRef.current || isEditingDescription) return;
+    if (!descriptionRef.current) return;
     const blocks = descriptionRef.current.querySelectorAll('h1, h2, h3, h4, p, li');
     blocks.forEach((block, i) => {
       block.id = `ai-block-${i + 1}`;
     });
-  }, [description, isEditingDescription]);
+  }, [description]);
 
-  const handleSaveDescription = async () => {
+  const handleDescriptionBlur = async () => {
     if (description !== (item.description || '')) {
       await onUpdateItem(phase.id, item.id, { description });
-      onShowToast?.('상세 설명이 저장되었습니다.');
     }
-    setIsEditingDescription(false);
-  };
-
-  const handleDescriptionBlur = () => {
-    if (isCancellingDescriptionRef.current) return;
-    handleSaveDescription();
   };
 
 
@@ -527,13 +517,10 @@ function ItemDetailPanel({
               <div className="flex items-center gap-3">
                 <FileText size={18} className="text-gray-400" />
                 <h3 className="text-[13px] font-black text-gray-400 dark:text-text-tertiary uppercase tracking-[0.2em]">상세 설명 (Wiki)</h3>
-                {isEditingDescription && <span className="text-[11px] text-emerald-500 font-black animate-pulse flex items-center gap-1.5 ml-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> EDITING MODE
-                </span>}
               </div>
 
-              {/* AI 요약 버튼 - 본문이 있고 편집 모드가 아닐 때만 표시 */}
-              {description && !isEditingDescription && !isReadOnly && (
+              {/* AI 요약 버튼 */}
+              {description && !isReadOnly && (
                 <button
                   onClick={handleSummarize}
                   disabled={isSummarizing}
@@ -606,53 +593,17 @@ function ItemDetailPanel({
               </div>
             )}
 
-            {!isEditingDescription || isReadOnly ? (
-              <div
-                ref={descriptionRef}
-                onClick={() => !isReadOnly && setIsEditingDescription(true)}
-                className={`min-h-[400px] p-8 -m-8 rounded-3xl transition-all duration-300 ease-notion ${!isReadOnly ? 'hover:bg-gray-50 dark:hover:bg-bg-elevated/40 cursor-pointer' : ''}`}
-              >
-                {description ? (
-                  <TiptapEditor
-                    key={`view-${item.id}`}
-                    content={description}
-                    editable={false}
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full py-20 text-center animate-fade-in">
-                    <div className="w-16 h-16 bg-gray-50 dark:bg-bg-hover rounded-2xl flex items-center justify-center text-2xl mb-6 shadow-inner ring-1 ring-gray-100 dark:ring-border-subtle">✍️</div>
-                    <p className="text-xl font-bold text-gray-300 dark:text-text-tertiary tracking-tight">작성된 상세 내용이 없습니다.</p>
-                    <p className="text-sm text-gray-400 dark:text-text-tertiary mt-2">클릭하여 업무 가이드라인이나 상세 내용을 자유롭게 작성하세요.</p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex flex-col gap-4 animate-in fade-in duration-300 ease-notion">
-                <TiptapEditor
-                  key={`edit-${item.id}`}
-                  content={description}
-                  onChange={setDescription}
-                  editable={true}
-                  itemId={item.id}
-                  onShowToast={onShowToast}
-                  onBlur={handleDescriptionBlur}
-                />
-
-                <div className="flex justify-end gap-3">
-                  <button
-                    onMouseDown={() => { isCancellingDescriptionRef.current = true; }}
-                    onClick={() => {
-                      isCancellingDescriptionRef.current = false;
-                      setDescription(item.description || '');
-                      setIsEditingDescription(false);
-                    }}
-                    className="px-6 py-2.5 text-[13px] font-black text-gray-400 hover:text-gray-900 dark:hover:text-text-primary uppercase tracking-widest transition-colors cursor-pointer"
-                  >
-                    취소
-                  </button>
-                </div>
-              </div>
-            )}
+            <div ref={descriptionRef}>
+              <TiptapEditor
+                key={`editor-${item.id}`}
+                content={description}
+                onChange={setDescription}
+                editable={!isReadOnly}
+                itemId={item.id}
+                onShowToast={onShowToast}
+                onBlur={handleDescriptionBlur}
+              />
+            </div>
           </div>
 
           {/* Comments Section */}
