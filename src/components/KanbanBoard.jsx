@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTheme } from 'next-themes';
-import { Moon, Sun } from 'lucide-react';
+import { Moon, Sun, Search } from 'lucide-react';
 import {
   DndContext,
   closestCorners,
@@ -27,6 +27,7 @@ import PeopleBoard from './PeopleBoard';
 import BoardSection from './BoardSection';
 import { TEAMS, GLOBAL_TAGS } from '../lib/constants';
 import FilterBar from './FilterBar';
+import SearchModal from './SearchModal';
 import { useFilterState, applyFilterSort } from '../hooks/useFilterState';
 
 import { Toast, ConfirmModal, InputModal } from './UI/Feedback';
@@ -50,8 +51,21 @@ export default function KanbanBoard({ onShowLogin }) {
   const [peopleError, setPeopleError] = useState(null);
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
 
   useEffect(() => setMounted(true), []);
+
+  // Ctrl+K / Cmd+K 전체 검색 단축키
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowSearch(v => !v);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   useEffect(() => {
     if (loading || !urlState.scrollTo) return;
@@ -345,6 +359,16 @@ export default function KanbanBoard({ onShowLogin }) {
             </div>
 
             <div className="flex items-center gap-4">
+              {/* 검색 버튼 */}
+              <button
+                onClick={() => setShowSearch(true)}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 dark:bg-bg-elevated text-gray-400 dark:text-text-tertiary hover:text-gray-700 dark:hover:text-text-secondary border border-gray-100 dark:border-border-subtle transition-all cursor-pointer text-sm"
+                title="전체 검색 (Ctrl+K)"
+              >
+                <Search size={15} strokeWidth={2.5} />
+                <span className="text-xs font-medium hidden sm:inline">검색</span>
+                <kbd className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-bg-hover text-gray-400 dark:text-text-tertiary font-mono">⌘K</kbd>
+              </button>
               {mounted && (
                 <button
                   onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -612,6 +636,14 @@ export default function KanbanBoard({ onShowLogin }) {
             <ProjectColumn phase={activePhase} phaseIndex={phases.findIndex(p => p.id === activePhase.id) + 1} isDragging />
           ) : null}
         </DragOverlay>
+
+        {/* 전체 검색 모달 */}
+        {showSearch && (
+          <SearchModal
+            onOpenDetail={(itemId) => setUrlState({ itemId })}
+            onClose={() => setShowSearch(false)}
+          />
+        )}
 
         {/* Global Feedback Components */}
         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
