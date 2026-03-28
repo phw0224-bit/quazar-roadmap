@@ -1,3 +1,16 @@
+/**
+ * @fileoverview Tiptap v3 기반 리치텍스트 에디터. ItemDetailPanel의 description 필드 전용.
+ *
+ * 핵심 기능:
+ * - 마크다운 붙여넣기 지원 (marked로 HTML 변환)
+ * - 복사 시 HTML→마크다운 변환 (turndown)
+ * - 파일 업로드 (이미지: 인라인 삽입, 문서: 링크)
+ * - `/` 슬래시 커맨드로 블록 삽입
+ * - 툴바 + BubbleMenu (텍스트 선택 시 플로팅)
+ *
+ * content prop: HTML 또는 마크다운. 에디터 내부는 항상 HTML로 처리.
+ * onChange: 편집 시마다 HTML emit. lastEmittedHTML로 중복 emit 방지.
+ */
 import { useEditor, EditorContent } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
@@ -19,6 +32,7 @@ import {
 import ResizableImage from './extensions/ResizableImage';
 import Callout from './extensions/Callout';
 import Toggle from './extensions/Toggle';
+import PageLink from './extensions/PageLink';
 import SlashCommand from './extensions/SlashCommand';
 
 const lowlight = createLowlight(common);
@@ -102,12 +116,17 @@ function Toolbar({ editor, fileInputRef, onShowToast }) {
   );
 }
 
-export default function Editor({ content, onChange, editable, itemId, onShowToast, onBlur }) {
+export default function Editor({ content, onChange, editable, itemId, onShowToast, onBlur, onAddChildPage, onShowPrompt, onOpenDetail }) {
   const lastEmittedHTML = useRef(null);
   const editorRef = useRef(null);
   const fileInputRef = useRef(null);
 
 
+  /**
+   * @description 이미지는 에디터에 직접 삽입, 그 외 문서는 다운로드 링크로 삽입.
+   * POST /upload/:itemId 성공 후 items.files jsonb 업데이트는 호출 측(ItemDetailPanel)에서 처리.
+   * @param {Event} e - input[type=file] change 이벤트
+   */
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -151,7 +170,30 @@ export default function Editor({ content, onChange, editable, itemId, onShowToas
       }),
       Callout,
       Toggle,
-      SlashCommand,
+      PageLink.configure({
+        onOpenDetail: onOpenDetail,
+      }),
+      SlashCommand.configure({
+        onAddChildPage: (onAddChildPage && onShowPrompt) ? (editor, range) => {
+          onShowPrompt('하위 페이지 추가', '페이지 제목을 입력하세요', async (title) => {
+            if (title && title.trim()) {
+              try {
+                const newPage = await onAddChildPage(title.trim());
+                if (newPage) {
+                  editor.chain().focus().deleteRange(range).insertContent({
+                    type: 'pageLink',
+                    attrs: { id: newPage.id, title: newPage.title },
+                  }).run();
+                }
+              } catch (err) {
+                onShowToast?.('하위 페이지 생성 실패: ' + err.message);
+              }
+            } else {
+              editor.chain().focus().deleteRange(range).run();
+            }
+          });
+        } : null,
+      }),
     ],
     content: convertToHTML(content),
     editable,

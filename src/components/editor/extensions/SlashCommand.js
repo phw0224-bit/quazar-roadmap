@@ -1,3 +1,14 @@
+/**
+ * @fileoverview Tiptap 슬래시 커맨드 확장. `/` 입력 시 블록 선택 팝업 트리거.
+ *
+ * @tiptap/suggestion 기반. SlashCommandMenu(React 컴포넌트)를 ReactRenderer로 마운트.
+ *
+ * 지원 블록: Text, H1-H3, BulletList, OrderedList, Checklist, Callout,
+ *            Toggle, Quote, CodeBlock, Divider, Image, ChildPage
+ * ChildPage: onAddChildPage 콜백이 제공될 때만 커맨드 목록에 추가.
+ *
+ * 메뉴 위치 계산: 현재 커서 위치 기준. 뷰포트 하단 초과 시 위쪽으로 반전.
+ */
 import { Extension } from '@tiptap/core';
 import Suggestion from '@tiptap/suggestion';
 import { ReactRenderer } from '@tiptap/react';
@@ -148,14 +159,32 @@ const SlashCommand = Extension.create({
 
   addOptions() {
     return {
+      onAddChildPage: null,
       suggestion: {
         char: '/',
         startOfLine: false,
         allowSpaces: false,
-        items: ({ query }) => {
+        items: ({ query, editor }) => {
           const q = query.toLowerCase().trim();
-          if (!q) return COMMANDS;
-          return COMMANDS.filter(item =>
+          
+          let availableCommands = [...COMMANDS];
+          
+          // onAddChildPage 콜백이 전달된 경우, 맨 앞에 '하위 페이지' 커맨드 추가
+          const extension = editor.extensionManager.extensions.find(e => e.name === 'slashCommand');
+          if (extension?.options?.onAddChildPage) {
+            availableCommands.unshift({
+              title: '하위 페이지',
+              description: '이 페이지의 하위 페이지 생성',
+              icon: '📄',
+              keywords: ['page', '페이지', '하위', 'child', 'subpage'],
+              command: ({ editor, range }) => {
+                extension.options.onAddChildPage(editor, range);
+              },
+            });
+          }
+
+          if (!q) return availableCommands;
+          return availableCommands.filter(item =>
             item.title.toLowerCase().includes(q) ||
             item.keywords.some(k => k.includes(q))
           );
