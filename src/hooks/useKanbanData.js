@@ -1,3 +1,14 @@
+/**
+ * @fileoverview 전체 칸반 보드 상태의 단일 진실 소스(Single Source of Truth).
+ *
+ * useReducer로 phases/sections를 관리하고, Supabase Realtime으로 다른 클라이언트와 동기화.
+ * 모든 CRUD 작업은 "dispatch 먼저 → API 호출 나중" 패턴(Optimistic Update)을 사용.
+ *
+ * 상태 구조:
+ * - phases: 칸반 컬럼(project) 배열. 각 phase는 items 배열 내장.
+ * - sections: 컬럼 그룹. phases와 별도 관리.
+ * - page_type='page' 아이템은 SET_DATA에서 phases에서 제거됨 (사이드바 전용).
+ */
 import { useEffect, useReducer, useCallback } from 'react';
 import API, { createChildPage } from '../api/kanbanAPI';
 import { supabase } from '../lib/supabase';
@@ -9,6 +20,21 @@ const INITIAL_STATE = {
   error: null,
 };
 
+/**
+ * @description 칸반 보드의 모든 상태 변경을 처리하는 순수 함수.
+ *
+ * 지원 액션:
+ * - SET_DATA: 초기 로드 또는 Realtime 재조회 후 전체 교체
+ * - ADD/UPDATE/DELETE/MOVE_PHASE: 칸반 컬럼(project) CRUD
+ * - ADD/UPDATE/DELETE/MOVE_ITEM: 카드(item) CRUD. MOVE는 cross-phase 지원
+ * - ADD/UPDATE/DELETE_COMMENT: 댓글 CRUD
+ * - ADD/UPDATE/DELETE/MOVE_SECTION: 섹션 그룹 CRUD
+ * - ADD_CHILD_PAGE: page_type='page' 아이템 추가 (사이드바용)
+ *
+ * @param {Object} state - 현재 상태 { phases, sections, loading, error }
+ * @param {Object} action - { type: string, payload: any }
+ * @returns {Object} 새 상태 (항상 새 객체 반환, 불변성 유지)
+ */
 const kanbanReducer = (state, action) => {
   switch (action.type) {
     case 'SET_DATA':
@@ -235,6 +261,12 @@ export const useKanbanData = () => {
     };
   }, [fetchData]);
 
+  /**
+   * @description 새 칸반 컬럼(Phase)을 추가. order_index는 현재 최대값+1 자동 계산.
+   * @param {string} title - 컬럼 제목
+   * @param {string} [boardType='main'] - 'main'|'개발팀'|'AI팀'|'지원팀'
+   * @param {string|null} [sectionId=null] - 속할 섹션 ID. null이면 섹션 없는 컬럼
+   */
   const addPhase = async (title, boardType = 'main', sectionId = null) => {
     const newPhase = await API.addPhase(title, boardType, sectionId);
     dispatch({ type: 'ADD_PHASE', payload: newPhase });
@@ -270,13 +302,54 @@ export const useKanbanData = () => {
     dispatch({ type: 'DELETE_ITEM', payload: { phaseId, itemId } });
   };
 
+  /**
+   * @description 아이템을 다른 Phase로 이동 또는 같은 Phase 내 재정렬.
+   * Optimistic: dispatch로 UI 즉시 반영 후 API 호출.
+   * 이동 후 source/target phase 양쪽의 order_index 전체 재계산.
+   * @param {string} sourcePhaseId - 원래 phase ID
+   * @param {string} targetPhaseId - 목적 phase ID (같은 phase면 재정렬)
+   * @param {string} itemId - 이동할 아이템 ID
+   * @param {number} targetIndex - 목적 phase에서의 위치 (0-based)
+   */
   const moveItem = async (sourcePhaseId, targetPhaseId, itemId, targetIndex) => {
     dispatch({ type: 'MOVE_ITEM', payload: { sourcePhaseId, targetPhaseId, itemId, targetIndex } });
     await API.moveItem(sourcePhaseId, targetPhaseId, itemId, targetIndex);
   };
 
+  /**
+   * @description page_type='page' 아이템(문서 페이지)을 생성하고 부모 아이템과 양방향 연결.
+   * 칸반 카드가 아닌 중첩 페이지 생성 시 사용. 사이드바 트리에 표시됨.
+   * 부모의 related_items에도 자동으로 추가됨.
+   * @param {string} phaseId - 속할 phase ID
+   * @param {string} parentItemId - 부모 아이템 ID (related_items 양방향 연결)
+   * @param {string} title - 페이지 제목
+   */
   const addChildPage = async (phaseId, parentItemId, title) => {
     const newPage = await createChildPage(phaseId, parentItemId, title);
+    
+    // 1. 하위 페이지(자기 자신)의 related_items에 부모 페이지를 추가 (상위 페이지 연결)
+    if (parentItemId) {
+      await updateItem(phaseId, newPage.id, {
+        related_items: [parentItemId]
+      });
+      // 로컬 상태 동기화를 위해 newPage 객체 업데이트
+      newPage.related_items = [parentItemId];
+    }
+
+    // 2. 부모 아이템의 related_items에도 하위 페이지를 추가 (양방향 연결)
+    if (parentItemId) {
+      const parentPhase = state.phases.find(p => p.id === phaseId);
+      const parentItem = parentPhase?.items.find(i => i.id === parentItemId);
+      if (parentItem) {
+        const currentRelations = parentItem.related_items || [];
+        if (!currentRelations.includes(newPage.id)) {
+          await updateItem(phaseId, parentItemId, { 
+            related_items: [...currentRelations, newPage.id] 
+          });
+        }
+      }
+    }
+
     dispatch({ type: 'ADD_CHILD_PAGE', payload: { phaseId, newPage } });
     return newPage;
   };

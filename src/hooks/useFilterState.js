@@ -1,3 +1,13 @@
+/**
+ * @fileoverview 필터/정렬/그룹화 상태 관리. DB 쿼리를 변경하지 않고 렌더링 레이어에서만 적용.
+ *
+ * 핵심 함수:
+ * - applyFilterSort(items, filters, sort): 필터+정렬 적용된 items 배열 반환
+ * - groupItems(items, groupBy): group 필드 기준으로 Map<key, items[]> 반환
+ *
+ * 필터 구조: [{ field: 'status'|'teams'|'tags'|'assignees', value: string }]
+ * 여러 필터는 AND 조건으로 결합.
+ */
 import { useState, useCallback } from 'react';
 
 const DEFAULT_STATE = {

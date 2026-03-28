@@ -1,3 +1,12 @@
+/**
+ * @fileoverview phases와 sections를 Sidebar 네비게이션용 계층 트리로 변환.
+ *
+ * 입력: phases[] + sections[] (useKanbanData 상태)
+ * 출력: board_type별 그룹 → sections → phases 구조
+ *
+ * page_type='page' 아이템만 트리에 포함 (칸반 카드 제외).
+ * parent_item_id를 따라 재귀적으로 자식 페이지 연결.
+ */
 import { useMemo } from 'react';
 
 export function usePageTree(phases, sections) {

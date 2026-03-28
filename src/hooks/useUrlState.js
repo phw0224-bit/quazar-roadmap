@@ -1,3 +1,19 @@
+/**
+ * @fileoverview URL 파라미터 ↔ 앱 상태 양방향 동기화. React Router 없이 URL 기반 라우팅 구현.
+ *
+ * 지원 파라미터:
+ * - view: 'board'|'timeline'|'people' (기본값: 'board')
+ * - item: 선택된 아이템 UUID (ItemDetailPanel 열림)
+ * - fullscreen: '1' (ItemDetailPanel 전체화면)
+ * - scrollTo: 'section:{id}' 또는 'project:{id}' (스크롤 대상)
+ * - filter: 'status:done,teams:AI팀' (쉼표 구분 AND 조건)
+ * - sort: 'title:asc' 또는 'created_at:desc'
+ * - group: 'status'|'assignees'|'tags'
+ *
+ * @returns {[state, setUrlState, replaceUrlState]}
+ * setUrlState → pushState (뒤로가기 가능)
+ * replaceUrlState → replaceState (히스토리 없음)
+ */
 import { useState, useEffect, useCallback } from 'react';
 
 // filter 파라미터 형식: "status:done,teams:AI팀"

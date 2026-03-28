@@ -1,3 +1,11 @@
+/**
+ * @fileoverview Supabase Auth 세션 관리 + 신규 사용자 프로필 설정 플로우.
+ *
+ * 신규 사용자는 user_metadata.needs_password_setup=true 플래그를 가짐.
+ * SetupProfileForm 완료 후 updateProfileAndStep()으로 플래그 제거 + profiles 테이블 upsert.
+ *
+ * @returns {{ user, loading, needsPasswordSetup, login, logout, updateProfileAndStep }}
+ */
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
