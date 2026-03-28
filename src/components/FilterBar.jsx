@@ -1,10 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { Filter, X, ArrowUpDown, Layers } from 'lucide-react';
-import { TEAMS, GLOBAL_TAGS, STATUS_MAP } from '../lib/constants';
+import { Filter, X, ArrowUpDown } from 'lucide-react';
+import { GLOBAL_TAGS, STATUS_MAP } from '../lib/constants';
 
 const FILTER_FIELDS = [
   { key: 'status',    label: '상태',   options: Object.entries(STATUS_MAP).map(([v, s]) => ({ value: v, label: s.label })) },
-  { key: 'teams',     label: '팀',     options: TEAMS.map(t => ({ value: t.name, label: t.name })) },
   { key: 'tags',      label: '태그',   options: GLOBAL_TAGS.map(t => ({ value: t.name, label: t.name })) },
   { key: 'assignees', label: '담당자', options: null },
 ];
@@ -14,13 +13,6 @@ const SORT_OPTIONS = [
   { field: 'title',       label: '이름 순',   allowDesc: true },
   { field: 'status',      label: '상태 순',   allowDesc: true },
   { field: 'created_at',  label: '생성일 순', allowDesc: true },
-];
-
-const GROUP_OPTIONS = [
-  { value: null,        label: '그룹 없음' },
-  { value: 'status',    label: '상태별' },
-  { value: 'assignees', label: '담당자별' },
-  { value: 'tags',      label: '태그별' },
 ];
 
 function Dropdown({ trigger, children, align = 'left' }) {
@@ -65,8 +57,8 @@ function DropdownItem({ onClick, children, active }) {
 }
 
 export default function FilterBar({
-  filters, sort, group, hasActiveFilters,
-  onAddFilter, onRemoveFilter, onClearFilters, onSetSort, onSetGroup,
+  filters, sort, hasActiveFilters,
+  onAddFilter, onRemoveFilter, onClearFilters, onSetSort,
 }) {
   const [addingField, setAddingField] = useState(null);
   const [assigneeInput, setAssigneeInput] = useState('');
@@ -90,7 +82,6 @@ export default function FilterBar({
   };
 
   const currentSort = sort ? `${SORT_OPTIONS.find(s => s.field === sort.field)?.label ?? sort.field} ${sort.dir === 'asc' ? '↑' : '↓'}` : null;
-  const currentGroup = group ? GROUP_OPTIONS.find(g => g.value === group)?.label : null;
 
   return (
     <div className="flex items-center gap-2 flex-wrap px-10 py-2.5 border-b border-gray-100 dark:border-border-subtle bg-white dark:bg-bg-base min-h-[48px]">
@@ -228,37 +219,10 @@ export default function FilterBar({
           </div>
         ))}
         {sort && (
-          <DropdownItem onClick={() => onSetSort(sort.field, sort.dir)}>
+          <DropdownItem onClick={() => onSetSort(null)}>
             정렬 해제
           </DropdownItem>
         )}
-      </Dropdown>
-
-      {/* 그룹화 드롭다운 */}
-      <Dropdown
-        trigger={
-          <button
-            type="button"
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors border cursor-pointer whitespace-nowrap ${
-              group
-                ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
-                : 'text-gray-500 dark:text-text-secondary hover:bg-gray-100 dark:hover:bg-bg-hover border-gray-200 dark:border-border-subtle'
-            }`}
-          >
-            <Layers size={13} />
-            <span>{currentGroup ? `그룹: ${currentGroup}` : '그룹화'}</span>
-          </button>
-        }
-      >
-        {GROUP_OPTIONS.map(opt => (
-          <DropdownItem
-            key={String(opt.value)}
-            onClick={() => onSetGroup(opt.value)}
-            active={group === opt.value}
-          >
-            {opt.label}
-          </DropdownItem>
-        ))}
       </Dropdown>
 
       {/* 초기화 */}

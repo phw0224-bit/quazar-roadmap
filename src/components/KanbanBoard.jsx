@@ -112,9 +112,14 @@ export default function KanbanBoard({ onShowLogin }) {
     }
   });
   const {
-    filters, sort, group, hasActiveFilters,
-    addFilter, removeFilter, reset: resetFilters, setSort, setGroup,
-  } = useFilterState();
+    filters, sort, hasActiveFilters,
+    addFilter, removeFilter, reset: resetFilters, setSort,
+  } = useFilterState({ filters: urlState.filters, sort: urlState.sort });
+
+  // 필터/정렬 변경 시 URL에 동기화
+  useEffect(() => {
+    replaceUrlState({ filters, sort });
+  }, [filters, sort]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Global UI Feedback State
   const [toast, setToast] = useState(null); // { message, type }
@@ -370,13 +375,11 @@ export default function KanbanBoard({ onShowLogin }) {
             <FilterBar
               filters={filters}
               sort={sort}
-              group={group}
               hasActiveFilters={hasActiveFilters}
               onAddFilter={addFilter}
               onRemoveFilter={removeFilter}
               onClearFilters={resetFilters}
               onSetSort={setSort}
-              onSetGroup={setGroup}
             />
           )}
 

@@ -25,6 +25,10 @@ export function useFilterState(initialState = {}) {
   }, []);
 
   const setSort = useCallback((field, dir = 'asc') => {
+    if (field === null) {
+      setState(prev => ({ ...prev, sort: null }));
+      return;
+    }
     setState(prev => ({
       ...prev,
       sort: prev.sort?.field === field && prev.sort?.dir === dir ? null : { field, dir },
@@ -37,7 +41,7 @@ export function useFilterState(initialState = {}) {
 
   const reset = useCallback(() => setState(DEFAULT_STATE), []);
 
-  const hasActiveFilters = state.filters.length > 0 || state.sort !== null || state.group !== null;
+  const hasActiveFilters = state.filters.length > 0 || state.sort !== null;
 
   return {
     filters: state.filters,
