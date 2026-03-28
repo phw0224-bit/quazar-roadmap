@@ -45,7 +45,6 @@ function ItemDetailPanel({
     setIsEditingRelations(false);
     setRelationSearchQuery('');
     setIsEditingTitle(false);
-    setIsEditingDescription(false);
     // 아이템이 바뀌면 저장된 요약 불러오기
     setAiSummary(item?.ai_summary || null);
     setSummaryError(null);
