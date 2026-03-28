@@ -365,3 +365,21 @@ input:focus, textarea:focus {
 .tiptap-content .hljs-meta { color: #f9e2af; }
 
 /* ── 드래그 핸들: Tiptap placeholder::before 와 충돌하므로 CSS 방식 사용 안 함 ── */
+
+/* ── Notion-style 블록 hover 하이라이트 ── */
+.tiptap-content .tiptap > * {
+  border-radius: 4px;
+  transition: background-color 80ms ease;
+}
+.tiptap-content .tiptap > *:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+.dark .tiptap-content .tiptap > *:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+/* 자체 배경이 있는 블록은 hover 배경 제외 */
+.tiptap-content .tiptap > pre:hover,
+.tiptap-content .tiptap > [data-callout]:hover,
+.tiptap-content .tiptap > [data-toggle]:hover {
+  background-color: transparent;
+}

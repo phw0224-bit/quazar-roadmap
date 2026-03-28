@@ -1,4 +1,5 @@
 import { useEditor, EditorContent } from '@tiptap/react';
+import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table';
@@ -9,10 +10,10 @@ import TaskItem from '@tiptap/extension-task-item';
 import { marked } from 'marked';
 import TurndownService from 'turndown';
 import { DOMSerializer } from '@tiptap/pm/model';
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import {
   Bold, Italic, List, ListOrdered, Quote, Code, Minus,
-  Heading1, Heading2, Heading3, ImagePlus, CheckSquare
+  Heading1, Heading2, Heading3, ImagePlus, CheckSquare, Strikethrough
 } from 'lucide-react';
 
 import ResizableImage from './extensions/ResizableImage';
@@ -54,36 +55,7 @@ function Divider() {
   return <div className="w-px h-5 bg-gray-200 dark:bg-border-subtle mx-0.5 self-center" />;
 }
 
-function Toolbar({ editor, itemId, onShowToast }) {
-  const fileInputRef = useRef(null);
-
-  const handleFileChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      onShowToast?.('파일 크기는 10MB를 초과할 수 없습니다.');
-      return;
-    }
-    const formData = new FormData();
-    formData.append('file', file);
-    try {
-      const response = await fetch(`/upload/${itemId}`, { method: 'POST', body: formData });
-      if (!response.ok) throw new Error('업로드 실패');
-      const result = await response.json();
-      if (result.mimetype?.startsWith('image/')) {
-        editor.chain().focus().setImage({ src: result.url, alt: result.originalName, width: null }).run();
-      } else {
-        editor.chain().focus().insertContent(
-          `<a href="${result.url}" target="_blank">${result.originalName}</a>`
-        ).run();
-      }
-      onShowToast?.('파일이 업로드되었습니다.');
-    } catch (err) {
-      onShowToast?.('파일 업로드 실패: ' + err.message);
-    }
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
+function Toolbar({ editor, fileInputRef, onShowToast }) {
   return (
     <div className="flex items-center gap-0.5 flex-wrap px-2 py-1.5 bg-gray-50 dark:bg-bg-elevated border border-gray-200 dark:border-border-subtle rounded-xl mb-3">
       <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive('bold')} title="굵게 (Ctrl+B)">
@@ -123,13 +95,6 @@ function Toolbar({ editor, itemId, onShowToast }) {
         <Minus size={15} />
       </ToolbarButton>
       <Divider />
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
-        className="hidden"
-        onChange={handleFileChange}
-      />
       <ToolbarButton onClick={() => fileInputRef.current?.click()} isActive={false} title="이미지/파일 첨부">
         <ImagePlus size={15} />
       </ToolbarButton>
@@ -140,6 +105,39 @@ function Toolbar({ editor, itemId, onShowToast }) {
 export default function Editor({ content, onChange, editable, itemId, onShowToast, onBlur }) {
   const lastEmittedHTML = useRef(null);
   const editorRef = useRef(null);
+  const wrapperRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  const [toolbarVisible, setToolbarVisible] = useState(false);
+  const [dragHandleTop, setDragHandleTop] = useState(null);
+  const [isDragHandleVisible, setIsDragHandleVisible] = useState(false);
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      onShowToast?.('파일 크기는 10MB를 초과할 수 없습니다.');
+      return;
+    }
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const response = await fetch(`/upload/${itemId}`, { method: 'POST', body: formData });
+      if (!response.ok) throw new Error('업로드 실패');
+      const result = await response.json();
+      if (result.mimetype?.startsWith('image/')) {
+        editorRef.current?.chain().focus().setImage({ src: result.url, alt: result.originalName, width: null }).run();
+      } else {
+        editorRef.current?.chain().focus().insertContent(
+          `<a href="${result.url}" target="_blank">${result.originalName}</a>`
+        ).run();
+      }
+      onShowToast?.('파일이 업로드되었습니다.');
+    } catch (err) {
+      onShowToast?.('파일 업로드 실패: ' + err.message);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const editor = useEditor({
     extensions: [
@@ -224,13 +222,85 @@ export default function Editor({ content, onChange, editable, itemId, onShowToas
     }
   }, [content]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const handleMouseMove = (e) => {
+    if (!editable) return;
+    const pm = wrapperRef.current?.querySelector('.ProseMirror');
+    if (!pm) return;
+    let el = e.target;
+    while (el && el.parentElement !== pm) el = el.parentElement;
+    if (!el || el === pm) { setIsDragHandleVisible(false); return; }
+    const pmRect = pm.getBoundingClientRect();
+    const blockRect = el.getBoundingClientRect();
+    setDragHandleTop(blockRect.top - pmRect.top + 10);
+    setIsDragHandleVisible(true);
+  };
+
   if (!editor) return null;
 
   return (
-    <div className="tiptap-wrapper">
-      {editable && (
-        <Toolbar editor={editor} itemId={itemId} onShowToast={onShowToast} />
+    <div
+      ref={wrapperRef}
+      className="tiptap-wrapper relative"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => setIsDragHandleVisible(false)}
+    >
+      {/* 파일 input: 슬래시 커맨드에서 querySelector로 접근하므로 항상 DOM에 유지 */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+
+      {/* 드래그 핸들 */}
+      {editable && isDragHandleVisible && dragHandleTop !== null && (
+        <div
+          className="absolute -left-5 text-gray-300 dark:text-text-tertiary select-none pointer-events-none flex items-center justify-center w-4 text-sm"
+          style={{ top: dragHandleTop }}
+          aria-hidden="true"
+        >
+          ⠿
+        </div>
       )}
+
+      {/* 툴바 토글 버튼 */}
+      {editable && (
+        <div className="flex items-center mb-1">
+          <button
+            type="button"
+            onMouseDown={(e) => { e.preventDefault(); setToolbarVisible(v => !v); }}
+            className="flex items-center gap-1 text-[11px] font-semibold text-gray-300 dark:text-text-tertiary hover:text-gray-500 dark:hover:text-text-secondary transition-colors px-2 py-0.5 rounded-lg hover:bg-gray-100 dark:hover:bg-bg-hover"
+          >
+            {toolbarVisible ? '▾ 서식 숨기기' : '▸ 서식'}
+          </button>
+        </div>
+      )}
+
+      {/* 툴바 (접힘 가능) */}
+      {editable && toolbarVisible && (
+        <Toolbar editor={editor} fileInputRef={fileInputRef} onShowToast={onShowToast} />
+      )}
+
+      {/* BubbleMenu: 텍스트 선택 시 플로팅 툴바 */}
+      {editable && (
+        <BubbleMenu
+          editor={editor}
+          options={{ placement: 'top', offset: 8 }}
+          shouldShow={({ state, from, to }) => from !== to && !state.selection.empty}
+          className="flex items-center gap-0.5 px-1.5 py-1 rounded-xl shadow-lg border bg-white dark:bg-bg-elevated border-gray-200 dark:border-border-strong animate-scale-in z-50"
+        >
+          <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive('bold')} title="굵게"><Bold size={13} /></ToolbarButton>
+          <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} isActive={editor.isActive('italic')} title="기울임"><Italic size={13} /></ToolbarButton>
+          <ToolbarButton onClick={() => editor.chain().focus().toggleStrike().run()} isActive={editor.isActive('strike')} title="취소선"><Strikethrough size={13} /></ToolbarButton>
+          <ToolbarButton onClick={() => editor.chain().focus().toggleCode().run()} isActive={editor.isActive('code')} title="인라인 코드"><Code size={13} /></ToolbarButton>
+          <Divider />
+          <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} isActive={editor.isActive('heading', { level: 1 })} title="제목 1"><Heading1 size={13} /></ToolbarButton>
+          <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} isActive={editor.isActive('heading', { level: 2 })} title="제목 2"><Heading2 size={13} /></ToolbarButton>
+          <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} isActive={editor.isActive('heading', { level: 3 })} title="제목 3"><Heading3 size={13} /></ToolbarButton>
+        </BubbleMenu>
+      )}
+
       <EditorContent
         editor={editor}
         className="prose dark:prose-invert max-w-none tiptap-content"
