@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTheme } from 'next-themes';
-import { Moon, Sun, Search } from 'lucide-react';
+import { Moon, Sun, Search, PanelLeft } from 'lucide-react';
 import {
   DndContext,
   closestCorners,
@@ -19,6 +19,7 @@ import {
 import { useKanbanData } from '../hooks/useKanbanData';
 import { useUrlState } from '../hooks/useUrlState';
 import { useAuth } from '../hooks/useAuth';
+import { useLayoutState } from '../hooks/useLayoutState';
 import API from '../api/kanbanAPI';
 import ProjectColumn from './ProjectColumn';
 import KanbanCard from './KanbanCard';
@@ -37,6 +38,7 @@ import { Toast, ConfirmModal, InputModal } from './UI/Feedback';
 const DISPLAY_BOARDS = ['main', '개발팀', 'AI팀', '지원팀'];
 
 export default function KanbanBoard({ onShowLogin }) {
+  const { toggleSidebar } = useLayoutState();
   const {
     phases, sections, loading, addPhase, addItem, updateItem, deleteItem,
     moveItem, updatePhase, deletePhase, movePhase, addComment, updateComment, deleteComment,
@@ -341,9 +343,16 @@ export default function KanbanBoard({ onShowLogin }) {
             style={{ marginRight: detailItemId && !isDetailFullscreen ? `${panelWidth}vw` : '0' }}
           >
           {/* Notion Style Header */}
-          <header className={`pl-10 py-5 flex justify-between items-center bg-white dark:bg-bg-base border-b border-gray-100 dark:border-border-subtle transition-all duration-300 ease-notion ${detailItemId && !isDetailFullscreen ? 'pr-4' : 'pr-10'}`}>
+          <header className={`pl-8 py-5 flex justify-between items-center bg-white dark:bg-bg-base border-b border-gray-100 dark:border-border-subtle transition-all duration-300 ease-notion ${detailItemId && !isDetailFullscreen ? 'pr-4' : 'pr-10'}`}>
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-3">
+                <button
+                  onClick={toggleSidebar}
+                  className="p-2 -ml-2 mr-1 rounded-lg text-gray-400 hover:text-gray-900 dark:text-text-tertiary dark:hover:text-text-primary hover:bg-gray-100 dark:hover:bg-bg-hover transition-colors cursor-pointer flex-shrink-0"
+                  title="사이드바 토글"
+                >
+                  <PanelLeft size={20} strokeWidth={2.5} />
+                </button>
                 <div className="text-3xl filter drop-shadow-sm">📂</div>
                 <h1 className="text-2xl font-black text-gray-900 dark:text-text-primary tracking-tight leading-none">
                   {activeView === 'board' ? '프로젝트 보드' : activeView === 'timeline' ? '타임라인' : '인원 관리'}

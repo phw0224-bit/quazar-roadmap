@@ -27,34 +27,47 @@ export function usePageTree(phases, sections) {
         }));
     }
 
-    // 4. 각 phase에 직계 최상위 page children 붙이기
-    // (parent_item_id가 없는 page 타입 아이템들)
-    const phasesWithTree = phases.map(phase => ({
-      ...phase,
-      pageChildren: (phase.items || [])
-        .filter(item => item.page_type === 'page' && !item.parent_item_id)
-        .sort((a, b) => a.order_index - b.order_index)
-        .map(item => ({ ...item, children: buildTree(item.id) })),
-    }));
+    // 4. main 보드가 아닌 phase들만 필터링하여 page children 붙이기
+    const phasesWithTree = phases
+      .filter(p => p.board_type !== 'main')
+      .map(phase => ({
+        ...phase,
+        pageChildren: (phase.items || [])
+          .filter(item => item.page_type === 'page' && !item.parent_item_id)
+          .sort((a, b) => a.order_index - b.order_index)
+          .map(item => ({ ...item, children: buildTree(item.id) })),
+      }));
 
-    // 5. section별 그룹핑
-    const sectionMap = {};
-    const standalone = [];
-    phasesWithTree.forEach(phase => {
-      if (phase.section_id) {
-        if (!sectionMap[phase.section_id]) sectionMap[phase.section_id] = [];
-        sectionMap[phase.section_id].push(phase);
-      } else {
-        standalone.push(phase);
-      }
+    // 5. board_type별 그룹핑
+    const boardTypes = [...new Set([
+      ...phasesWithTree.map(p => p.board_type),
+      ...sections.filter(s => s.board_type !== 'main').map(s => s.board_type)
+    ])].filter(Boolean);
+
+    const boards = boardTypes.map(boardType => {
+      const boardSections = sections
+        .filter(s => s.board_type === boardType)
+        .sort((a, b) => a.order_index - b.order_index)
+        .map(section => ({
+          ...section,
+          phases: phasesWithTree
+            .filter(p => p.section_id === section.id)
+            .sort((a, b) => a.order_index - b.order_index)
+        }));
+
+      const standalonePhases = phasesWithTree
+        .filter(p => p.board_type === boardType && !p.section_id)
+        .sort((a, b) => a.order_index - b.order_index);
+
+      return {
+        id: `board-${boardType}`,
+        title: boardType,
+        sections: boardSections,
+        standalone: standalonePhases,
+      };
     });
 
-    return {
-      sections: sections.map(s => ({
-        ...s,
-        phases: (sectionMap[s.id] || []).sort((a, b) => a.order_index - b.order_index),
-      })),
-      standalone: standalone.sort((a, b) => a.order_index - b.order_index),
-    };
+    return boards.sort((a, b) => a.title.localeCompare(b.title, 'ko-KR'));
   }, [phases, sections]);
 }
+
