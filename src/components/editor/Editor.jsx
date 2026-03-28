@@ -10,7 +10,7 @@ import TaskItem from '@tiptap/extension-task-item';
 import { marked } from 'marked';
 import TurndownService from 'turndown';
 import { DOMSerializer } from '@tiptap/pm/model';
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect } from 'react';
 import {
   Bold, Italic, List, ListOrdered, Quote, Code, Minus,
   Heading1, Heading2, Heading3, ImagePlus, CheckSquare, Strikethrough
@@ -105,12 +105,8 @@ function Toolbar({ editor, fileInputRef, onShowToast }) {
 export default function Editor({ content, onChange, editable, itemId, onShowToast, onBlur }) {
   const lastEmittedHTML = useRef(null);
   const editorRef = useRef(null);
-  const wrapperRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  const [toolbarVisible, setToolbarVisible] = useState(false);
-  const [dragHandleTop, setDragHandleTop] = useState(null);
-  const [isDragHandleVisible, setIsDragHandleVisible] = useState(false);
 
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
@@ -222,27 +218,11 @@ export default function Editor({ content, onChange, editable, itemId, onShowToas
     }
   }, [content]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleMouseMove = (e) => {
-    if (!editable) return;
-    const pm = wrapperRef.current?.querySelector('.ProseMirror');
-    if (!pm) return;
-    let el = e.target;
-    while (el && el.parentElement !== pm) el = el.parentElement;
-    if (!el || el === pm) { setIsDragHandleVisible(false); return; }
-    const pmRect = pm.getBoundingClientRect();
-    const blockRect = el.getBoundingClientRect();
-    setDragHandleTop(blockRect.top - pmRect.top + 10);
-    setIsDragHandleVisible(true);
-  };
-
   if (!editor) return null;
 
   return (
     <div
-      ref={wrapperRef}
-      className="tiptap-wrapper relative"
-      onMouseMove={handleMouseMove}
-      onMouseLeave={() => setIsDragHandleVisible(false)}
+      className="tiptap-wrapper"
     >
       {/* 파일 input: 슬래시 커맨드에서 querySelector로 접근하므로 항상 DOM에 유지 */}
       <input
@@ -252,35 +232,6 @@ export default function Editor({ content, onChange, editable, itemId, onShowToas
         className="hidden"
         onChange={handleFileChange}
       />
-
-      {/* 드래그 핸들 */}
-      {editable && isDragHandleVisible && dragHandleTop !== null && (
-        <div
-          className="absolute -left-5 text-gray-300 dark:text-text-tertiary select-none pointer-events-none flex items-center justify-center w-4 text-sm"
-          style={{ top: dragHandleTop }}
-          aria-hidden="true"
-        >
-          ⠿
-        </div>
-      )}
-
-      {/* 툴바 토글 버튼 */}
-      {editable && (
-        <div className="flex items-center mb-1">
-          <button
-            type="button"
-            onMouseDown={(e) => { e.preventDefault(); setToolbarVisible(v => !v); }}
-            className="flex items-center gap-1 text-[11px] font-semibold text-gray-300 dark:text-text-tertiary hover:text-gray-500 dark:hover:text-text-secondary transition-colors px-2 py-0.5 rounded-lg hover:bg-gray-100 dark:hover:bg-bg-hover"
-          >
-            {toolbarVisible ? '▾ 서식 숨기기' : '▸ 서식'}
-          </button>
-        </div>
-      )}
-
-      {/* 툴바 (접힘 가능) */}
-      {editable && toolbarVisible && (
-        <Toolbar editor={editor} fileInputRef={fileInputRef} onShowToast={onShowToast} />
-      )}
 
       {/* BubbleMenu: 텍스트 선택 시 플로팅 툴바 */}
       {editable && (
