@@ -40,6 +40,7 @@ export default function KanbanBoard({ onShowLogin }) {
     phases, sections, loading, addPhase, addItem, updateItem, deleteItem,
     moveItem, updatePhase, deletePhase, movePhase, addComment, updateComment, deleteComment,
     addSection, updateSection, deleteSection, moveSection,
+    addChildPage,
   } = useKanbanData();
 
   const { user, logout } = useAuth();
@@ -617,7 +618,7 @@ export default function KanbanBoard({ onShowLogin }) {
               <ItemDetailPanel
                 item={detailItem}
                 phase={detailPhase}
-                allItems={phases.flatMap(p => p.items)}
+                allItems={phases.flatMap(p => p.items || [])}
                 onClose={closeDetailPanel}
                 isFullscreen={isDetailFullscreen}
                 onToggleFullscreen={() => setUrlState({ fullscreen: !isDetailFullscreen })}
