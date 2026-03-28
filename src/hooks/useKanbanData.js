@@ -127,12 +127,11 @@ const kanbanReducer = (state, action) => {
       };
     }
     case 'ADD_CHILD_PAGE':
-      // action: { phaseId, newPage }
       return {
         ...state,
         phases: state.phases.map(p =>
-          p.id === action.phaseId
-            ? { ...p, items: [...(p.items || []), action.newPage] }
+          p.id === action.payload.phaseId
+            ? { ...p, items: [...(p.items || []), { ...action.payload.newPage, comments: [] }].sort((a, b) => a.order_index - b.order_index) }
             : p
         ),
       };
@@ -278,7 +277,7 @@ export const useKanbanData = () => {
 
   const addChildPage = async (phaseId, parentItemId, title) => {
     const newPage = await createChildPage(phaseId, parentItemId, title);
-    dispatch({ type: 'ADD_CHILD_PAGE', phaseId, newPage });
+    dispatch({ type: 'ADD_CHILD_PAGE', payload: { phaseId, newPage } });
     return newPage;
   };
 
