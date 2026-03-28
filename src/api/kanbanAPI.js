@@ -366,7 +366,6 @@ export async function createChildPage(projectId, parentItemId, title) {
   const { data: existing } = await supabase
     .from('items')
     .select('order_index')
-    .eq('project_id', projectId)
     .eq('parent_item_id', parentItemId)
     .order('order_index', { ascending: false })
     .limit(1);
