@@ -379,3 +379,206 @@ VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=eyJ...
 **Phase 7 — 커스텀 속성 시스템**
 - 팀별 자체 필드 정의 (노션 DB 속성 스타일)
 - 신규 테이블 필요: `item_properties`, `item_property_values`
+
+---
+
+## 11. Documentation System Guide
+
+> 이 프로젝트는 3-레이어 AI 친화적 문서화 시스템을 사용한다.
+> 어떤 AI든 아래 규칙을 따르면 동일한 형식으로 문서를 작성·수정할 수 있다.
+
+### 레이어 구조
+
+```
+Layer 1: CLAUDE.md          ← 프로젝트 전체 청사진 (AI 세션 시작점)
+Layer 2: 폴더별 README.md   ← 폴더 역할과 패턴 설명 (탐색 진입 전 읽기)
+Layer 3: 파일별 JSDoc       ← 코드 인라인 "왜" 설명 (코드 읽기 전 읽기)
+```
+
+**원칙:** 각 레이어는 "아래 레이어를 읽지 않아도 이해 가능"해야 한다.
+CLAUDE.md만 읽어도 아키텍처를 파악할 수 있고, README.md까지 읽으면 코드 탐색 전략이 세워지고,
+JSDoc까지 읽으면 개별 파일을 한 줄씩 분석할 필요가 없어야 한다.
+
+---
+
+### Layer 1 — CLAUDE.md 작성 규칙
+
+**목적:** AI 세션 시작 시 컨텍스트 로딩 비용을 최소화. 코드를 읽지 않고도 전체 구조를 파악 가능하게.
+
+**고정 섹션 구조 (번호 바꾸지 말 것):**
+
+| 섹션 | 내용 | 언제 업데이트 |
+|------|------|--------------|
+| 1. Domain Context | 목적, 사용자, 도메인 특수성 | 비즈니스 요구사항 변경 시 |
+| 2. Architecture Overview | 컴포넌트 트리, 상태 흐름, URL 구조 | 주요 컴포넌트 추가/삭제 시 |
+| 3. Tech Stack | 기술 스택 테이블 | 패키지 추가/변경 시 |
+| 4. Data Model | SQL 스키마 (실제 운영 기준) | DB 컬럼 추가/삭제 시 |
+| 5. Business Rules | board_type/page_type/status 등 도메인 규칙 | 규칙 변경 시 |
+| 6. Key Flows | 상태 관리, DnD, 파일업로드, AI요약 흐름 | 흐름 변경 시 |
+| 7. Component Map | 파일 트리 + 핵심 Props 계약 | 파일 추가/삭제/이동 시 |
+| 8. Conventions | 공통 코딩 패턴 (stopProp, isReadOnly 등) | 새 패턴 도입 시 |
+| 9. Dev Guide | 실행 명령어, 환경변수, 배포 | 인프라 변경 시 |
+| 10. Roadmap | 미구현 Phase | Phase 완료 또는 신규 계획 시 |
+| 11. Documentation System Guide | 이 섹션 | 문서화 규칙 자체 변경 시 |
+
+**작성 원칙:**
+- **현재 상태만** 기록. "~할 예정"은 Roadmap 섹션에만 작성
+- 코드 예시는 실제 코드베이스의 패턴을 그대로 사용 (가상 예시 금지)
+- 각 섹션은 독립적으로 읽을 수 있어야 함 (다른 섹션 참조 최소화)
+- 한국어 우선. 기술 용어는 영어 유지
+
+**새 컴포넌트/훅 추가 시 CLAUDE.md 업데이트 체크리스트:**
+```
+□ Section 2: Architecture Overview에 컴포넌트 위치 추가
+□ Section 7: Component Map 파일 트리에 추가
+□ Section 7: 새 Props 계약이 있으면 핵심 Props 계약에 추가
+□ Section 8: 새 공통 패턴 도입했으면 Conventions에 추가
+```
+
+**DB 변경 시 CLAUDE.md 업데이트 체크리스트:**
+```
+□ Section 4: Data Model SQL 스키마 업데이트
+□ Section 5: 새 비즈니스 규칙이 생기면 Business Rules에 추가
+□ Section 6: 흐름이 바뀌면 Key Flows 업데이트
+```
+
+---
+
+### Layer 2 — 폴더별 README.md 작성 규칙
+
+**목적:** 폴더 안의 파일들을 열기 전에 "이 폴더가 무엇을 담당하는지" 파악. AI가 어느 파일을 읽어야 할지 결정하는 진입점.
+
+**필수 포함 섹션 (템플릿):**
+
+````markdown
+# {폴더명}/
+
+> {이 폴더의 한 줄 역할 설명. 왜 이 폴더가 존재하는지 중심으로.}
+
+## 책임
+- {이 폴더 코드가 담당하는 관심사 목록}
+- {다른 폴더와의 경계: "X는 하지 않고 Y만 한다"}
+
+## 주요 파일
+
+| 파일 | 역할 | 주요 의존성 |
+|------|------|------------|
+| `파일명.js` | **핵심.** 한 줄 설명 | 의존 모듈 |
+| `파일명.js` | 한 줄 설명 | - |
+
+## 패턴 & 규칙
+
+{이 폴더 코드에서 반복되는 패턴, 주의사항, 코드 예시}
+```javascript
+// 실제 코드 패턴 예시 (가상 코드 금지)
+```
+````
+
+**작성 원칙:**
+- `> 한 줄 설명`은 "이 폴더가 무엇을 하는가"가 아니라 "**왜** 이 폴더가 필요한가" 중심
+- 주요 파일 테이블에서 핵심 파일에는 **핵심.** 접두어 붙이기
+- 패턴 & 규칙 섹션: 추상적 설명보다 실제 코드 스니펫 우선
+- 하위 폴더가 있으면 "하위 폴더" 섹션을 추가하고 각 폴더를 한 줄로 설명
+- 파일이 3개 이하인 폴더는 주요 파일 테이블 생략 가능, 인라인 설명으로 대체
+
+**새 파일 추가 시 README.md 업데이트:**
+- 해당 폴더의 README.md `주요 파일` 테이블에 행 추가
+- 해당 파일이 새 패턴을 도입했다면 `패턴 & 규칙` 섹션에 예시 추가
+- 상위 폴더 README.md에서 이 폴더를 참조하고 있다면 설명 업데이트
+
+---
+
+### Layer 3 — JSDoc 작성 규칙
+
+**목적:** 코드 파일을 열었을 때 첫 20줄 안에 "이 파일이 **왜** 존재하는지"를 파악. 코드를 한 줄씩 읽는 비용 절감.
+
+**@fileoverview — 파일 최상단 필수**
+
+모든 훅(`.js`), API 파일(`.js`), 주요 컴포넌트(`.jsx`)에 추가:
+
+```javascript
+/**
+ * @fileoverview {이 파일이 왜 필요한가 — 비즈니스 맥락 1~2줄}
+ *
+ * {핵심 동작 원리 또는 주의사항}
+ * {다른 파일과의 관계 (어디서 호출되는지, 무엇에 의존하는지)}
+ *
+ * {반환값/노출 API가 있으면 한 줄 요약}
+ */
+```
+
+**좋은 @fileoverview 예시:**
+```javascript
+/**
+ * @fileoverview 전체 칸반 보드 상태의 단일 진실 소스(Single Source of Truth).
+ *
+ * useReducer로 phases/sections를 관리하고, Supabase Realtime으로 다른 클라이언트와 동기화.
+ * 모든 CRUD 작업은 "dispatch 먼저 → API 호출 나중" 패턴(Optimistic Update)을 사용.
+ *
+ * 상태 구조: phases(칸반 컬럼 배열, items 내장), sections(섹션 배열), loading, error
+ */
+```
+
+**나쁜 @fileoverview 예시 (금지):**
+```javascript
+/**
+ * @fileoverview 칸반 데이터 훅.  ← "무엇"만 설명, "왜"가 없음
+ */
+```
+
+**@description — 함수/메서드 단위**
+
+비즈니스 맥락이 있는 함수에만 추가 (단순 getter/setter 제외):
+
+```javascript
+/**
+ * @description {왜 이 함수가 필요한가 — 비즈니스 요구사항 기준}
+ * {핵심 주의사항 또는 사이드이펙트}
+ * @param {타입} paramName - {데이터 구조 또는 가능한 값 설명}
+ * @returns {타입} {반환값의 의미}
+ */
+```
+
+**@param 작성 기준:**
+- 타입은 간략히 (`string`, `Object`, `Array` 수준). 과도한 TypeScript 스타일 금지
+- 가능한 값이 열거 가능하면 명시: `- 'main'|'개발팀'|'AI팀'|'지원팀'`
+- 데이터 구조가 복잡하면 인라인 예시 포함:
+  ```javascript
+  * @param {Object} updates - 변경할 필드만 포함. `{ status: 'done', assignees: ['홍길동'] }`
+  ```
+
+**언제 JSDoc을 추가해야 하는가:**
+```
+✅ 추가할 것:
+  - 새 훅 파일 생성 시 → @fileoverview 필수
+  - 새 API 함수 생성 시 → @fileoverview (파일) + @description (함수)
+  - 새 주요 컴포넌트 생성 시 → @fileoverview 필수
+  - 비즈니스 로직이 복잡한 함수 → @description
+
+❌ 추가하지 말 것:
+  - 단순 이벤트 핸들러 (e.g., handleClick, handleChange)
+  - JSX 내부 인라인 함수
+  - 이미 파일명/함수명으로 역할이 명확한 경우
+  - 유틸리티 파일의 단순 변환 함수
+```
+
+**JSDoc 업데이트 기준:**
+- 함수 **시그니처** 변경 시 → @param/@returns 업데이트
+- 함수 **목적** 변경 시 → @description 업데이트
+- 파일 **역할** 변경 시 → @fileoverview 업데이트
+- 단순 버그픽스나 리팩토링은 JSDoc 변경 불필요
+
+---
+
+### 문서 업데이트 트리거 요약
+
+| 변경 사항 | Layer 1 (CLAUDE.md) | Layer 2 (README.md) | Layer 3 (JSDoc) |
+|-----------|--------------------|--------------------|-----------------|
+| 새 컴포넌트 파일 추가 | Section 7 업데이트 | 해당 폴더 README 업데이트 | @fileoverview 추가 |
+| 새 훅 추가 | Section 2, 7 업데이트 | hooks/README.md 업데이트 | @fileoverview 추가 |
+| DB 컬럼 추가 | Section 4 스키마 업데이트 | 해당 없음 | API 함수 @param 업데이트 |
+| 새 비즈니스 규칙 | Section 5 업데이트 | 해당 없음 | 영향받는 함수 @description 업데이트 |
+| 새 공통 패턴 도입 | Section 8 업데이트 | 해당 폴더 README 패턴 섹션 | 해당 없음 |
+| 파일 삭제 | Section 7에서 제거 | README 테이블에서 제거 | 해당 없음 (파일 삭제됨) |
+| 파일 이동/이름 변경 | Section 7 경로 수정 | 양쪽 폴더 README 수정 | @fileoverview 내 경로 언급 수정 |
+| Phase 완료 | Section 10 Roadmap에서 제거, 관련 섹션들 현재 상태로 업데이트 | 해당 없음 | 해당 없음 |
