@@ -29,6 +29,13 @@ export const STATUS_MAP = {
   'done': { label: '완료', color: 'bg-green-100 text-green-900 font-bold ring-2 ring-green-300 shadow-md' },
 };
 
+export const PRIORITY_MAP = {
+  0: { label: '없음', icon: null,  color: '' },
+  1: { label: '낮음', icon: '🔵', color: 'text-blue-500 dark:text-blue-400' },
+  2: { label: '중간', icon: '🟡', color: 'text-amber-500 dark:text-amber-400' },
+  3: { label: '높음', icon: '🔴', color: 'text-red-500 dark:text-red-400' },
+};
+
 export const PROJECT_TINTS = [
   {
     column: 'bg-sky-50/45 dark:bg-bg-elevated border-sky-100/80 dark:border-border-subtle',

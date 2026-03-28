@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { MessageSquare, FileText, ExternalLink, Trash2, CheckCircle2 } from 'lucide-react';
-import { STATUS_MAP, TEAM_COLORS, GLOBAL_TAGS } from '../lib/constants';
+import { MessageSquare, FileText, ExternalLink, Trash2, Calendar } from 'lucide-react';
+import { STATUS_MAP, TEAM_COLORS, GLOBAL_TAGS, PRIORITY_MAP } from '../lib/constants';
 
 export default function KanbanCard({
   item, itemIndex, phaseId, accentColor,
@@ -114,6 +114,25 @@ export default function KanbanCard({
                 </span>
               ))}
           </div>
+
+          {/* 날짜 / 우선순위 */}
+          {(item.start_date || item.end_date || (item.priority > 0)) && (
+            <div className="flex flex-wrap items-center gap-2 mt-1" onPointerDown={stopProp}>
+              {item.priority > 0 && PRIORITY_MAP[item.priority] && (
+                <span className={`text-[11px] font-black ${PRIORITY_MAP[item.priority].color}`}>
+                  {PRIORITY_MAP[item.priority].icon} {PRIORITY_MAP[item.priority].label}
+                </span>
+              )}
+              {(item.start_date || item.end_date) && (
+                <span className="flex items-center gap-1 text-[11px] font-bold text-gray-400 dark:text-text-tertiary">
+                  <Calendar size={10} strokeWidth={2.5} />
+                  {item.start_date && item.end_date
+                    ? `${item.start_date} → ${item.end_date}`
+                    : item.start_date || item.end_date}
+                </span>
+              )}
+            </div>
+          )}
 
           <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-50 dark:border-border-subtle/50" onPointerDown={stopProp}>
             <div className="flex gap-4">

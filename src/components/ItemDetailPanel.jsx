@@ -3,11 +3,11 @@ import {
   ChevronsRight, Maximize2, Minimize2, ChevronRight, CheckCircle2,
   Clock, Users, Building2, Tag, Link2, FileText, Plus, X,
   MessageSquare, Search, ArrowUpRight, AlignCenter, AlignJustify,
-  Sparkles, RefreshCw
+  Sparkles, RefreshCw, Calendar, Flag
 } from 'lucide-react';
 import CommentSection from './CommentSection';
 import TiptapEditor from './editor/Editor';
-import { TEAMS, STATUS_MAP } from '../lib/constants';
+import { TEAMS, STATUS_MAP, PRIORITY_MAP } from '../lib/constants';
 import { summarizeContent } from '../api/summarizeAPI';
 
 function ItemDetailPanel({ 
@@ -506,6 +506,60 @@ function ItemDetailPanel({
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* 시작일 */}
+            <div className="flex items-center min-h-[48px] group">
+              <div className="w-48 flex items-center gap-3 text-gray-400 dark:text-text-tertiary shrink-0">
+                <Calendar size={18} strokeWidth={2.5} />
+                <span className="text-[13px] font-black uppercase tracking-widest">시작일</span>
+              </div>
+              <div className="flex-1 px-3 py-2 rounded-xl hover:bg-white dark:hover:bg-bg-hover hover:shadow-sm hover:ring-1 hover:ring-gray-100 dark:hover:ring-border-subtle transition-all">
+                <input
+                  type="date"
+                  disabled={isReadOnly}
+                  value={item.start_date || ''}
+                  onChange={e => onUpdateItem(phase.id, item.id, { start_date: e.target.value || null })}
+                  className="bg-transparent border-none p-0 text-sm font-black text-gray-800 dark:text-text-primary focus:ring-0 cursor-pointer w-full dark:color-scheme-dark disabled:cursor-default"
+                />
+              </div>
+            </div>
+
+            {/* 마감일 */}
+            <div className="flex items-center min-h-[48px] group">
+              <div className="w-48 flex items-center gap-3 text-gray-400 dark:text-text-tertiary shrink-0">
+                <Calendar size={18} strokeWidth={2.5} />
+                <span className="text-[13px] font-black uppercase tracking-widest">마감일</span>
+              </div>
+              <div className="flex-1 px-3 py-2 rounded-xl hover:bg-white dark:hover:bg-bg-hover hover:shadow-sm hover:ring-1 hover:ring-gray-100 dark:hover:ring-border-subtle transition-all">
+                <input
+                  type="date"
+                  disabled={isReadOnly}
+                  value={item.end_date || ''}
+                  onChange={e => onUpdateItem(phase.id, item.id, { end_date: e.target.value || null })}
+                  className="bg-transparent border-none p-0 text-sm font-black text-gray-800 dark:text-text-primary focus:ring-0 cursor-pointer w-full dark:color-scheme-dark disabled:cursor-default"
+                />
+              </div>
+            </div>
+
+            {/* 우선순위 */}
+            <div className="flex items-center min-h-[48px] group">
+              <div className="w-48 flex items-center gap-3 text-gray-400 dark:text-text-tertiary shrink-0">
+                <Flag size={18} strokeWidth={2.5} />
+                <span className="text-[13px] font-black uppercase tracking-widest">우선순위</span>
+              </div>
+              <div className="flex-1 px-3 py-2 rounded-xl hover:bg-white dark:hover:bg-bg-hover hover:shadow-sm hover:ring-1 hover:ring-gray-100 dark:hover:ring-border-subtle transition-all">
+                <select
+                  disabled={isReadOnly}
+                  value={item.priority ?? 0}
+                  onChange={e => onUpdateItem(phase.id, item.id, { priority: Number(e.target.value) })}
+                  className="bg-transparent border-none p-0 text-sm font-black text-gray-800 dark:text-text-primary focus:ring-0 cursor-pointer appearance-none w-full dark:color-scheme-dark disabled:cursor-default"
+                >
+                  {Object.entries(PRIORITY_MAP).map(([val, { label, icon }]) => (
+                    <option key={val} value={val}>{icon ? `${icon} ${label}` : label}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>

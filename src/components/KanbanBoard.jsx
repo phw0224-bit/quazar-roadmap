@@ -25,6 +25,7 @@ import KanbanCard from './KanbanCard';
 import ItemDetailPanel from './ItemDetailPanel';
 import PeopleBoard from './PeopleBoard';
 import BoardSection from './BoardSection';
+import TimelineView from './TimelineView';
 import { TEAMS, GLOBAL_TAGS } from '../lib/constants';
 import FilterBar from './FilterBar';
 import SearchModal from './SearchModal';
@@ -330,7 +331,7 @@ export default function KanbanBoard({ onShowLogin }) {
               <div className="flex items-center gap-3">
                 <div className="text-3xl filter drop-shadow-sm">📂</div>
                 <h1 className="text-2xl font-black text-gray-900 dark:text-text-primary tracking-tight leading-none">
-                  {activeView === 'board' ? '프로젝트 보드' : '인원 관리'}
+                  {activeView === 'board' ? '프로젝트 보드' : activeView === 'timeline' ? '타임라인' : '인원 관리'}
                 </h1>
               </div>
               
@@ -344,6 +345,16 @@ export default function KanbanBoard({ onShowLogin }) {
                   }`}
                 >
                   보드
+                </button>
+                <button
+                  onClick={() => setUrlState({ view: 'timeline' })}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${
+                    activeView === 'timeline'
+                      ? 'bg-white dark:bg-bg-hover text-gray-900 dark:text-text-primary shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.05]'
+                      : 'text-gray-400 dark:text-text-tertiary hover:text-gray-600 dark:hover:text-text-secondary'
+                  }`}
+                >
+                  타임라인
                 </button>
                 <button
                   onClick={() => setUrlState({ view: 'people' })}
@@ -408,7 +419,14 @@ export default function KanbanBoard({ onShowLogin }) {
           )}
 
           {/* Board Scroll Area */}
-          {activeView === 'board' ? (
+          {activeView === 'timeline' ? (
+            <TimelineView
+              phases={filteredPhases.filter(p => (p.board_type || 'main') !== 'main')}
+              onUpdateItem={updateItem}
+              onOpenDetail={(itemId) => setUrlState({ itemId })}
+              isReadOnly={!user}
+            />
+          ) : activeView === 'board' ? (
             <div
               className={`flex-1 overflow-x-auto overflow-y-auto pt-10 pb-10 pl-10 custom-scrollbar bg-white dark:bg-bg-base transition-all duration-300 ease-notion flex flex-col gap-20 ${detailItemId && !isDetailFullscreen ? 'pr-4' : 'pr-10'}`}
               onClick={(e) => {
@@ -603,7 +621,7 @@ export default function KanbanBoard({ onShowLogin }) {
               <ItemDetailPanel
                 item={detailItem}
                 phase={detailPhase}
-                allItems={phases.flatMap(p => p.items)}
+                allItems={phases.filter(p => (p.board_type || 'main') !== 'main').flatMap(p => p.items)}
                 onClose={closeDetailPanel}
                 isFullscreen={isDetailFullscreen}
                 onToggleFullscreen={() => setUrlState({ fullscreen: !isDetailFullscreen })}
