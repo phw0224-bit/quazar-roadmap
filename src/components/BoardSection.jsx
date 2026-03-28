@@ -1,3 +1,10 @@
+/**
+ * @fileoverview 칸반 섹션 그룹. 여러 ProjectColumn을 묶는 컨테이너.
+ *
+ * useSortable로 섹션 자체도 드래그 가능 (섹션 간 순서 변경).
+ * SortableContext(horizontalListSortingStrategy)로 내부 columns 가로 정렬.
+ * 섹션 삭제 시 속한 projects는 삭제되지 않고 section_id만 null로 변경.
+ */
 import { useState } from 'react';
 import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';

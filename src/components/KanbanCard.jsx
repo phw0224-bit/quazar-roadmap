@@ -1,3 +1,10 @@
+/**
+ * @fileoverview 칸반 카드 단일 컴포넌트. @dnd-kit useSortable로 드래그 가능.
+ *
+ * 완료 토글: status 'done' ↔ 'none' 전환 (체크박스 스타일).
+ * isReadOnly=true 시 DnD 비활성화 + 편집 버튼 숨김.
+ * stopProp: 카드 내 모든 버튼에 onPointerDown={stopProp} 필수 (DnD 충돌 방지).
+ */
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { MessageSquare, FileText, ExternalLink, Trash2, Calendar } from 'lucide-react';

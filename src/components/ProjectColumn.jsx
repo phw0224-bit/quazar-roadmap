@@ -1,3 +1,12 @@
+/**
+ * @fileoverview 칸반 컬럼 하나 (Phase/Project). DnD droppable + draggable 이중 역할.
+ *
+ * - 컬럼 자체: useSortable (가로 드래그로 순서 변경)
+ * - 컬럼 내부: useDroppable (다른 컬럼에서 카드 드롭 수신)
+ * - 컬럼 내 카드들: SortableContext(verticalListSortingStrategy)
+ *
+ * 색상 테마: PROJECT_TINTS 배열에서 phaseIndex % 4 로 결정.
+ */
 import { useEffect, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import {

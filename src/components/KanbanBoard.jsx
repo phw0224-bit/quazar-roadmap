@@ -1,3 +1,16 @@
+/**
+ * @fileoverview 칸반 앱 최상위 오케스트레이터. board/timeline/people 뷰 전환 + DnD 컨텍스트.
+ *
+ * 담당:
+ * - @dnd-kit DnD 컨텍스트 (sections, phases, items 세 레벨 드래그)
+ * - Toast/Confirm/Prompt 전역 피드백 상태 관리 + 콜백 전달
+ * - ItemDetailPanel 열림/닫힘 + 리사이즈 (panelWidth 20~80%)
+ * - URL 상태 ↔ 필터/뷰 동기화
+ * - Ctrl+K 검색 단축키 리스너
+ *
+ * DnD 타입 판별: activeId prefix ('section-', phase vs item)
+ * localStorage: expandedSections Set, isMainBoardCollapsed boolean
+ */
 import { useState, useEffect, useMemo } from 'react';
 import { useTheme } from 'next-themes';
 import { Moon, Sun, Search, PanelLeft } from 'lucide-react';
@@ -176,6 +189,11 @@ export default function KanbanBoard({ onShowLogin }) {
     setActiveId(event.active.id);
   };
 
+  /**
+   * @description DnD 드롭 완료 시 타입(section/phase/item) 판별 후 해당 이동 메서드 호출.
+   * phase 이동 시 다른 section 위에 드롭하면 updatePhase로 section_id도 변경.
+   * @param {Object} event - @dnd-kit DragEndEvent { active, over }
+   */
   const handleDragEnd = async (event) => {
     if (!user) return;
     const { active, over } = event;

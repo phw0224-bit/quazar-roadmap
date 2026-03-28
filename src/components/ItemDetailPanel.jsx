@@ -1,3 +1,18 @@
+/**
+ * @fileoverview 아이템 상세 편집 패널. 앱에서 가장 복잡한 컴포넌트.
+ *
+ * 담당:
+ * - 제목/부제목/담당자/팀/태그/상태/우선순위/날짜 인라인 편집
+ * - Tiptap 에디터 (description HTML)
+ * - AI 요약 생성 + [N] 인용 → 에디터 블록 스크롤
+ * - 관계 아이템 검색/추가/제거
+ * - 자식 페이지 목록 + 생성
+ * - 댓글 목록 (CommentSection)
+ * - 브레드크럼 네비게이션 (parent_item_id 체인 추적)
+ *
+ * AI 인용 시스템: summary의 [N] 배지 클릭 → blocks[N] 텍스트로
+ * 에디터 내 data-id 속성 검색 → 해당 DOM 노드 scrollIntoView.
+ */
 import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   ChevronsRight, Maximize2, Minimize2, ChevronRight, CheckCircle2,
@@ -35,12 +50,6 @@ function ItemDetailPanel({
   const [aiSummary, setAiSummary] = useState(item?.ai_summary || null);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState(null);
-
-  // 하위 페이지: 현재 아이템의 직계 자식 page 타입 아이템
-  const childPages = useMemo(() =>
-    allItems.filter(i => i.parent_item_id === item?.id && i.page_type === 'page'),
-    [allItems, item?.id]
-  );
 
   // 본문 DOM 참조 (citation 클릭 시 해당 블록으로 스크롤)
   const descriptionRef = useRef(null);
@@ -196,6 +205,23 @@ function ItemDetailPanel({
     onShowToast?.(isDone ? '완료 표시를 해제했습니다.' : '완료로 표시했습니다.');
   };
 
+  // 브레드크럼 경로 계산 (Phase -> Parent1 -> Parent2 -> ... -> Current Item)
+  const itemPath = useMemo(() => {
+    const path = [];
+    let current = item;
+    // 부모 아이템들을 역순으로 수집
+    while (current && current.parent_item_id) {
+      const parent = allItems.find(i => i.id === current.parent_item_id);
+      if (parent) {
+        path.unshift(parent);
+        current = parent;
+      } else {
+        break;
+      }
+    }
+    return path;
+  }, [item, allItems]);
+
   if (!item) return null;
 
   return (
@@ -239,6 +265,20 @@ function ItemDetailPanel({
               >
                 🧭 {phase?.title}
               </button>
+              
+              {/* 계층형 부모 아이템 경로 표시 */}
+              {itemPath.map((p) => (
+                <div key={p.id} className="flex items-center gap-2 shrink-0">
+                  <ChevronRight size={12} strokeWidth={3} className="text-gray-300 dark:text-text-tertiary" />
+                  <button
+                    onClick={() => onOpenDetail?.(p.id)}
+                    className="bg-gray-100 dark:bg-bg-hover px-2.5 py-1 rounded-lg text-gray-500 dark:text-text-secondary shrink-0 hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-all border border-transparent hover:border-gray-200 dark:hover:border-border-strong"
+                  >
+                    📄 {p.title || p.content}
+                  </button>
+                </div>
+              ))}
+
               <ChevronRight size={12} strokeWidth={3} className="text-gray-300 dark:text-text-tertiary" />
               <span className="text-gray-900 dark:text-text-primary truncate font-black">{item.title || item.content}</span>
             </nav>
@@ -663,55 +703,16 @@ function ItemDetailPanel({
                 itemId={item.id}
                 onShowToast={onShowToast}
                 onBlur={handleDescriptionBlur}
+                onAddChildPage={onAddChildPage ? async (title) => {
+                  return await onAddChildPage(phase?.id, item?.id, title);
+                } : null}
+                onShowPrompt={onShowPrompt}
+                onOpenDetail={onOpenDetail}
               />
             </div>
           </div>
 
-          {/* 하위 페이지 섹션 */}
-          <div className="border-t border-[var(--color-border-subtle)] pt-4 mt-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wide">
-                하위 페이지
-              </span>
-              {!isReadOnly && onAddChildPage && (
-                <button
-                  onPointerDown={stopProp}
-                  onClick={(e) => {
-                    stopProp(e);
-                    onShowPrompt?.('하위 페이지 추가', '페이지 제목을 입력하세요', async (title) => {
-                      if (!title?.trim()) return;
-                      await onAddChildPage(phase?.id, item?.id, title.trim());
-                    });
-                  }}
-                  className="text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)]
-                             px-2 py-0.5 rounded hover:bg-[var(--color-bg-hover)] transition-colors"
-                >
-                  + 추가
-                </button>
-              )}
-            </div>
 
-            {childPages.length === 0 ? (
-              <p className="text-xs text-[var(--color-text-tertiary)] italic">하위 페이지가 없습니다.</p>
-            ) : (
-              <div className="space-y-1">
-                {childPages.map(page => (
-                  <div
-                    key={page.id}
-                    onPointerDown={stopProp}
-                    onClick={(e) => { stopProp(e); onOpenDetail?.(page.id); }}
-                    className="flex items-center gap-2 p-2 rounded cursor-pointer
-                               hover:bg-[var(--color-bg-hover)] transition-colors group"
-                  >
-                    <span className="text-sm flex-shrink-0">📄</span>
-                    <span className="text-sm text-[var(--color-text-primary)] truncate flex-1">
-                      {page.title || '제목 없음'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
 
           {/* Comments Section */}
           <div className="flex flex-col gap-10 pb-40">
