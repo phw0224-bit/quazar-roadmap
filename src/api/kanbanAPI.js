@@ -375,7 +375,7 @@ export async function createChildPage(projectId, parentItemId, title) {
 
   const { data, error } = await supabase
     .from('items')
-    .insert({
+    .insert([{
       project_id: projectId,
       parent_item_id: parentItemId,
       title,
@@ -386,12 +386,11 @@ export async function createChildPage(projectId, parentItemId, title) {
       tags: [],
       related_items: [],
       order_index: nextOrder,
-    })
-    .select()
-    .single();
+    }])
+    .select();
 
   if (error) throw error;
-  return data;
+  return data[0];
 }
 
 export async function getChildPages(parentItemId) {
