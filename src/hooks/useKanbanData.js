@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useCallback } from 'react';
-import API from '../api/kanbanAPI';
+import API, { createChildPage } from '../api/kanbanAPI';
 import { supabase } from '../lib/supabase';
 
 const INITIAL_STATE = {
@@ -126,6 +126,16 @@ const kanbanReducer = (state, action) => {
         })
       };
     }
+    case 'ADD_CHILD_PAGE':
+      // action: { phaseId, newPage }
+      return {
+        ...state,
+        phases: state.phases.map(p =>
+          p.id === action.phaseId
+            ? { ...p, items: [...(p.items || []), action.newPage] }
+            : p
+        ),
+      };
     case 'ADD_COMMENT':
       return {
         ...state,
@@ -266,6 +276,12 @@ export const useKanbanData = () => {
     await API.moveItem(sourcePhaseId, targetPhaseId, itemId, targetIndex);
   };
 
+  const addChildPage = async (phaseId, parentItemId, title) => {
+    const newPage = await createChildPage(phaseId, parentItemId, title);
+    dispatch({ type: 'ADD_CHILD_PAGE', phaseId, newPage });
+    return newPage;
+  };
+
   const addComment = async (phaseId, itemId, content) => {
     const newComment = await API.addComment(phaseId, itemId, content);
     // Real-time listener will also handle this, but we can update state immediately for speed
@@ -315,6 +331,7 @@ export const useKanbanData = () => {
     updateItem,
     deleteItem,
     moveItem,
+    addChildPage,
     addComment,
     updateComment,
     deleteComment,
