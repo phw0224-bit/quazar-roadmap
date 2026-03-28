@@ -173,6 +173,40 @@ input:focus, textarea:focus {
   min-height: 200px;
 }
 
+/* Notion-style compact block spacing */
+.tiptap-content .tiptap > * {
+  margin-top: 0.15em;
+  margin-bottom: 0.15em;
+}
+.tiptap-content .tiptap > p {
+  margin-top: 0.1em;
+  margin-bottom: 0.1em;
+}
+.tiptap-content .tiptap > h1,
+.tiptap-content .tiptap > h2,
+.tiptap-content .tiptap > h3 {
+  margin-top: 0.75em;
+  margin-bottom: 0.1em;
+}
+.tiptap-content .tiptap > ul,
+.tiptap-content .tiptap > ol {
+  margin-top: 0.1em;
+  margin-bottom: 0.1em;
+  padding-left: 1.4em;
+}
+.tiptap-content .tiptap > blockquote {
+  margin-top: 0.3em;
+  margin-bottom: 0.3em;
+}
+.tiptap-content .tiptap > pre {
+  margin-top: 0.4em;
+  margin-bottom: 0.4em;
+}
+.tiptap-content .tiptap li {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
 .tiptap-content .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
