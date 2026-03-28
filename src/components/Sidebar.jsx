@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronRight, LayoutGrid, Clock, Users, PanelLeft, Pin } from 'lucide-react';
+import { ChevronRight, LayoutGrid, Clock, Users, PanelLeft, MousePointer2 } from 'lucide-react';
 import { usePageTree } from '../hooks/usePageTree';
 import SidebarTree from './SidebarTree';
 
@@ -21,8 +21,8 @@ export default function Sidebar({
   onAddChildPage,
   onShowPrompt,
   isReadOnly,
-  mode,
-  onModeToggle,
+  hoverMode,
+  onHoverModeToggle,
 }) {
   const [expandedIds, setExpandedIds] = useState(() => {
     try {
@@ -55,7 +55,6 @@ export default function Sidebar({
     });
   };
 
-  const isDocked = mode === 'docked';
 
   return (
     <div className="w-full h-full flex flex-col bg-[color:var(--color-bg-elevated)] overflow-hidden">
@@ -68,16 +67,16 @@ export default function Sidebar({
           </span>
         </div>
 
-        {/* Mode toggle button */}
+        {/* Hover mode toggle button */}
         <button
           className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-md
             text-[color:var(--color-text-tertiary)] hover:text-[color:var(--color-text-primary)]
             hover:bg-[color:var(--color-bg-hover)] transition-colors duration-100 cursor-pointer"
-          onClick={onModeToggle}
+          onClick={onHoverModeToggle}
           onPointerDown={stopProp}
-          title={isDocked ? '플로팅 모드로 전환' : '고정 모드로 전환'}
+          title={hoverMode ? '클릭 모드로 전환' : '호버 모드로 전환'}
         >
-          {isDocked ? <Pin size={14} strokeWidth={2} /> : <PanelLeft size={14} strokeWidth={2} />}
+          {hoverMode ? <PanelLeft size={14} strokeWidth={2} /> : <MousePointer2 size={14} strokeWidth={2} />}
         </button>
       </div>
 

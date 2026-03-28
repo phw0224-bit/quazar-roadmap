@@ -345,7 +345,7 @@ export default function KanbanBoard({ onShowLogin }) {
               <div className="flex items-center gap-3">
                 <div className="text-3xl filter drop-shadow-sm">📂</div>
                 <h1 className="text-2xl font-black text-gray-900 dark:text-text-primary tracking-tight leading-none">
-                  {activeView === 'board' ? '프로젝트 보드' : '인원 관리'}
+                  {activeView === 'board' ? '프로젝트 보드' : activeView === 'timeline' ? '타임라인' : '인원 관리'}
                 </h1>
               </div>
               
@@ -359,6 +359,16 @@ export default function KanbanBoard({ onShowLogin }) {
                   }`}
                 >
                   보드
+                </button>
+                <button
+                  onClick={() => setUrlState({ view: 'timeline' })}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${
+                    activeView === 'timeline'
+                      ? 'bg-white dark:bg-bg-hover text-gray-900 dark:text-text-primary shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.05]'
+                      : 'text-gray-400 dark:text-text-tertiary hover:text-gray-600 dark:hover:text-text-secondary'
+                  }`}
+                >
+                  타임라인
                 </button>
                 <button
                   onClick={() => setUrlState({ view: 'people' })}
