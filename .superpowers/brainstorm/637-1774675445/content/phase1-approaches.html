@@ -1,0 +1,77 @@
+<h2>Phase 1 — 에디터 구현 방식 선택</h2>
+<p class="subtitle">슬래시 커맨드 + Callout/Toggle 블록을 어떻게 구현할지 결정합니다.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>@tiptap/suggestion 공식 방식 <span style="font-size:12px;background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:10px;margin-left:6px;">권장</span></h3>
+      <p>Tiptap 공식 슬래시 커맨드 패턴. suggestion 확장으로 팝업 위치·키보드 탐색을 처리하고, React 컴포넌트로 메뉴 UI만 담당.</p>
+      <div class="pros-cons" style="margin-top:10px;">
+        <div class="pros"><h4>장점</h4><ul>
+          <li>에디터와 완벽 통합 (커서 위치 정확)</li>
+          <li>키보드(↑↓Enter/Esc) 기본 지원</li>
+          <li>멘션(@) 추가 시 동일 패턴 재사용</li>
+          <li>바이브코딩 추가 확장 쉬움</li>
+        </ul></div>
+        <div class="cons"><h4>단점</h4><ul>
+          <li>초기 설정 코드 ~80줄</li>
+          <li>팝업 위치 계산 직접 처리 필요</li>
+        </ul></div>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:#6b7280;font-family:monospace;background:#f9fafb;padding:8px;border-radius:6px;">
+        설치: @tiptap/suggestion, @tiptap/extension-code-block-lowlight,<br>
+        lowlight, @tiptap/extension-task-list, @tiptap/extension-task-item
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>커스텀 팝업 방식 (floating-ui)</h3>
+      <p>에디터 이벤트를 직접 감지해서 React 포털로 팝업 렌더링. 더 자유로운 UI 커스터마이징 가능.</p>
+      <div class="pros-cons" style="margin-top:10px;">
+        <div class="pros"><h4>장점</h4><ul>
+          <li>UI 디자인 완전 자유</li>
+          <li>팝업 위치·애니메이션 세밀 제어</li>
+          <li>Tiptap에 덜 종속</li>
+        </ul></div>
+        <div class="cons"><h4>단점</h4><ul>
+          <li>키보드 이벤트 직접 구현</li>
+          <li>에디터-팝업 동기화 버그 위험</li>
+          <li>추가 라이브러리 (floating-ui)</li>
+        </ul></div>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:#6b7280;font-family:monospace;background:#f9fafb;padding:8px;border-radius:6px;">
+        설치: @floating-ui/react, + 기타 tiptap 확장들
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>점진적 확장 방식 (슬래시 커맨드 먼저, 블록 나중)</h3>
+      <p>슬래시 커맨드 메뉴 UI/UX를 먼저 완성하고, Callout·Toggle 등 블록은 2단계로 추가.</p>
+      <div class="pros-cons" style="margin-top:10px;">
+        <div class="pros"><h4>장점</h4><ul>
+          <li>빠른 첫 결과물 확인</li>
+          <li>리스크 분산</li>
+        </ul></div>
+        <div class="cons"><h4>단점</h4><ul>
+          <li>두 번 작업 필요</li>
+          <li>구조 변경 가능성</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:24px;padding:16px;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;">
+  <strong>💡 바이브코딩 관점</strong>
+  <p style="font-size:13px;color:#374151;margin-top:6px;">
+    <b>A 방식</b>이 가장 좋습니다. <code>SlashCommand.js</code> 파일 하나가 "슬래시 커맨드의 모든 로직"을 담고,
+    <code>SlashCommandMenu.jsx</code>가 "팝업 UI만" 담당 → AI가 파일만 보면 바로 이해하고 수정 가능한 구조.
+  </p>
+</div>

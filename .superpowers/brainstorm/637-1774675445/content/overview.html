@@ -1,0 +1,138 @@
+<h2>Quazar Roadmap — 전체 기능 범위 파악</h2>
+<p class="subtitle">노션 수준 + 회사 맞춤 기능을 모두 구현하려면 아래처럼 큰 작업들이 남아 있습니다.<br>어디서 시작할지 먼저 정해야 효율적으로 진행할 수 있습니다.</p>
+
+<div class="section">
+  <span class="label">✅ 이미 구현됨</span>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+    <span style="background:#d1fae5;color:#065f46;padding:4px 12px;border-radius:20px;font-size:13px;">칸반 보드 (4개 팀)</span>
+    <span style="background:#d1fae5;color:#065f46;padding:4px 12px;border-radius:20px;font-size:13px;">아이템 상세 패널</span>
+    <span style="background:#d1fae5;color:#065f46;padding:4px 12px;border-radius:20px;font-size:13px;">리치 텍스트 에디터</span>
+    <span style="background:#d1fae5;color:#065f46;padding:4px 12px;border-radius:20px;font-size:13px;">드래그&앤드롭 (DnD)</span>
+    <span style="background:#d1fae5;color:#065f46;padding:4px 12px;border-radius:20px;font-size:13px;">People 보드</span>
+    <span style="background:#d1fae5;color:#065f46;padding:4px 12px;border-radius:20px;font-size:13px;">AI 요약</span>
+    <span style="background:#d1fae5;color:#065f46;padding:4px 12px;border-radius:20px;font-size:13px;">댓글 & 파일첨부</span>
+    <span style="background:#d1fae5;color:#065f46;padding:4px 12px;border-radius:20px;font-size:13px;">관계 아이템 링크</span>
+    <span style="background:#d1fae5;color:#065f46;padding:4px 12px;border-radius:20px;font-size:13px;">Supabase Realtime</span>
+    <span style="background:#d1fae5;color:#065f46;padding:4px 12px;border-radius:20px;font-size:13px;">다크모드</span>
+    <span style="background:#d1fae5;color:#065f46;padding:4px 12px;border-radius:20px;font-size:13px;">인증 (Auth)</span>
+  </div>
+</div>
+
+<div class="section">
+  <span class="label">🚧 구현 예정 기능 — 7개 Phase + 추가 기능</span>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;">
+
+    <div style="border:1.5px solid #e5e7eb;border-radius:12px;padding:16px;background:#fafafa;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="background:#3b82f6;color:white;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">Phase 1</span>
+        <strong>에디터 완성</strong>
+      </div>
+      <ul style="font-size:13px;color:#374151;margin:0;padding-left:16px;line-height:2;">
+        <li>슬래시 커맨드 (<code>/</code> 팝업)</li>
+        <li>Callout / Toggle 블록</li>
+        <li>체크리스트 (TaskList)</li>
+        <li>코드블록 하이라이팅</li>
+        <li>블록 드래그 핸들 <code>⠿</code></li>
+      </ul>
+    </div>
+
+    <div style="border:1.5px solid #e5e7eb;border-radius:12px;padding:16px;background:#fafafa;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="background:#8b5cf6;color:white;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">Phase 2</span>
+        <strong>필터 / 정렬 / 그룹화</strong>
+      </div>
+      <ul style="font-size:13px;color:#374151;margin:0;padding-left:16px;line-height:2;">
+        <li>다중 필터 조건 (AND)</li>
+        <li>정렬 (제목/날짜/상태)</li>
+        <li>그룹화 (담당자/태그/상태)</li>
+        <li>URL 파라미터 저장</li>
+      </ul>
+    </div>
+
+    <div style="border:1.5px solid #e5e7eb;border-radius:12px;padding:16px;background:#fafafa;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="background:#f59e0b;color:white;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">Phase 3</span>
+        <strong>Cmd+K 전체 검색</strong>
+      </div>
+      <ul style="font-size:13px;color:#374151;margin:0;padding-left:16px;line-height:2;">
+        <li>전문검색 (FTS, PostgreSQL)</li>
+        <li>300ms 디바운스 실시간</li>
+        <li>최근 방문 아이템</li>
+        <li>클릭 → 상세 패널 이동</li>
+      </ul>
+    </div>
+
+    <div style="border:1.5px solid #e5e7eb;border-radius:12px;padding:16px;background:#fafafa;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="background:#10b981;color:white;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">Phase 4</span>
+        <strong>날짜 + 타임라인 뷰</strong>
+      </div>
+      <ul style="font-size:13px;color:#374151;margin:0;padding-left:16px;line-height:2;">
+        <li>시작일/마감일 DatePicker</li>
+        <li>우선순위 속성</li>
+        <li>간트 차트 (CSS Grid + DnD)</li>
+        <li>주/월/분기 줌</li>
+      </ul>
+    </div>
+
+    <div style="border:1.5px solid #e5e7eb;border-radius:12px;padding:16px;background:#fff7ed;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="background:#ef4444;color:white;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">Phase 5 ⚠️ 대변경</span>
+        <strong>사이드바 + 무한 중첩 페이지</strong>
+      </div>
+      <ul style="font-size:13px;color:#374151;margin:0;padding-left:16px;line-height:2;">
+        <li>왼쪽 사이드바 트리 네비게이션</li>
+        <li>무한 중첩 서브페이지</li>
+        <li>page/task/board 타입</li>
+        <li>전체 레이아웃 재설계</li>
+      </ul>
+    </div>
+
+    <div style="border:1.5px solid #e5e7eb;border-radius:12px;padding:16px;background:#fafafa;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="background:#6366f1;color:white;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">Phase 6</span>
+        <strong>@멘션 + Google Chat 알림</strong>
+      </div>
+      <ul style="font-size:13px;color:#374151;margin:0;padding-left:16px;line-height:2;">
+        <li>댓글 @이름 자동완성</li>
+        <li>멘션 시 Google Chat DM</li>
+        <li>알림 히스토리</li>
+      </ul>
+    </div>
+
+    <div style="border:1.5px solid #e5e7eb;border-radius:12px;padding:16px;background:#fafafa;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="background:#64748b;color:white;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">Phase 7 (장기)</span>
+        <strong>커스텀 속성 시스템</strong>
+      </div>
+      <ul style="font-size:13px;color:#374151;margin:0;padding-left:16px;line-height:2;">
+        <li>팀별 커스텀 필드 정의</li>
+        <li>텍스트/숫자/날짜/선택 등</li>
+        <li>수식(Formula) 필드</li>
+      </ul>
+    </div>
+
+    <div style="border:1.5px solid #fbbf24;border-radius:12px;padding:16px;background:#fffbeb;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="background:#d97706;color:white;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">추가 (노션 수준)</span>
+        <strong>미정의 추가 기능</strong>
+      </div>
+      <ul style="font-size:13px;color:#374151;margin:0;padding-left:16px;line-height:2;">
+        <li>Table / Gallery / List 뷰</li>
+        <li>Calendar 뷰</li>
+        <li>템플릿 시스템</li>
+        <li>북마크 / 즐겨찾기</li>
+        <li>히스토리 & 버전 관리</li>
+        <li>권한 관리 (팀별 접근)</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<div class="section" style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:12px;padding:16px;">
+  <strong>🤔 지금 결정할 사항</strong>
+  <p style="font-size:13px;color:#374151;margin-top:8px;">이 모든 기능을 한 번에 계획하면 스펙이 너무 방대해집니다. <br>
+  Phase별로 하나씩 진행하는 게 현실적입니다 — <strong>어떤 Phase부터 시작하고 싶으신가요?</strong></p>
+</div>

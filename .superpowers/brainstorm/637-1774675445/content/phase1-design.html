@@ -1,0 +1,179 @@
+<h2>Phase 1 — 설계 확인</h2>
+<p class="subtitle">구현 전 전체 구조를 확인하세요. 각 섹션에서 피드백 주시면 반영합니다.</p>
+
+<!-- 폴더 구조 -->
+<div class="section">
+  <span class="label">📁 파일 구조 (바이브코딩 최적화)</span>
+  <div style="background:#1e1e1e;color:#d4d4d4;border-radius:10px;padding:20px;font-family:monospace;font-size:13px;line-height:1.9;margin-top:10px;">
+    <span style="color:#6a9955;">src/components/</span><br>
+    &nbsp;&nbsp;<span style="color:#ce9178;">TiptapEditor.jsx</span> <span style="color:#6a9955;">← 삭제 (editor/Editor.jsx로 이전)</span><br>
+    &nbsp;&nbsp;<span style="color:#4fc1ff;">editor/</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#ce9178;">Editor.jsx</span> <span style="color:#6a9955;">← 메인 에디터 (확장 조립 + toolbar)</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#ce9178;">SlashCommandMenu.jsx</span> <span style="color:#6a9955;">← 슬래시 팝업 UI만</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#4fc1ff;">extensions/</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#ce9178;">SlashCommand.js</span> <span style="color:#6a9955;">← /커맨드 로직 + 블록 목록</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#ce9178;">Callout.js</span> <span style="color:#6a9955;">← Callout 커스텀 노드</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#ce9178;">Toggle.js</span> <span style="color:#6a9955;">← Toggle 커스텀 노드</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#ce9178;">ResizableImage.js</span> <span style="color:#6a9955;">← 기존 코드 이동</span>
+  </div>
+  <p style="font-size:12px;color:#6b7280;margin-top:8px;">TiptapEditor.jsx를 import하던 모든 곳은 editor/Editor.jsx로 경로만 변경합니다.</p>
+</div>
+
+<!-- 슬래시 커맨드 UX -->
+<div class="section">
+  <span class="label">⌨️ 슬래시 커맨드 UX</span>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:10px;">
+    <div>
+      <p style="font-size:13px;color:#374151;margin-bottom:8px;font-weight:600;">동작 흐름</p>
+      <ol style="font-size:13px;color:#374151;line-height:2;padding-left:16px;margin:0;">
+        <li><code>/</code> 입력 → 팝업 즉시 표시</li>
+        <li>텍스트 입력으로 블록 검색 필터링</li>
+        <li><kbd>↑</kbd><kbd>↓</kbd> 탐색, <kbd>Enter</kbd> 선택</li>
+        <li><kbd>Esc</kbd> 또는 포커스 이탈 → 닫힘</li>
+        <li>블록 선택 시 <code>/커맨드텍스트</code> 자동 삭제</li>
+      </ol>
+    </div>
+    <div>
+      <p style="font-size:13px;color:#374151;margin-bottom:8px;font-weight:600;">팝업 위치</p>
+      <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px;background:#fafafa;font-size:13px;">
+        <div style="height:24px;background:#f3f4f6;border-radius:4px;margin-bottom:8px;display:flex;align-items:center;padding:0 8px;color:#374151;">
+          안녕하세요 <span style="color:#3b82f6;border-right:2px solid #3b82f6;">/</span>
+        </div>
+        <div style="border:1px solid #e5e7eb;border-radius:8px;background:white;padding:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+          <div style="padding:6px 8px;border-radius:6px;background:#eff6ff;color:#1d4ed8;font-size:12px;">📝 텍스트</div>
+          <div style="padding:6px 8px;border-radius:6px;color:#374151;font-size:12px;">H1 제목 1</div>
+          <div style="padding:6px 8px;border-radius:6px;color:#374151;font-size:12px;">H2 제목 2</div>
+          <div style="padding:6px 8px;border-radius:6px;color:#374151;font-size:12px;">☑ 체크리스트</div>
+          <div style="padding:6px 8px;border-radius:6px;color:#6b7280;font-size:11px;">… 더 보기</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 지원 블록 목록 -->
+<div class="section">
+  <span class="label">🧱 슬래시 커맨드 블록 목록 (13개)</span>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;">
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px;font-size:12px;">
+      <span style="font-size:16px;">📝</span> <strong>텍스트</strong><br><span style="color:#6b7280;">기본 단락</span>
+    </div>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px;font-size:12px;">
+      <span style="font-size:16px;">H1</span> <strong>제목 1</strong><br><span style="color:#6b7280;">큰 제목</span>
+    </div>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px;font-size:12px;">
+      <span style="font-size:16px;">H2</span> <strong>제목 2</strong><br><span style="color:#6b7280;">중간 제목</span>
+    </div>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px;font-size:12px;">
+      <span style="font-size:16px;">H3</span> <strong>제목 3</strong><br><span style="color:#6b7280;">소제목</span>
+    </div>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px;font-size:12px;">
+      <span style="font-size:16px;">•</span> <strong>불릿 리스트</strong><br><span style="color:#6b7280;">- 목록</span>
+    </div>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px;font-size:12px;">
+      <span style="font-size:16px;">1.</span> <strong>번호 목록</strong><br><span style="color:#6b7280;">순서 있는 목록</span>
+    </div>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px;font-size:12px;">
+      <span style="font-size:16px;">☑</span> <strong>체크리스트</strong><br><span style="color:#6b7280;">할 일 목록</span>
+    </div>
+    <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px;font-size:12px;">
+      <span style="font-size:16px;">💡</span> <strong>Callout</strong><br><span style="color:#6b7280;">강조 박스 (4색)</span>
+    </div>
+    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px;font-size:12px;">
+      <span style="font-size:16px;">▶</span> <strong>Toggle</strong><br><span style="color:#6b7280;">접기/펼치기</span>
+    </div>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px;font-size:12px;">
+      <span style="font-size:16px;">"</span> <strong>인용구</strong><br><span style="color:#6b7280;">Blockquote</span>
+    </div>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px;font-size:12px;">
+      <span style="font-size:16px;">&lt;/&gt;</span> <strong>코드블록</strong><br><span style="color:#6b7280;">언어별 하이라이트</span>
+    </div>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px;font-size:12px;">
+      <span style="font-size:16px;">—</span> <strong>구분선</strong><br><span style="color:#6b7280;">Horizontal rule</span>
+    </div>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px;font-size:12px;">
+      <span style="font-size:16px;">🖼</span> <strong>이미지</strong><br><span style="color:#6b7280;">업로드 트리거</span>
+    </div>
+  </div>
+</div>
+
+<!-- Callout 디자인 -->
+<div class="section">
+  <span class="label">💡 Callout 블록 디자인</span>
+  <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
+    <div style="background:#fef9c3;border-left:4px solid #eab308;border-radius:8px;padding:12px 16px;display:flex;align-items:flex-start;gap:10px;">
+      <span style="font-size:18px;flex-shrink:0;">💡</span>
+      <span style="font-size:13px;color:#713f12;">기본 정보를 강조할 때 사용합니다. (노랑)</span>
+    </div>
+    <div style="background:#fff7ed;border-left:4px solid #f97316;border-radius:8px;padding:12px 16px;display:flex;align-items:flex-start;gap:10px;">
+      <span style="font-size:18px;flex-shrink:0;">⚠️</span>
+      <span style="font-size:13px;color:#7c2d12;">주의사항이나 경고를 표시합니다. (주황)</span>
+    </div>
+    <div style="background:#fef2f2;border-left:4px solid #ef4444;border-radius:8px;padding:12px 16px;display:flex;align-items:flex-start;gap:10px;">
+      <span style="font-size:18px;flex-shrink:0;">❌</span>
+      <span style="font-size:13px;color:#7f1d1d;">위험하거나 금지된 사항을 나타냅니다. (빨강)</span>
+    </div>
+    <div style="background:#eff6ff;border-left:4px solid #3b82f6;border-radius:8px;padding:12px 16px;display:flex;align-items:flex-start;gap:10px;">
+      <span style="font-size:18px;flex-shrink:0;">ℹ️</span>
+      <span style="font-size:13px;color:#1e3a8a;">참고 정보나 팁을 제공합니다. (파랑)</span>
+    </div>
+    <p style="font-size:12px;color:#6b7280;margin-top:4px;">슬래시 커맨드로 삽입 → 이모지 클릭으로 타입 변경 가능</p>
+  </div>
+</div>
+
+<!-- Toggle 디자인 -->
+<div class="section">
+  <span class="label">▶ Toggle 블록 디자인</span>
+  <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;background:#fafafa;margin-top:10px;">
+    <div style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+      <span style="font-size:12px;color:#6b7280;transition:transform 0.2s;">▶</span>
+      <span style="font-size:13px;font-weight:500;color:#111;">Toggle 제목 클릭으로 접기/펼치기</span>
+    </div>
+    <div style="margin-top:8px;padding-left:22px;font-size:13px;color:#374151;">
+      ▼ 펼쳐진 상태 — 내부에 텍스트, 목록, 이미지 등 모든 블록 포함 가능
+    </div>
+  </div>
+</div>
+
+<!-- 블록 드래그 핸들 -->
+<div class="section">
+  <span class="label">⠿ 블록 드래그 핸들</span>
+  <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;background:#fafafa;margin-top:10px;">
+    <div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+      <span style="color:#d1d5db;cursor:grab;font-size:16px;user-select:none;">⠿</span>
+      <span style="color:#374151;">블록 왼쪽 호버 시 드래그 핸들 표시 → 드래그로 순서 변경</span>
+    </div>
+    <p style="font-size:12px;color:#6b7280;margin-top:6px;">Tiptap DragHandle 확장 사용 (별도 패키지 불필요, StarterKit 외 추가)</p>
+  </div>
+</div>
+
+<!-- 영향 범위 -->
+<div class="section">
+  <span class="label">📋 영향 받는 기존 파일</span>
+  <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:10px;">
+    <thead>
+      <tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb;">
+        <th style="text-align:left;padding:8px 12px;">파일</th>
+        <th style="text-align:left;padding:8px 12px;">변경 내용</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="border-bottom:1px solid #f3f4f6;">
+        <td style="padding:8px 12px;font-family:monospace;">TiptapEditor.jsx</td>
+        <td style="padding:8px 12px;">→ editor/Editor.jsx로 이전 후 삭제</td>
+      </tr>
+      <tr style="border-bottom:1px solid #f3f4f6;">
+        <td style="padding:8px 12px;font-family:monospace;">ItemDetailPanel.jsx</td>
+        <td style="padding:8px 12px;">import 경로만 변경 (로직 무변경)</td>
+      </tr>
+      <tr style="border-bottom:1px solid #f3f4f6;">
+        <td style="padding:8px 12px;font-family:monospace;">package.json</td>
+        <td style="padding:8px 12px;">5개 패키지 추가</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:16px;margin-top:8px;">
+  <strong>✅ 이 설계가 맞으면 "맞아" 또는 수정 원하시면 알려주세요</strong>
+</div>

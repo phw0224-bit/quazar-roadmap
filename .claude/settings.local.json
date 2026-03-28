@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(C:/Users/uguls/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.6/scripts/start-server.sh --project-dir \"C:/Users/uguls/Documents/quazar-roadmap-main\")",
+      "Bash(cat \"C:/Users/uguls/Documents/quazar-roadmap-main/.superpowers/brainstorm/\"*/state/server-info)",
+      "Bash(cmd.exe /c \"dir C:\\\\Users\\\\uguls\\\\.claude\\\\plugins\\\\cache\\\\claude-plugins-official\\\\superpowers\\\\5.0.6\\\\scripts\" \")",
+      "Bash(cmd.exe /c 'dir \"C:\\\\Users\\\\uguls\\\\.claude\\\\plugins\\\\cache\\\\claude-plugins-official\\\\superpowers\\\\5.0.6\\\\scripts\"' 2>&1)",
+      "Bash(cmd.exe /c 'dir C:\\\\Users\\\\uguls\\\\.claude\\\\plugins\\\\cache\\\\claude-plugins-official\\\\superpowers\\\\5.0.6\\\\scripts' 2>&1)",
+      "Bash(echo $HOME)",
+      "Read(//c/Users/uguls/Documents/quazar-roadmap-main/$HOME/**)",
+      "Bash(\"$HOME/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.6/skills/brainstorming/scripts/start-server.sh\" --project-dir \"/c/Users/uguls/Documents/quazar-roadmap-main\")",
+      "Bash(cat)",
+      "Bash(cmd.exe)",
+      "Bash(cmd.exe /c 'where node 2>&1')",
+      "Bash(export PATH=\"/c/Program Files/nodejs:$PATH\")",
+      "Bash(cat \"/c/Users/uguls/Documents/quazar-roadmap-main/.superpowers/brainstorm/\"*/state/server-info)"
+    ]
+  }
+}
