@@ -29,3 +29,5 @@ node_modules/
 .gemini/
 yarn.lock/
 .pdca-status.json
+.worktrees/
+.superpowers/
