@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { Filter, X, ArrowUpDown } from 'lucide-react';
-import { GLOBAL_TAGS, STATUS_MAP } from '../lib/constants';
+import { TEAMS, GLOBAL_TAGS, STATUS_MAP } from '../lib/constants';
 
 const FILTER_FIELDS = [
   { key: 'status',    label: '상태',   options: Object.entries(STATUS_MAP).map(([v, s]) => ({ value: v, label: s.label })) },
+  { key: 'teams',     label: '팀',     options: TEAMS.map(t => ({ value: t.name, label: t.name })) },
   { key: 'tags',      label: '태그',   options: GLOBAL_TAGS.map(t => ({ value: t.name, label: t.name })) },
   { key: 'assignees', label: '담당자', options: null },
 ];
