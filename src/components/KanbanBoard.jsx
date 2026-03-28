@@ -630,6 +630,8 @@ export default function KanbanBoard({ onShowLogin }) {
                 onOpenDetail={(itemId) => setUrlState({ itemId })}
                 onShowConfirm={showConfirm}
                 onShowToast={showToast}
+                onAddChildPage={addChildPage}
+                onShowPrompt={showPrompt}
                 isReadOnly={!user}
               />
             </div>

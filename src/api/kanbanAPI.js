@@ -392,6 +392,9 @@ export async function createChildPage(projectId, parentItemId, title) {
   return data[0];
 }
 
+// NOTE: 현재 미사용. usePageTree 훅이 이미 로드된 phases 데이터에서
+// 하위 페이지를 파생하므로 직접 API 호출이 필요없음.
+// 향후 on-demand 로딩 시 사용 예정.
 export async function getChildPages(parentItemId) {
   const { data, error } = await supabase
     .from('items')
