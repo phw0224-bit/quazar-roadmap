@@ -94,6 +94,7 @@ projects (
   title       text,
   board_type  text,
   section_id  uuid REFERENCES sections(id),  -- null 허용
+  description text,      -- 프로젝트 개요/설명 (가상 페이지용)
   assignees   text[],    -- profiles.name 값 배열
   order_index int,
   created_at  timestamptz
