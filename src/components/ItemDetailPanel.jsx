@@ -6,24 +6,24 @@
  * - Tiptap 에디터 (description HTML)
  * - AI 요약 생성 + [N] 인용 → 에디터 블록 스크롤
  * - 관계 아이템 검색/추가/제거
- * - 자식 페이지 목록 + 생성
+ * - 자식 페이지 목록 + 생성 (속성 상속 대응)
+ * - 기존 페이지 연결 (Slash Command 연동)
+ * - 프로젝트 가상 페이지 대응 (page_type='project')
  * - 댓글 목록 (CommentSection)
  * - 브레드크럼 네비게이션 (parent_item_id 체인 추적)
- *
- * AI 인용 시스템: summary의 [N] 배지 클릭 → blocks[N] 텍스트로
- * 에디터 내 data-id 속성 검색 → 해당 DOM 노드 scrollIntoView.
  */
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   ChevronsRight, Maximize2, Minimize2, ChevronRight, CheckCircle2,
   Clock, Users, Building2, Tag, Link2, FileText, Plus, X,
   MessageSquare, Search, ArrowUpRight, AlignCenter, AlignJustify,
-  Sparkles, RefreshCw, Calendar, Flag
+  Sparkles, RefreshCw, Calendar, Flag, LayoutList
 } from 'lucide-react';
 import CommentSection from './CommentSection';
 import TiptapEditor from './editor/Editor';
 import { TEAMS, STATUS_MAP, PRIORITY_MAP } from '../lib/constants';
 import { summarizeContent } from '../api/summarizeAPI';
+import SearchModal from './SearchModal';
 
 function ItemDetailPanel({
   item, phase, allItems = [], onClose, onUpdateItem, isReadOnly,
@@ -45,6 +45,32 @@ function ItemDetailPanel({
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(item?.title || item?.content || '');
   const [isWideView, setIsWideView] = useState(false);
+
+  // 기존 페이지 연결 모달 관련 상태
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const linkCallbackRef = useRef(null);
+
+  const handleLinkExistingPage = useCallback((callback) => {
+    linkCallbackRef.current = callback;
+    setShowLinkModal(true);
+  }, []);
+
+  const handleLinkSelect = async (itemId) => {
+    const itemToLink = allItems.find(i => i.id === itemId);
+    if (itemToLink) {
+      linkCallbackRef.current?.(itemToLink);
+      
+      const currentRelations = item.related_items || [];
+      if (!currentRelations.includes(itemId) && item.id !== itemId) {
+        await onUpdateItem(phase.id, item.id, { related_items: [...currentRelations, itemId] });
+        onShowToast?.('연관 업무가 추가되었습니다.');
+      }
+    } else {
+      linkCallbackRef.current?.(null);
+    }
+    setShowLinkModal(false);
+    linkCallbackRef.current = null;
+  };
 
   // AI 요약 관련 state
   const [aiSummary, setAiSummary] = useState(item?.ai_summary || null);
@@ -708,10 +734,64 @@ function ItemDetailPanel({
                 } : null}
                 onShowPrompt={onShowPrompt}
                 onOpenDetail={onOpenDetail}
+                onLinkExistingPage={handleLinkExistingPage}
               />
             </div>
           </div>
 
+          {/* Project Items List (Only for project page_type) */}
+          {item.page_type === 'project' && phase?.items && phase.items.length > 0 && (
+            <div className="flex flex-col gap-6 pt-8 border-t border-gray-100 dark:border-border-subtle">
+               <div className="flex items-center gap-3 border-b border-gray-100 dark:border-border-subtle pb-4">
+                 <LayoutList size={18} className="text-gray-400" />
+                 <h3 className="text-[13px] font-black text-gray-400 dark:text-text-tertiary uppercase tracking-[0.2em]">소속 업무 목록</h3>
+                 <span className="bg-gray-100 dark:bg-bg-hover px-2 py-0.5 rounded-md text-[11px] font-black text-gray-500 tabular-nums border border-gray-200 dark:border-border-subtle">
+                   {phase.items.length}
+                 </span>
+               </div>
+               <div className="flex flex-col gap-2">
+                 {phase.items.map(childItem => {
+                   const cPriority = PRIORITY_MAP[childItem.priority || 0];
+                   return (
+                     <div
+                       key={childItem.id}
+                       onClick={() => onOpenDetail?.(childItem.id)}
+                       className="group flex items-center justify-between p-3 rounded-2xl border border-gray-100 dark:border-border-subtle hover:border-blue-200 dark:hover:border-blue-800/50 hover:shadow-md bg-white dark:bg-bg-elevated cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99]"
+                     >
+                       <div className="flex items-center gap-3 min-w-0">
+                         <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${childItem.status === 'done' ? 'bg-emerald-500' : childItem.status === 'in-progress' ? 'bg-blue-500' : 'bg-gray-300'}`} />
+                         <span className="text-sm font-bold text-gray-800 dark:text-text-primary truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                           {childItem.title || childItem.content}
+                         </span>
+                       </div>
+                       <div className="flex items-center gap-3 shrink-0">
+                         {cPriority.icon && (
+                           <span className="text-xs" title={`우선순위: ${cPriority.label}`}>{cPriority.icon}</span>
+                         )}
+                         {(childItem.assignees || []).length > 0 ? (
+                           <div className="flex -space-x-2 mr-2">
+                             {childItem.assignees.slice(0, 3).map((a, i) => (
+                               <div key={i} className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 border-2 border-white dark:border-bg-elevated flex items-center justify-center text-[9px] font-bold text-gray-600 dark:text-text-secondary z-10" title={a}>
+                                 {a.charAt(0).toUpperCase()}
+                               </div>
+                             ))}
+                             {childItem.assignees.length > 3 && (
+                               <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 border-2 border-white dark:border-bg-elevated flex items-center justify-center text-[9px] font-bold text-gray-500 dark:text-text-tertiary z-0">
+                                 +{childItem.assignees.length - 3}
+                               </div>
+                             )}
+                           </div>
+                         ) : (
+                           <span className="text-[11px] font-bold text-gray-400 dark:text-text-tertiary mr-2">미배정</span>
+                         )}
+                         <ChevronRight size={14} className="text-gray-300 dark:text-text-tertiary group-hover:text-blue-500 transition-colors" />
+                       </div>
+                     </div>
+                   );
+                 })}
+               </div>
+            </div>
+          )}
 
 
           {/* Comments Section */}
@@ -733,6 +813,18 @@ function ItemDetailPanel({
           </div>
         </div>
       </div>
+
+      {showLinkModal && (
+        <SearchModal
+          phases={[{ title: '전체 아이템', items: allItems }]}
+          onOpenDetail={handleLinkSelect}
+          onClose={() => {
+            linkCallbackRef.current?.(null);
+            setShowLinkModal(false);
+            linkCallbackRef.current = null;
+          }}
+        />
+      )}
     </div>
   );
 }

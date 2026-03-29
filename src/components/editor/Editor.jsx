@@ -5,7 +5,7 @@
  * - 마크다운 붙여넣기 지원 (marked로 HTML 변환)
  * - 복사 시 HTML→마크다운 변환 (turndown)
  * - 파일 업로드 (이미지: 인라인 삽입, 문서: 링크)
- * - `/` 슬래시 커맨드로 블록 삽입
+ * - `/` 슬래시 커맨드로 블록 삽입 (하위 페이지 생성, 기존 페이지 연결 지원)
  * - 툴바 + BubbleMenu (텍스트 선택 시 플로팅)
  *
  * content prop: HTML 또는 마크다운. 에디터 내부는 항상 HTML로 처리.
@@ -116,7 +116,7 @@ function Toolbar({ editor, fileInputRef, onShowToast }) {
   );
 }
 
-export default function Editor({ content, onChange, editable, itemId, onShowToast, onBlur, onAddChildPage, onShowPrompt, onOpenDetail }) {
+export default function Editor({ content, onChange, editable, itemId, onShowToast, onBlur, onAddChildPage, onShowPrompt, onOpenDetail, onLinkExistingPage }) {
   const lastEmittedHTML = useRef(null);
   const editorRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -188,6 +188,18 @@ export default function Editor({ content, onChange, editable, itemId, onShowToas
               } catch (err) {
                 onShowToast?.('하위 페이지 생성 실패: ' + err.message);
               }
+            } else {
+              editor.chain().focus().deleteRange(range).run();
+            }
+          });
+        } : null,
+        onLinkExistingPage: onLinkExistingPage ? (editor, range) => {
+          onLinkExistingPage((item) => {
+            if (item) {
+              editor.chain().focus().deleteRange(range).insertContent({
+                type: 'pageLink',
+                attrs: { id: item.id, title: item.title || item.content },
+              }).run();
             } else {
               editor.chain().focus().deleteRange(range).run();
             }

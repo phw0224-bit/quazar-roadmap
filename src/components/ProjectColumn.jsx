@@ -15,7 +15,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { MoreHorizontal, Plus, Edit2, Trash2, User, Link } from 'lucide-react';
+import { MoreHorizontal, Plus, Edit2, Trash2, User, Link, Maximize2 } from 'lucide-react';
 import KanbanCard from './KanbanCard';
 import { PROJECT_TINTS } from '../lib/constants';
 
@@ -146,6 +146,13 @@ export default function ProjectColumn({
           </div>
 
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200" onClick={stopProp} onPointerDown={stopProp}>
+            <button
+              className="p-1.5 hover:bg-white/60 dark:hover:bg-bg-hover rounded-lg text-gray-400 dark:text-text-tertiary hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-all"
+              title="상세 페이지로 열기"
+              onClick={() => onOpenDetail?.(project.id)}
+            >
+              <Maximize2 size={14} strokeWidth={2.5} />
+            </button>
             <button
               className="p-1.5 hover:bg-white/60 dark:hover:bg-bg-hover rounded-lg text-gray-400 dark:text-text-tertiary hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-all"
               title="링크 복사"

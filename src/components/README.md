@@ -15,14 +15,14 @@
 | `KanbanBoard.jsx` | **최상위 오케스트레이터.** DnD 컨텍스트, 뷰 전환, 전역 모달 관리 |
 | `ItemDetailPanel.jsx` | 우측 슬라이드 패널. 에디터+메타데이터+AI요약+댓글. 가장 복잡한 컴포넌트 |
 | `BoardSection.jsx` | 섹션 그룹 (프로젝트 컬럼들을 묶음) |
-| `ProjectColumn.jsx` | 칸반 컬럼 하나 (Phase). DnD droppable + draggable |
+| `ProjectColumn.jsx` | 칸반 컬럼 하나 (Phase). **핵심.** 가상 페이지(제목 클릭 시 패널 열림) 기능 포함 |
 | `KanbanCard.jsx` | 카드 (Item). DnD sortable |
 | `TimelineView.jsx` | 간트 스타일 타임라인 뷰 |
 | `PeopleBoard.jsx` | 팀원별 업무 현황 뷰 |
 | `Sidebar.jsx` | 좌측 사이드바 |
 | `SidebarTree.jsx` | 재귀 페이지 트리 (Sidebar 내부에서 사용) |
 | `FilterBar.jsx` | 필터/정렬/그룹 UI |
-| `SearchModal.jsx` | Ctrl+K 전역 검색 모달 |
+| `SearchModal.jsx` | Ctrl+K 전역 검색 모달. 담당자 이름 검색 지원 |
 | `CommentSection.jsx` | 댓글 목록 (ItemDetailPanel 내부) |
 | `Comment.jsx` | 단일 댓글 (수정/삭제 포함) |
 | `FileUploadButton.jsx` | 파일 첨부 드래그앤드롭 UI |

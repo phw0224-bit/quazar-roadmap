@@ -394,7 +394,15 @@ export default supabaseAPI;
  * @param {string} title
  * @returns {Promise<Object>} 생성된 item 객체
  */
-export async function createChildPage(projectId, parentItemId, title) {
+/**
+ * @description 하위 페이지 생성. 부모의 속성(팀, 태그 등)을 상속받을 수 있음.
+ * @param {string} projectId - 소속 프로젝트 ID
+ * @param {string} parentItemId - 부모 아이템 ID
+ * @param {string} title - 페이지 제목
+ * @param {Object} inheritedProps - { teams: string[], tags: string[] } 상속받을 속성
+ * @returns {Promise<Object>} 생성된 아이템 객체
+ */
+export async function createChildPage(projectId, parentItemId, title, inheritedProps = {}) {
   const { data: existing } = await supabase
     .from('items')
     .select('order_index')
@@ -413,8 +421,8 @@ export async function createChildPage(projectId, parentItemId, title) {
       page_type: 'page',
       status: 'none',
       assignees: [],
-      teams: [],
-      tags: [],
+      teams: inheritedProps.teams || [],
+      tags: inheritedProps.tags || [],
       related_items: [],
       order_index: nextOrder,
     }])

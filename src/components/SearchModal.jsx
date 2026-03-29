@@ -1,9 +1,15 @@
+/**
+ * @fileoverview 전역 검색 모달 (Cmd+K).
+ *
+ * 모든 보드의 아이템을 제목, 본문, 담당자 이름으로 검색.
+ * 결과 클릭 시 해당 아이템의 상세 패널을 오픈.
+ */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, X, FileText } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { STATUS_MAP } from '../lib/constants';
 
-export default function SearchModal({ onOpenDetail, onClose }) {
+export default function SearchModal({ phases = [], onOpenDetail, onClose }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -15,18 +21,30 @@ export default function SearchModal({ onOpenDetail, onClose }) {
     inputRef.current?.focus();
   }, []);
 
-  const search = useCallback(async (q) => {
+  /**
+   * @description 로컬 캐시된 phases 데이터를 기반으로 검색 수행.
+   * 제목(title), 부제목(content), 담당자(assignees) 필드를 포함하여 검색.
+   * @param {string} q - 검색어
+   */
+  const search = useCallback((q) => {
     if (!q.trim()) { setResults([]); return; }
     setLoading(true);
-    const { data } = await supabase
-      .from('items')
-      .select('id, title, content, status, tags, teams, projects(title)')
-      .or(`title.ilike.%${q}%,content.ilike.%${q}%`)
-      .limit(15);
+    
+    const lowerQ = q.toLowerCase();
+    const allItems = phases.flatMap(p => 
+      (p.items || []).map(item => ({ ...item, projects: { title: p.title } }))
+    ).filter(item => {
+      const matchTitle = item.title?.toLowerCase().includes(lowerQ);
+      const matchContent = item.content?.toLowerCase().includes(lowerQ);
+      const matchAssignee = item.assignees?.some(a => a.toLowerCase().includes(lowerQ));
+      return matchTitle || matchContent || matchAssignee;
+    });
 
-    setResults(data || []);
+    const uniqueItems = Array.from(new Map(allItems.map(i => [i.id, i])).values());
+
+    setResults(uniqueItems.slice(0, 15));
     setLoading(false);
-  }, []);
+  }, [phases]);
 
   useEffect(() => {
     clearTimeout(debounceRef.current);

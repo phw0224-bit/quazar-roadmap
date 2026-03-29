@@ -9,6 +9,12 @@
  *
  * 메뉴 위치 계산: 현재 커서 위치 기준. 뷰포트 하단 초과 시 위쪽으로 반전.
  */
+/**
+ * @fileoverview Tiptap 슬래시 커맨드(/) 확장.
+ *
+ * 에디터 본문에서 / 입력 시 메뉴 팝업을 트리거하며,
+ * 하위 페이지 생성 및 기존 페이지 연결 콜백을 지원.
+ */
 import { Extension } from '@tiptap/core';
 import Suggestion from '@tiptap/suggestion';
 import { ReactRenderer } from '@tiptap/react';
@@ -169,8 +175,18 @@ const SlashCommand = Extension.create({
           
           let availableCommands = [...COMMANDS];
           
-          // onAddChildPage 콜백이 전달된 경우, 맨 앞에 '하위 페이지' 커맨드 추가
           const extension = editor.extensionManager.extensions.find(e => e.name === 'slashCommand');
+          if (extension?.options?.onLinkExistingPage) {
+            availableCommands.unshift({
+              title: '기존 페이지 연결',
+              description: '다른 페이지 또는 업무 링크 삽입',
+              icon: '🔗',
+              keywords: ['link', '링크', '연결', '기존', '페이지'],
+              command: ({ editor, range }) => {
+                extension.options.onLinkExistingPage(editor, range);
+              },
+            });
+          }
           if (extension?.options?.onAddChildPage) {
             availableCommands.unshift({
               title: '하위 페이지',

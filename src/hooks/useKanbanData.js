@@ -325,7 +325,21 @@ export const useKanbanData = () => {
    * @param {string} title - 페이지 제목
    */
   const addChildPage = async (phaseId, parentItemId, title) => {
-    const newPage = await createChildPage(phaseId, parentItemId, title);
+    let inheritedTeams = [];
+    let inheritedTags = [];
+    if (parentItemId) {
+      const parentPhase = state.phases.find(p => p.id === phaseId);
+      const parentItem = parentPhase?.items?.find(i => i.id === parentItemId);
+      if (parentItem) {
+        inheritedTeams = parentItem.teams || [];
+        inheritedTags = parentItem.tags || [];
+      }
+    }
+
+    const newPage = await createChildPage(phaseId, parentItemId, title, {
+      teams: inheritedTeams,
+      tags: inheritedTags,
+    });
     
     // 1. 하위 페이지(자기 자신)의 related_items에 부모 페이지를 추가 (상위 페이지 연결)
     if (parentItemId) {

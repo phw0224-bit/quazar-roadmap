@@ -322,8 +322,39 @@ export default function KanbanBoard({ onShowLogin }) {
   const activePhase = phases.find(p => p.id === activeId);
   const activeSection = sections.find(s => s.id === activeId);
 
-  const detailItem = detailItemId ? phases.flatMap(p => p.items).find(i => i.id === detailItemId) : null;
-  const detailPhase = detailItem ? phases.find(p => p.items.some(i => i.id === detailItemId)) : null;
+  let detailItem = detailItemId ? phases.flatMap(p => p.items).find(i => i.id === detailItemId) : null;
+  let detailPhase = detailItem ? phases.find(p => p.items.some(i => i.id === detailItemId)) : null;
+
+  if (!detailItem && detailItemId) {
+    const projectPhase = phases.find(p => p.id === detailItemId);
+    if (projectPhase) {
+      detailItem = {
+        id: projectPhase.id,
+        title: projectPhase.title,
+        description: projectPhase.description || '',
+        status: 'none',
+        page_type: 'project',
+        assignees: [],
+        teams: [],
+        tags: [],
+        related_items: [],
+      };
+      detailPhase = projectPhase;
+    }
+  }
+
+  const handleUpdateItem = async (phaseId, itemId, updates) => {
+    if (detailItem?.page_type === 'project') {
+      try {
+        await updatePhase(itemId, updates);
+      } catch (err) {
+        onShowToast?.('프로젝트 속성 업데이트 실패 (DB 마이그레이션 필요)');
+      }
+      return;
+    }
+    await updateItem(phaseId, itemId, updates);
+  };
+
   const closeDetailPanel = () => {
     setUrlState({ itemId: null, fullscreen: false });
   };
@@ -346,7 +377,7 @@ export default function KanbanBoard({ onShowLogin }) {
       phases={phases}
       activeView={activeView}
       activeItemId={detailItemId}
-      onNavigate={(view) => setUrlState({ view })}
+      onNavigate={(view) => setUrlState({ view, itemId: null })}
       onOpenItem={(itemId) => setUrlState({ itemId })}
       onAddChildPage={addChildPage}
       onShowPrompt={showPrompt}
@@ -668,7 +699,7 @@ export default function KanbanBoard({ onShowLogin }) {
                 isFullscreen={isDetailFullscreen}
                 onToggleFullscreen={() => setUrlState({ fullscreen: !isDetailFullscreen })}
                 onBreadcrumbNavigate={handleBreadcrumbNavigate}
-                onUpdateItem={updateItem}
+                onUpdateItem={handleUpdateItem}
                 onAddComment={addComment}
                 onUpdateComment={updateComment}
                 onDeleteComment={deleteComment}
@@ -702,6 +733,7 @@ export default function KanbanBoard({ onShowLogin }) {
         {/* 전체 검색 모달 */}
         {showSearch && (
           <SearchModal
+            phases={phases}
             onOpenDetail={(itemId) => setUrlState({ itemId })}
             onClose={() => setShowSearch(false)}
           />
