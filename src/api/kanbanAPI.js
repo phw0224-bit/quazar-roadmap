@@ -418,16 +418,16 @@ const supabaseAPI = {
    * @param {number} targetIndex - 0-based 타임라인 내 목표 위치
    */
   movePhaseTimeline: async (phaseId, sectionId, targetIndex) => {
-    const query = supabase
+    let query = supabase
       .from('projects')
       .select('id, timeline_order_index')
       .order('timeline_order_index', { ascending: true });
-    
+
     // sectionId가 null이면 null 프로젝트끼리만, 있으면 같은 섹션 내에서만
     if (sectionId === null) {
-      query.is('section_id', null);
+      query = query.is('section_id', null);
     } else {
-      query.eq('section_id', sectionId);
+      query = query.eq('section_id', sectionId);
     }
 
     const { data: phases } = await query;

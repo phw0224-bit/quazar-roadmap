@@ -503,9 +503,11 @@ export default function KanbanBoard({ onShowLogin }) {
           {activeView === 'timeline' ? (
             <TimelineView
               phases={filteredPhases.filter(p => (p.board_type || 'main') !== 'main')}
+              sections={sections.filter(s => (s.board_type || 'main') !== 'main')}
               onUpdateItem={updateItem}
               onOpenDetail={(itemId) => setUrlState({ itemId })}
               isReadOnly={!user}
+              showToast={showToast}
             />
           ) : activeView === 'board' ? (
             <div

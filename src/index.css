@@ -335,15 +335,19 @@ input:focus, textarea:focus {
 
 .tiptap-content ul[data-type="taskList"] li {
   display: flex;
-  align-items: flex-start;
+  align-items: baseline;
   gap: 0.5rem;
 }
 
 .tiptap-content ul[data-type="taskList"] li > label {
   flex-shrink: 0;
-  margin-top: 0.2rem;
   display: flex;
   align-items: center;
+  line-height: 1;
+}
+
+.tiptap-content ul[data-type="taskList"] li > div > p {
+  margin: 0;
 }
 
 .tiptap-content ul[data-type="taskList"] li > label input[type="checkbox"] {
