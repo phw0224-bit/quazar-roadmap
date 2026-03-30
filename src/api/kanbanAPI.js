@@ -257,20 +257,31 @@ const supabaseAPI = {
   },
 
   /**
-   * @description 아이템을 다른 phase로 이동하거나 같은 phase 내에서 재정렬.
-   * source와 target phase 양쪽의 order_index 전체를 재계산하여 upsert.
+   * @description 아이템을 다른 phase나 부모로 이동하거나 같은 레벨 내에서 재정렬.
    * @param {string} sourcePhaseId
-   * @param {string} targetPhaseId - sourcePhaseId와 같으면 재정렬
+   * @param {string} targetPhaseId
    * @param {string} itemId
    * @param {number} targetIndex - 0-based 삽입 위치
+   * @param {string|null} targetParentId - 새로운 부모 아이템 ID (undefined면 기존 로직 동작)
    */
-  moveItem: async (sourcePhaseId, targetPhaseId, itemId, targetIndex) => {
-    const { data: targetItems } = await supabase
+  moveItem: async (sourcePhaseId, targetPhaseId, itemId, targetIndex, targetParentId = undefined) => {
+    // 1. 대상 부모/프로젝트 내의 현재 아이템들 가져오기
+    let query = supabase
       .from('items')
-      .select('id, order_index')
-      .eq('project_id', targetPhaseId)
-      .order('order_index', { ascending: true });
+      .select('id, order_index, page_type')
+      .eq('project_id', targetPhaseId);
 
+    // 사이드바 계층 이동인 경우에만 parent_item_id 필터링 적용
+    if (targetParentId === null) {
+      query = query.is('parent_item_id', null);
+    } else if (targetParentId !== undefined) {
+      query = query.eq('parent_item_id', targetParentId);
+    }
+
+    const { data: targetItems, error: fetchError } = await query.order('order_index', { ascending: true });
+    if (fetchError) throw fetchError;
+
+    // 2. 이동할 아이템의 인덱스 찾기 및 배열 재조립
     const movingItemIdx = targetItems.findIndex(i => i.id === itemId);
     let newItems = [...targetItems];
 
@@ -278,15 +289,21 @@ const supabaseAPI = {
       const [movingItem] = newItems.splice(movingItemIdx, 1);
       newItems.splice(targetIndex, 0, movingItem);
     } else {
+      // 다른 부모/프로젝트에서 넘어온 경우
       newItems.splice(targetIndex, 0, { id: itemId });
     }
 
-    const updatePromises = newItems.map((item, idx) =>
-      supabase.from('items').update({
+    // 3. 전체 순서 재계산 및 업데이트
+    const updatePromises = newItems.map((item, idx) => {
+      const updates = {
         project_id: targetPhaseId,
         order_index: idx
-      }).eq('id', item.id)
-    );
+      };
+      if (targetParentId !== undefined) {
+        updates.parent_item_id = targetParentId;
+      }
+      return supabase.from('items').update(updates).eq('id', item.id);
+    });
 
     const results = await Promise.all(updatePromises);
     const errors = results.filter(r => r.error);

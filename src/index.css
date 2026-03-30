@@ -421,3 +421,44 @@ input:focus, textarea:focus {
 .tiptap-content .tiptap > [data-toggle]:hover {
   background-color: transparent;
 }
+
+/* ── Tiptap Global Drag Handle ── */
+.drag-handle {
+  position: fixed; /* 뷰포트 기준으로 위치 설정 (getBoundingClientRect 대응) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  background-image: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="%23666666" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 14px;
+  opacity: 0;
+  cursor: grab;
+  transition: opacity 0.1s ease-in, background-color 0.1s ease;
+  border-radius: 4px;
+  z-index: 99999;
+}
+.dark .drag-handle {
+  background-image: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="%23dddddd" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>');
+}
+.drag-handle:hover {
+  opacity: 1 !important;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+.dark .drag-handle:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+.tiptap-content .tiptap > *:hover ~ .drag-handle,
+.drag-handle:hover {
+  opacity: 0.6;
+}
+.drag-handle.active {
+  opacity: 1;
+  cursor: grabbing;
+}
+.ProseMirror-dropcursor {
+  border-top: 2px solid #3b82f6 !important;
+  transition: all 0.1s ease-in-out;
+}

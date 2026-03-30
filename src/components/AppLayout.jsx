@@ -16,7 +16,7 @@ export default function AppLayout({
 }) {
   const { isOpen, hoverMode, toggleHoverMode } = useLayoutState();
   const [isHovering, setIsHovering] = useState(false);
-
+  
   const handleHoverModeToggle = () => {
     toggleHoverMode();
     setIsHovering(false);
@@ -30,8 +30,8 @@ export default function AppLayout({
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[color:var(--color-bg-base)] relative">
-
+    <div className="flex h-screen overflow-hidden bg-[color:var(--color-bg-base)] relative transition-colors duration-200">
+      
       {/* Hover trigger zone & floating sidebar */}
       {hoverMode && (
         <div

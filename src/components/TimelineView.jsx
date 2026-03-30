@@ -1,22 +1,38 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { PRIORITY_MAP } from '../lib/constants';
-import { ChevronDown, ChevronRight, GripVertical } from 'lucide-react';
+import { PRIORITY_MAP, STATUS_MAP } from '../lib/constants';
+import { ChevronDown, ChevronRight, GripVertical, Minus, Plus } from 'lucide-react';
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import kanbanAPI from '../api/kanbanAPI';
 
-const ZOOM = {
-  week:    { dayWidth: 80, tickEvery: 1  },
-  month:   { dayWidth: 22, tickEvery: 7  },
-  quarter: { dayWidth: 8,  tickEvery: 14 },
+const ZOOM_PRESETS = {
+  day:   { dayWidth: 120, tickEvery: 1 },
+  week:  { dayWidth: 50,  tickEvery: 1 },
+  month: { dayWidth: 18,  tickEvery: 7 },
 };
+
+const ZOOM_MIN  = 5;    // dayWidth 최솟값
+const ZOOM_MAX  = 200;  // dayWidth 최댓값
+const ZOOM_STEP = 1.3;  // 확대/축소 배율
 
 const LEFT_W    = 260;
 const ROW_H     = 44;
 const PHASE_H   = 52;
 const SECTION_H = 40;
 const HEADER_H  = 60;
+
+// 바 렌더링 임계값
+const MIN_BAR_W_TEXT        = 50;   // 이 너비 이상이면 아이템 바 안에 텍스트 표시
+const MIN_BAR_W_DATES       = 120;  // 이 너비 이상이면 아이템 바 안에 날짜까지 표시
+const MIN_PHASE_BAR_W_TEXT  = 60;   // 프로젝트 바 텍스트 표시 최소 너비
+const MIN_PHASE_BAR_W_DATES = 140;  // 프로젝트 바 날짜 표시 최소 너비
+const BAR_PADDING           = 16;   // 아이템 바 상하 여백 합계 (top 8px * 2)
+
+// localStorage 키
+const LS_COLLAPSED_SECTIONS = 'timeline-collapsed-sections';
+const LS_COLLAPSED_PROJECTS = 'timeline-collapsed-projects';
+const LS_HIDE_UNDATED       = 'timeline-hide-undated';
 
 function toDay(dateStr) {
   const d = new Date(dateStr);
@@ -55,6 +71,7 @@ function barColor(item) {
 function PhaseRow({
   phase, isReadOnly, collapsedProjects, toggleProjectCollapse,
   onOpenDetail, totalWidth, dayWidth, days, rangeStart,
+  hideUndated, onTooltipShow, onTooltipMove, onTooltipHide,
 }) {
   const {
     attributes, listeners, setNodeRef, transform, transition, isDragging,
@@ -68,6 +85,10 @@ function PhaseRow({
 
   const isCollapsed = collapsedProjects.has(phase.id);
 
+  const visibleItems = hideUndated
+    ? phase.items.filter(i => i.start_date)
+    : phase.items;
+
   return (
     <div
       ref={setNodeRef}
@@ -76,7 +97,7 @@ function PhaseRow({
       {...attributes}
     >
       {/* 프로젝트 헤더 행 */}
-      <div className="flex sticky top-[100px] z-20" style={{ height: PHASE_H }}>
+      <div className="flex sticky z-20" style={{ top: HEADER_H + SECTION_H, height: PHASE_H }}>
         {/* 왼쪽: 제목 + 핸들 */}
         <div
           className="sticky left-0 z-30 flex items-center px-3 gap-2 bg-gray-100/80 dark:bg-bg-elevated/60 border-b border-r border-gray-200 dark:border-border-subtle shrink-0 backdrop-blur-sm cursor-pointer hover:bg-gray-200/70 dark:hover:bg-bg-hover transition-colors"
@@ -125,9 +146,9 @@ function PhaseRow({
                 style={{ left: Math.max(0, x), width: w, height: PHASE_H - 14 }}
                 onClick={(e) => { e.stopPropagation(); onOpenDetail(phase.id); }}
               >
-                {w > 60 && (
+                {w > MIN_PHASE_BAR_W_TEXT && (
                   <span className="truncate">
-                    {phase.title}{w > 140 && ` · ${formatDate(pStart)}→${formatDate(pEnd)}`}
+                    {phase.title}{w > MIN_PHASE_BAR_W_DATES && ` · ${formatDate(pStart)}→${formatDate(pEnd)}`}
                   </span>
                 )}
               </div>
@@ -139,10 +160,10 @@ function PhaseRow({
       {/* 아이템 행 */}
       {!isCollapsed && (
         <SortableContext
-          items={phase.items.map(i => `item-${i.id}`)}
+          items={visibleItems.map(i => `item-${i.id}`)}
           strategy={verticalListSortingStrategy}
         >
-          {phase.items.map(item => (
+          {visibleItems.map(item => (
             <ItemRow
               key={item.id}
               item={item}
@@ -153,6 +174,9 @@ function PhaseRow({
               days={days}
               rangeStart={rangeStart}
               onOpenDetail={onOpenDetail}
+              onTooltipShow={onTooltipShow}
+              onTooltipMove={onTooltipMove}
+              onTooltipHide={onTooltipHide}
             />
           ))}
         </SortableContext>
@@ -161,7 +185,7 @@ function PhaseRow({
   );
 }
 
-function ItemRow({ item, phaseId, isReadOnly, totalWidth, dayWidth, days, rangeStart, onOpenDetail }) {
+function ItemRow({ item, phaseId, isReadOnly, totalWidth, dayWidth, days, rangeStart, onOpenDetail, onTooltipShow, onTooltipMove, onTooltipHide }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `item-${item.id}`,
     data: { type: 'item', projectId: phaseId },
@@ -214,14 +238,17 @@ function ItemRow({ item, phaseId, isReadOnly, totalWidth, dayWidth, days, rangeS
           const { x, w, start, end } = getBar(item, rangeStart, dayWidth);
           return (
             <div
-              className={`absolute top-[8px] flex items-center px-2 text-[11px] font-semibold text-white truncate rounded-md shadow-sm select-none cursor-pointer hover:brightness-90 transition-all ${barColor(item)}`}
-              style={{ left: Math.max(0, x), width: w, height: ROW_H - 16 }}
+              className={`absolute flex items-center px-2 text-[11px] font-semibold text-white truncate rounded-md shadow-sm select-none cursor-pointer hover:brightness-90 transition-all ${barColor(item)}`}
+              style={{ left: Math.max(0, x), width: w, top: BAR_PADDING / 2, height: ROW_H - BAR_PADDING }}
               onClick={(e) => { e.stopPropagation(); onOpenDetail(item.id); }}
+              onMouseEnter={(e) => onTooltipShow?.(item, e)}
+              onMouseMove={(e) => onTooltipMove?.(e)}
+              onMouseLeave={() => onTooltipHide?.()}
             >
-              {w > 50 && (
+              {w > MIN_BAR_W_TEXT && (
                 <span className="truncate">
                   {item.title || item.content}
-                  {w > 120 && ` · ${formatDate(start)}→${formatDate(end)}`}
+                  {w > MIN_BAR_W_DATES && ` · ${formatDate(start)}→${formatDate(end)}`}
                 </span>
               )}
             </div>
@@ -236,29 +263,42 @@ function ItemRow({ item, phaseId, isReadOnly, totalWidth, dayWidth, days, rangeS
 
 export default function TimelineView({ phases, sections, onUpdateItem, onOpenDetail, isReadOnly = false, showToast }) {
   const [zoom, setZoom] = useState('month');
+  const [dayWidth, setDayWidth] = useState(ZOOM_PRESETS['month'].dayWidth);
   const containerRef = useRef(null);
 
   const [collapsedSections, setCollapsedSections] = useState(() => {
     try {
-      const saved = localStorage.getItem('timeline-collapsed-sections');
+      const saved = localStorage.getItem(LS_COLLAPSED_SECTIONS);
       return saved ? new Set(JSON.parse(saved)) : new Set();
     } catch { return new Set(); }
   });
 
   const [collapsedProjects, setCollapsedProjects] = useState(() => {
     try {
-      const saved = localStorage.getItem('timeline-collapsed-projects');
+      const saved = localStorage.getItem(LS_COLLAPSED_PROJECTS);
       return saved ? new Set(JSON.parse(saved)) : new Set();
     } catch { return new Set(); }
   });
 
+  const [hideUndated, setHideUndated] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(LS_HIDE_UNDATED)) ?? false;
+    } catch { return false; }
+  });
+
+  const [tooltip, setTooltip] = useState(null); // { item, x, y }
+
   useEffect(() => {
-    localStorage.setItem('timeline-collapsed-sections', JSON.stringify([...collapsedSections]));
+    localStorage.setItem(LS_COLLAPSED_SECTIONS, JSON.stringify([...collapsedSections]));
   }, [collapsedSections]);
 
   useEffect(() => {
-    localStorage.setItem('timeline-collapsed-projects', JSON.stringify([...collapsedProjects]));
+    localStorage.setItem(LS_COLLAPSED_PROJECTS, JSON.stringify([...collapsedProjects]));
   }, [collapsedProjects]);
+
+  useEffect(() => {
+    localStorage.setItem(LS_HIDE_UNDATED, JSON.stringify(hideUndated));
+  }, [hideUndated]);
 
   const toggleSectionCollapse = (sectionId) => {
     setCollapsedSections(prev => {
@@ -276,7 +316,19 @@ export default function TimelineView({ phases, sections, onUpdateItem, onOpenDet
     });
   };
 
-  const { dayWidth, tickEvery } = ZOOM[zoom];
+  const handleTooltipShow = (item, e) => setTooltip({ item, x: e.clientX, y: e.clientY });
+  const handleTooltipMove = (e) => setTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+  const handleTooltipHide = () => setTooltip(null);
+
+  // tickEvery는 dayWidth에서 동적으로 파생 (일별 틱 → 주별 틱 → 2주별 틱)
+  const tickEvery = dayWidth >= 40 ? 1 : dayWidth >= 14 ? 7 : 14;
+
+  const handleZoomPreset = (key) => {
+    setZoom(key);
+    setDayWidth(ZOOM_PRESETS[key].dayWidth);
+  };
+  const zoomIn  = () => setDayWidth(prev => Math.min(ZOOM_MAX, Math.round(prev * ZOOM_STEP)));
+  const zoomOut = () => setDayWidth(prev => Math.max(ZOOM_MIN, Math.round(prev / ZOOM_STEP)));
 
   // ── 날짜 범위 계산 ──────────────────────────────────────────────
   const today = toDay(new Date());
@@ -409,13 +461,16 @@ export default function TimelineView({ phases, sections, onUpdateItem, onOpenDet
         sectionPhases.forEach(phase => {
           h += PHASE_H;
           if (!collapsedProjects.has(phase.id)) {
-            h += phase.items.length * ROW_H;
+            const count = hideUndated
+              ? phase.items.filter(i => i.start_date).length
+              : phase.items.length;
+            h += count * ROW_H;
           }
         });
       }
       return acc + h;
     }, 0);
-  }, [sectionGroups, collapsedSections, collapsedProjects, hasRealSections]);
+  }, [sectionGroups, collapsedSections, collapsedProjects, hasRealSections, hideUndated]);
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
@@ -424,22 +479,49 @@ export default function TimelineView({ phases, sections, onUpdateItem, onOpenDet
         {/* 줌 툴바 */}
         <div className="flex items-center gap-3 px-10 py-2.5 border-b border-gray-100 dark:border-border-subtle shrink-0">
           <div className="flex items-center gap-1 p-1 bg-gray-100 dark:bg-bg-elevated rounded-xl">
-            {Object.keys(ZOOM).map(key => (
+            {Object.keys(ZOOM_PRESETS).map(key => (
               <button
                 key={key}
-                onClick={() => setZoom(key)}
+                onClick={() => handleZoomPreset(key)}
                 className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                   zoom === key
                     ? 'bg-white dark:bg-bg-hover text-gray-900 dark:text-text-primary shadow-sm'
                     : 'text-gray-500 dark:text-text-tertiary hover:text-gray-800 dark:hover:text-text-secondary'
                 }`}
               >
-                {key === 'week' ? '주별' : key === 'month' ? '월별' : '분기별'}
+                {key === 'day' ? '일별' : key === 'week' ? '주별' : '월별'}
               </button>
             ))}
+            <div className="w-px h-4 bg-gray-300 dark:bg-border-subtle mx-1 self-center" />
+            <button
+              onClick={zoomOut}
+              disabled={dayWidth <= ZOOM_MIN}
+              className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-text-tertiary hover:bg-white dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+              title="축소"
+            >
+              <Minus size={12} />
+            </button>
+            <button
+              onClick={zoomIn}
+              disabled={dayWidth >= ZOOM_MAX}
+              className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-text-tertiary hover:bg-white dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+              title="확대"
+            >
+              <Plus size={12} />
+            </button>
           </div>
+          <button
+            onClick={() => setHideUndated(v => !v)}
+            className={`px-3 py-1 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+              hideUndated
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-100 dark:bg-bg-elevated text-gray-500 dark:text-text-tertiary hover:text-gray-800 dark:hover:text-text-secondary'
+            }`}
+          >
+            날짜 없는 항목 숨기기
+          </button>
           <span className="text-xs text-gray-400 dark:text-text-tertiary">
-            날짜가 설정된 업무만 바로 표시됩니다 · 왼쪽 영역을 드래그해서 순서를 변경할 수 있습니다
+            왼쪽 영역을 드래그해서 순서를 변경할 수 있습니다
           </span>
         </div>
 
@@ -556,6 +638,10 @@ export default function TimelineView({ phases, sections, onUpdateItem, onOpenDet
                           dayWidth={dayWidth}
                           days={days}
                           rangeStart={rangeStart}
+                          hideUndated={hideUndated}
+                          onTooltipShow={handleTooltipShow}
+                          onTooltipMove={handleTooltipMove}
+                          onTooltipHide={handleTooltipHide}
                         />
                       ))}
                     </div>
@@ -566,6 +652,30 @@ export default function TimelineView({ phases, sections, onUpdateItem, onOpenDet
 
           </div>
         </div>
+
+        {/* 간트 바 호버 툴팁 */}
+        {tooltip && (
+          <div
+            className="fixed z-[9999] pointer-events-none bg-white dark:bg-bg-elevated border border-gray-200 dark:border-border-subtle rounded-xl shadow-xl px-3 py-2.5 text-xs min-w-[180px] max-w-[240px]"
+            style={{ left: tooltip.x + 14, top: tooltip.y - 12 }}
+          >
+            <p className="font-bold text-gray-900 dark:text-text-primary mb-1.5 truncate">
+              {tooltip.item.title || tooltip.item.content}
+            </p>
+            <div className="flex flex-col gap-1 text-gray-500 dark:text-text-secondary">
+              <span>{STATUS_MAP[tooltip.item.status]?.label ?? '미지정'}</span>
+              {tooltip.item.start_date && (
+                <span>
+                  {formatDate(tooltip.item.start_date)} → {formatDate(tooltip.item.end_date ?? tooltip.item.start_date)}
+                </span>
+              )}
+              {tooltip.item.assignees?.length > 0 && (
+                <span className="truncate">{tooltip.item.assignees.join(', ')}</span>
+              )}
+            </div>
+          </div>
+        )}
+
       </div>
     </DndContext>
   );
