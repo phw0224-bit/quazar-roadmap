@@ -26,7 +26,7 @@ import { summarizeContent } from '../api/summarizeAPI';
 import SearchModal from './SearchModal';
 
 function ItemDetailPanel({
-  item, phase, allItems = [], onClose, onUpdateItem, isReadOnly,
+  item, phase, allItems = [], onClose, onUpdateItem, onUpdatePhase, isReadOnly,
   isFullscreen = false, onToggleFullscreen,
   onBreadcrumbNavigate,
   onAddComment, onUpdateComment, onDeleteComment, onOpenDetail,
@@ -593,8 +593,15 @@ function ItemDetailPanel({
                 <input
                   type="date"
                   disabled={isReadOnly}
-                  value={item.start_date || ''}
-                  onChange={e => onUpdateItem(phase.id, item.id, { start_date: e.target.value || null })}
+                  value={(item.page_type === 'project' ? phase?.start_date : item.start_date) || ''}
+                  onChange={e => {
+                    const newValue = e.target.value || null;
+                    if (item.page_type === 'project') {
+                      onUpdatePhase?.(phase.id, { start_date: newValue });
+                    } else {
+                      onUpdateItem(phase.id, item.id, { start_date: newValue });
+                    }
+                  }}
                   className="bg-transparent border-none p-0 text-sm font-black text-gray-800 dark:text-text-primary focus:ring-0 cursor-pointer w-full dark:color-scheme-dark disabled:cursor-default"
                 />
               </div>
@@ -610,8 +617,15 @@ function ItemDetailPanel({
                 <input
                   type="date"
                   disabled={isReadOnly}
-                  value={item.end_date || ''}
-                  onChange={e => onUpdateItem(phase.id, item.id, { end_date: e.target.value || null })}
+                  value={(item.page_type === 'project' ? phase?.end_date : item.end_date) || ''}
+                  onChange={e => {
+                    const newValue = e.target.value || null;
+                    if (item.page_type === 'project') {
+                      onUpdatePhase?.(phase.id, { end_date: newValue });
+                    } else {
+                      onUpdateItem(phase.id, item.id, { end_date: newValue });
+                    }
+                  }}
                   className="bg-transparent border-none p-0 text-sm font-black text-gray-800 dark:text-text-primary focus:ring-0 cursor-pointer w-full dark:color-scheme-dark disabled:cursor-default"
                 />
               </div>

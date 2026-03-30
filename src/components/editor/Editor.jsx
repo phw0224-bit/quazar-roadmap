@@ -7,9 +7,10 @@
  * - 파일 업로드 (이미지: 인라인 삽입, 문서: 링크)
  * - `/` 슬래시 커맨드로 블록 삽입 (하위 페이지 생성, 기존 페이지 연결 지원)
  * - 툴바 + BubbleMenu (텍스트 선택 시 플로팅)
+ * - **IME composition 처리**: 한글 입력 시 composition 중간 상태를 onChange로 emit하지 않음
  *
  * content prop: HTML 또는 마크다운. 에디터 내부는 항상 HTML로 처리.
- * onChange: 편집 시마다 HTML emit. lastEmittedHTML로 중복 emit 방지.
+ * onChange: 편집 시마다 HTML emit. lastEmittedHTML로 중복 emit 방지. IME composition 중에는 호출 안 함.
  */
 import { useEditor, EditorContent } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
@@ -120,6 +121,7 @@ export default function Editor({ content, onChange, editable, itemId, onShowToas
   const lastEmittedHTML = useRef(null);
   const editorRef = useRef(null);
   const fileInputRef = useRef(null);
+  const isComposing = useRef(false);
 
 
   /**
@@ -245,8 +247,29 @@ export default function Editor({ content, onChange, editable, itemId, onShowToas
         view.dispatch(view.state.tr.deleteSelection());
         return true;
       },
+      handleDOMEvents: {
+        compositionstart: () => {
+          isComposing.current = true;
+          return false;
+        },
+        compositionend: () => {
+          isComposing.current = false;
+          // composition 완료 후 최종 상태를 onChange로 emit
+          if (editorRef.current) {
+            const html = editorRef.current.getHTML();
+            if (html !== lastEmittedHTML.current) {
+              lastEmittedHTML.current = html;
+              onChange?.(html);
+            }
+          }
+          return false;
+        },
+      },
     },
     onUpdate: ({ editor }) => {
+      // IME composition 중이면 onChange 호출 스킵
+      if (isComposing.current) return;
+      
       const html = editor.getHTML();
       lastEmittedHTML.current = html;
       onChange?.(html);

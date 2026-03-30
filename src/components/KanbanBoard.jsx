@@ -355,6 +355,14 @@ export default function KanbanBoard({ onShowLogin }) {
     await updateItem(phaseId, itemId, updates);
   };
 
+  const handleUpdatePhase = async (phaseId, updates) => {
+    try {
+      await updatePhase(phaseId, updates);
+    } catch (err) {
+      showToast('프로젝트 업데이트 실패: ' + err.message, 'error');
+    }
+  };
+
   const closeDetailPanel = () => {
     setUrlState({ itemId: null, fullscreen: false });
   };
@@ -700,6 +708,7 @@ export default function KanbanBoard({ onShowLogin }) {
                 onToggleFullscreen={() => setUrlState({ fullscreen: !isDetailFullscreen })}
                 onBreadcrumbNavigate={handleBreadcrumbNavigate}
                 onUpdateItem={handleUpdateItem}
+                onUpdatePhase={handleUpdatePhase}
                 onAddComment={addComment}
                 onUpdateComment={updateComment}
                 onDeleteComment={deleteComment}

@@ -382,6 +382,93 @@ const supabaseAPI = {
     const errors = results.filter(r => r.error);
     if (errors.length > 0) throw errors[0].error;
   },
+
+  // ========== 타임라인 전용 함수 ==========
+
+  /**
+   * @description 타임라인 뷰에서 섹션 순서 변경. order_index가 아닌 timeline_order_index 사용.
+   * @param {string} sectionId 
+   * @param {string} boardType 
+   * @param {number} targetIndex - 0-based 타임라인 내 목표 위치
+   */
+  moveSectionTimeline: async (sectionId, boardType, targetIndex) => {
+    const { data: secs } = await supabase
+      .from('sections')
+      .select('id, timeline_order_index')
+      .eq('board_type', boardType)
+      .order('timeline_order_index', { ascending: true });
+
+    const movingIdx = secs.findIndex(s => s.id === sectionId);
+    if (movingIdx === -1) throw new Error('Section not found');
+    
+    const [moving] = secs.splice(movingIdx, 1);
+    secs.splice(targetIndex, 0, moving);
+
+    const results = await Promise.all(
+      secs.map((s, idx) => supabase.from('sections').update({ timeline_order_index: idx }).eq('id', s.id))
+    );
+    const errors = results.filter(r => r.error);
+    if (errors.length > 0) throw errors[0].error;
+  },
+
+  /**
+   * @description 타임라인 뷰에서 프로젝트 순서 변경. 같은 섹션 내에서만 이동 가능.
+   * @param {string} phaseId 
+   * @param {string} sectionId - 속한 섹션 ID (null 허용)
+   * @param {number} targetIndex - 0-based 타임라인 내 목표 위치
+   */
+  movePhaseTimeline: async (phaseId, sectionId, targetIndex) => {
+    const query = supabase
+      .from('projects')
+      .select('id, timeline_order_index')
+      .order('timeline_order_index', { ascending: true });
+    
+    // sectionId가 null이면 null 프로젝트끼리만, 있으면 같은 섹션 내에서만
+    if (sectionId === null) {
+      query.is('section_id', null);
+    } else {
+      query.eq('section_id', sectionId);
+    }
+
+    const { data: phases } = await query;
+    const movingIdx = phases.findIndex(p => p.id === phaseId);
+    if (movingIdx === -1) throw new Error('Project not found in section');
+    
+    const [moving] = phases.splice(movingIdx, 1);
+    phases.splice(targetIndex, 0, moving);
+
+    const results = await Promise.all(
+      phases.map((p, idx) => supabase.from('projects').update({ timeline_order_index: idx }).eq('id', p.id))
+    );
+    const errors = results.filter(r => r.error);
+    if (errors.length > 0) throw errors[0].error;
+  },
+
+  /**
+   * @description 타임라인 뷰에서 아이템 순서 변경. 같은 프로젝트 내에서만 이동 가능.
+   * @param {string} itemId 
+   * @param {string} projectId - 속한 프로젝트 ID
+   * @param {number} targetIndex - 0-based 타임라인 내 목표 위치
+   */
+  moveItemTimeline: async (itemId, projectId, targetIndex) => {
+    const { data: items } = await supabase
+      .from('items')
+      .select('id, timeline_order_index')
+      .eq('project_id', projectId)
+      .order('timeline_order_index', { ascending: true });
+
+    const movingIdx = items.findIndex(i => i.id === itemId);
+    if (movingIdx === -1) throw new Error('Item not found in project');
+    
+    const [moving] = items.splice(movingIdx, 1);
+    items.splice(targetIndex, 0, moving);
+
+    const results = await Promise.all(
+      items.map((item, idx) => supabase.from('items').update({ timeline_order_index: idx }).eq('id', item.id))
+    );
+    const errors = results.filter(r => r.error);
+    if (errors.length > 0) throw errors[0].error;
+  },
 };
 
 export default supabaseAPI;

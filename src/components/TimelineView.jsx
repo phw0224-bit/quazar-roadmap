@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { PRIORITY_MAP } from '../lib/constants';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 const ZOOM = {
   week:    { dayWidth: 52, tickEvery: 1  },
@@ -9,7 +10,7 @@ const ZOOM = {
 
 const LEFT_W = 260;
 const ROW_H  = 44;
-const PHASE_H = 36;
+const PHASE_H = 52;  // 프로젝트 헤더 높이 증가 (간트 바 공간 확보)
 const HEADER_H = 60;
 
 function toDay(dateStr) {
@@ -34,7 +35,34 @@ export default function TimelineView({ phases, onUpdateItem, onOpenDetail, isRea
   const [dragging, setDragging] = useState(null);
   // dragging: { phaseId, itemId, origStart, origEnd, startX, currentDelta }
 
-  const { dayWidth, tickEvery } = ZOOM[zoom];
+  // 접기/펼치기 상태 (localStorage 영속화)
+  const [collapsedProjects, setCollapsedProjects] = useState(() => {
+    try {
+      const saved = localStorage.getItem('timeline-collapsed-projects');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  // localStorage 동기화
+  useEffect(() => {
+    localStorage.setItem('timeline-collapsed-projects', JSON.stringify([...collapsedProjects]));
+  }, [collapsedProjects]);
+
+  const toggleProjectCollapse = (projectId) => {
+    setCollapsedProjects(prev => {
+      const next = new Set(prev);
+      if (next.has(projectId)) {
+        next.delete(projectId);
+      } else {
+        next.add(projectId);
+      }
+      return next;
+    });
+  };
+
+  const { dayWidth, tickEvery} = ZOOM[zoom];
 
   // ── 날짜 범위 계산 ──────────────────────────────────────────────
   const today = toDay(new Date());
@@ -243,21 +271,67 @@ export default function TimelineView({ phases, onUpdateItem, onOpenDetail, isRea
                 {/* 프로젝트 헤더 행 */}
                 <div className="flex sticky top-[60px] z-20" style={{ height: PHASE_H }}>
                   <div
-                    className="sticky left-0 z-30 flex items-center px-4 bg-gray-50/90 dark:bg-bg-elevated/80 border-b border-r border-gray-100 dark:border-border-subtle shrink-0 backdrop-blur-sm"
+                    className="sticky left-0 z-30 flex items-center px-4 bg-gray-50/90 dark:bg-bg-elevated/80 border-b border-r border-gray-100 dark:border-border-subtle shrink-0 backdrop-blur-sm gap-2"
                     style={{ width: LEFT_W }}
                   >
+                    <button
+                      onClick={() => toggleProjectCollapse(phase.id)}
+                      className="shrink-0 p-0.5 hover:bg-gray-200 dark:hover:bg-bg-hover rounded text-gray-400 dark:text-text-tertiary hover:text-gray-900 dark:hover:text-text-primary transition-colors"
+                      title={collapsedProjects.has(phase.id) ? '펼치기' : '접기'}
+                    >
+                      {collapsedProjects.has(phase.id) ? <ChevronRight size={14} strokeWidth={3} /> : <ChevronDown size={14} strokeWidth={3} />}
+                    </button>
                     <span className="text-[11px] font-black uppercase tracking-widest text-gray-500 dark:text-text-tertiary truncate">
                       {phase.title}
                     </span>
                   </div>
+                  {/* 프로젝트 간트 영역 */}
                   <div
-                    className="flex-1 bg-gray-50/60 dark:bg-bg-elevated/30 border-b border-gray-100 dark:border-border-subtle"
+                    className="flex-1 bg-gray-50/60 dark:bg-bg-elevated/30 border-b border-gray-100 dark:border-border-subtle relative"
                     style={{ width: totalWidth }}
-                  />
+                  >
+                    {/* 프로젝트 간트 바 (날짜 있을 시) */}
+                    {phase.start_date && (() => {
+                      const pStart = phase.start_date;
+                      const pEnd = phase.end_date || phase.start_date;
+                      const x = daysBetween(rangeStart, pStart) * dayWidth;
+                      const w = Math.max((daysBetween(pStart, pEnd) + 1) * dayWidth, dayWidth);
+                      return (
+                        <div
+                          className="absolute top-2 flex items-center px-3 text-[10px] font-bold text-gray-600 dark:text-text-tertiary rounded-lg border-2 border-gray-400 dark:border-gray-500 bg-gray-200/30 dark:bg-gray-700/20 shadow-sm truncate"
+                          style={{ left: Math.max(0, x), width: w, height: PHASE_H - 12 }}
+                        >
+                          {w > 100 && (
+                            <span className="truncate">
+                              {phase.title} · {formatDate(pStart)}→{formatDate(pEnd)}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </div>
 
-                {/* 아이템 행 */}
-                {phase.items.map(item => {
+                {/* 아이템 행 (접혔을 때 렌더링 스킵) */}
+                {!collapsedProjects.has(phase.id) && (
+                  <>
+                    {[...phase.items]
+                  .sort((a, b) => {
+                    // 1. 날짜 있는 것 우선
+                    const aHasDate = !!a.start_date;
+                    const bHasDate = !!b.start_date;
+                    if (aHasDate !== bHasDate) return bHasDate ? 1 : -1;
+                    
+                    // 2. 둘 다 날짜 있으면 start_date 오름차순
+                    if (aHasDate && bHasDate) {
+                      const dateCompare = (a.start_date || '').localeCompare(b.start_date || '');
+                      if (dateCompare !== 0) return dateCompare;
+                    }
+                    
+                    // 3. 같으면 order_index 유지
+                    return a.order_index - b.order_index;
+                  })
+                  .map(item => {
                   const hasBar = !!item.start_date;
                   const isDraggingThis = dragging?.itemId === item.id;
                   const priority = PRIORITY_MAP[item.priority];
@@ -320,6 +394,8 @@ export default function TimelineView({ phases, onUpdateItem, onOpenDetail, isRea
                     </div>
                   );
                 })}
+                  </>
+                )}
               </div>
             ))}
           </div>
