@@ -22,6 +22,7 @@ export default function BoardSection({
   onShowPrompt,
   selectedTeam, selectedTag, selectedStatus,
   onAddItem, onUpdateItem, onDeleteItem, onUpdatePhase, onDeletePhase,
+  onCompletePhase,
   onOpenDetail, onShowConfirm, onShowToast,
   isReadOnly,
 }) {
@@ -195,6 +196,7 @@ export default function BoardSection({
                   onDeleteItem={onDeleteItem}
                   onUpdatePhase={onUpdatePhase}
                   onDeletePhase={onDeletePhase}
+                  onCompletePhase={onCompletePhase}
                   onOpenDetail={onOpenDetail}
                   onShowConfirm={onShowConfirm}
                   onShowToast={onShowToast}
