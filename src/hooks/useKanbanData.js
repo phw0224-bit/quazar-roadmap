@@ -277,6 +277,19 @@ export const useKanbanData = () => {
     dispatch({ type: 'UPDATE_PHASE', payload: { id: phaseId, updates: updated } });
   };
 
+  const completePhase = async (phaseId, isCompleted) => {
+    const phase = state.phases.find(p => p.id === phaseId);
+    if (!phase) return;
+    const meta = isCompleted
+      ? { sectionId: phase.section_id, orderIndex: phase.order_index }
+      : { preCompletionSectionId: phase.pre_completion_section_id, preCompletionOrderIndex: phase.pre_completion_order_index };
+    const updates = isCompleted
+      ? { is_completed: true, pre_completion_section_id: phase.section_id, pre_completion_order_index: phase.order_index }
+      : { is_completed: false, section_id: phase.pre_completion_section_id, order_index: phase.pre_completion_order_index };
+    dispatch({ type: 'UPDATE_PHASE', payload: { id: phaseId, updates } });
+    await API.completePhase(phaseId, isCompleted, meta);
+  };
+
   const deletePhase = async (phaseId) => {
     await API.deletePhase(phaseId);
     dispatch({ type: 'DELETE_PHASE', payload: phaseId });
@@ -412,6 +425,7 @@ export const useKanbanData = () => {
     addPhase,
     updatePhase,
     deletePhase,
+    completePhase,
     movePhase,
     addItem,
     updateItem,
