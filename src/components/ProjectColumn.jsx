@@ -15,7 +15,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { MoreHorizontal, Plus, Edit2, Trash2, User, Link, Maximize2, EyeOff } from 'lucide-react';
+import { MoreHorizontal, Plus, Edit2, Trash2, User, Link, Maximize2, EyeOff, CheckCircle2 } from 'lucide-react';
 import KanbanCard from './KanbanCard';
 import { PROJECT_TINTS } from '../lib/constants';
 
@@ -35,6 +35,8 @@ export default function ProjectColumn({
   phase: project, phaseIndex: projectIndex, isDragging: isDraggingProp = false,
   onAddItem, onUpdateItem, onDeleteItem, onUpdatePhase: onUpdateProject, onDeletePhase: onDeleteProject,
   onOpenDetail, onShowConfirm, onShowToast,
+  onCompletePhase,
+  isCompletedView = false,
   isReadOnly = false,
 }) {
   const [showEditProject, setShowEditProject] = useState(false);
@@ -70,6 +72,17 @@ export default function ProjectColumn({
   const [newItemTitle, setNewItemTitle] = useState('');
   const [editedProject, setEditedProject] = useState({ title: project.title });
   const [assigneeInput, setAssigneeInput] = useState((project.assignees || []).join(', '));
+
+  useEffect(() => {
+    if (isReadOnly) return;
+    const kanbanItems = project.items.filter(item => !item.page_type || item.page_type === 'task');
+    const allDone = kanbanItems.length > 0 && kanbanItems.every(item => item.status === 'done');
+    if (allDone && !project.is_completed) {
+      onCompletePhase?.(project.id, true);
+    } else if (!allDone && project.is_completed) {
+      onCompletePhase?.(project.id, false);
+    }
+  }, [project.items, project.is_completed, isReadOnly]);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -156,6 +169,19 @@ export default function ProjectColumn({
           </div>
 
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200" onClick={stopProp} onPointerDown={stopProp}>
+            {!isReadOnly && (
+              <button
+                className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                  project.is_completed
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                    : 'text-gray-400 dark:text-text-tertiary hover:bg-white/60 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'
+                }`}
+                title={project.is_completed ? '완료 해제' : '프로젝트 완료로 표시'}
+                onClick={() => onCompletePhase?.(project.id, !project.is_completed)}
+              >
+                <CheckCircle2 size={14} strokeWidth={2.5} />
+              </button>
+            )}
             {completedCount > 0 && (
               <button
                 className={`p-1.5 rounded-lg transition-all cursor-pointer ${
@@ -287,7 +313,7 @@ export default function ProjectColumn({
           </button>
         )}
 
-        {!isReadOnly && (
+        {!isReadOnly && !isCompletedView && (
           <div className="mt-1" onPointerDown={stopProp}>
             {!showAddItem ? (
               <button
