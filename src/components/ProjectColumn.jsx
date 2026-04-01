@@ -15,7 +15,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { MoreHorizontal, Plus, Edit2, Trash2, User, Link, Maximize2 } from 'lucide-react';
+import { MoreHorizontal, Plus, Edit2, Trash2, User, Link, Maximize2, EyeOff } from 'lucide-react';
 import KanbanCard from './KanbanCard';
 import { PROJECT_TINTS } from '../lib/constants';
 
@@ -43,8 +43,13 @@ export default function ProjectColumn({
 
   const COLLAPSED_COUNT = 6;
   const [isExpanded, setIsExpanded] = useState(false);
-  const hasMore = project.items.length > COLLAPSED_COUNT;
-  const visibleItems = isExpanded ? project.items : project.items.slice(0, COLLAPSED_COUNT);
+  const [hideCompleted, setHideCompleted] = useState(false);
+  const completedCount = project.items.filter(item => item.status === 'done').length;
+  const displayItems = hideCompleted
+    ? project.items.filter(item => item.status !== 'done')
+    : project.items;
+  const hasMore = displayItems.length > COLLAPSED_COUNT;
+  const visibleItems = isExpanded ? displayItems : displayItems.slice(0, COLLAPSED_COUNT);
 
   const { setNodeRef: setDroppableRef } = useDroppable({ id: project.id });
   const { attributes, listeners, setNodeRef: setSortableRef, transform, transition, isDragging: isSortableDragging } = useSortable({
@@ -151,6 +156,19 @@ export default function ProjectColumn({
           </div>
 
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200" onClick={stopProp} onPointerDown={stopProp}>
+            {completedCount > 0 && (
+              <button
+                className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                  hideCompleted
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                    : 'text-gray-400 dark:text-text-tertiary hover:bg-white/60 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'
+                }`}
+                title={hideCompleted ? `완료 항목 표시 (${completedCount}개)` : `완료 항목 숨기기 (${completedCount}개)`}
+                onClick={() => setHideCompleted(prev => !prev)}
+              >
+                <EyeOff size={14} strokeWidth={2.5} />
+              </button>
+            )}
             <button
               className="p-1.5 hover:bg-white/60 dark:hover:bg-bg-hover rounded-lg text-gray-400 dark:text-text-tertiary hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-all"
               title="상세 페이지로 열기"
@@ -239,6 +257,11 @@ export default function ProjectColumn({
 
       {/* Cards Area */}
       <div className={`flex-1 flex flex-col gap-4 p-3 min-h-[50px] overflow-y-auto no-scrollbar pb-12 rounded-b-[22px] ${projectTint.body} transition-colors duration-300`}>
+        {hideCompleted && completedCount > 0 && (
+          <div className="text-[11px] text-center text-gray-400 dark:text-text-tertiary py-1">
+            완료된 항목 {completedCount}개 숨김
+          </div>
+        )}
         <SortableContext items={visibleItems.map(i => i.id)} strategy={verticalListSortingStrategy} disabled={isReadOnly}>
           {visibleItems.map((item, idx) => (
             <KanbanCard
