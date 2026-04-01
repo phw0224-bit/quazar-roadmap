@@ -198,6 +198,34 @@ const supabaseAPI = {
     return data[0];
   },
 
+  /**
+   * @description 프로젝트 완료/복귀 처리. 완료 시 현재 위치를 저장, 복귀 시 복원.
+   * @param {string} phaseId
+   * @param {boolean} isCompleted - true: 완료, false: 복귀
+   * @param {Object} meta - { sectionId, orderIndex } 완료 시 저장할 현재 위치
+   *                      - { preCompletionSectionId, preCompletionOrderIndex } 복귀 시 복원할 위치
+   */
+  completePhase: async (phaseId, isCompleted, meta = {}) => {
+    const updates = isCompleted
+      ? {
+          is_completed: true,
+          pre_completion_section_id: meta.sectionId ?? null,
+          pre_completion_order_index: meta.orderIndex ?? null,
+        }
+      : {
+          is_completed: false,
+          section_id: meta.preCompletionSectionId ?? null,
+          order_index: meta.preCompletionOrderIndex ?? null,
+        };
+    const { data, error } = await supabase
+      .from('projects')
+      .update(updates)
+      .eq('id', phaseId)
+      .select();
+    if (error) throw error;
+    return data[0];
+  },
+
   deletePhase: async (phaseId) => {
     const { error } = await supabase.from('projects').delete().eq('id', phaseId);
     if (error) throw error;
