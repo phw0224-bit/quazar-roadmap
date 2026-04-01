@@ -82,7 +82,8 @@ export default function ProjectColumn({
     } else if (!allDone && project.is_completed) {
       onCompletePhase?.(project.id, false);
     }
-  }, [project.items, project.is_completed, isReadOnly]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.items, isReadOnly]);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -168,7 +169,7 @@ export default function ProjectColumn({
             </span>
           </div>
 
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200" onClick={stopProp} onPointerDown={stopProp}>
+          <div className="flex items-center gap-1" onClick={stopProp} onPointerDown={stopProp}>
             {!isReadOnly && (
               <button
                 className={`p-1.5 rounded-lg transition-all cursor-pointer ${
@@ -182,6 +183,7 @@ export default function ProjectColumn({
                 <CheckCircle2 size={14} strokeWidth={2.5} />
               </button>
             )}
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
             {completedCount > 0 && (
               <button
                 className={`p-1.5 rounded-lg transition-all cursor-pointer ${
@@ -232,6 +234,7 @@ export default function ProjectColumn({
                 </button>
               </>
             )}
+            </div>
           </div>
         </div>
 
