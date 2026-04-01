@@ -13,7 +13,7 @@
  */
 import { useState, useEffect, useMemo } from 'react';
 import { useTheme } from 'next-themes';
-import { Moon, Sun, Search, PanelLeft } from 'lucide-react';
+import { Moon, Sun, Search, PanelLeft, CheckCircle2, ChevronRight, ChevronDown } from 'lucide-react';
 import {
   DndContext,
   closestCorners,
@@ -54,7 +54,7 @@ export default function KanbanBoard({ onShowLogin }) {
   const { toggleSidebar } = useLayoutState();
   const {
     phases, sections, loading, addPhase, addItem, updateItem, deleteItem,
-    moveItem, updatePhase, deletePhase, movePhase, addComment, updateComment, deleteComment,
+    moveItem, updatePhase, deletePhase, completePhase, movePhase, addComment, updateComment, deleteComment,
     addSection, updateSection, deleteSection, moveSection,
     addChildPage,
   } = useKanbanData();
@@ -133,6 +133,16 @@ export default function KanbanBoard({ onShowLogin }) {
       return new Set();
     }
   });
+  const [expandedCompletedBoards, setExpandedCompletedBoards] = useState(() => {
+    try {
+      const saved = localStorage.getItem('kanban-completed-expanded');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+  const [expandedCompletedPhases, setExpandedCompletedPhases] = useState(new Set());
+
   const [panelWidth, setPanelWidth] = useState(50); // percentage width
   const [isResizing, setIsResizing] = useState(false);
   const [isMainBoardCollapsed, setIsMainBoardCollapsed] = useState(() => {
@@ -285,6 +295,10 @@ export default function KanbanBoard({ onShowLogin }) {
   useEffect(() => {
     localStorage.setItem('kanban-expanded-sections', JSON.stringify([...expandedSections]));
   }, [expandedSections]);
+
+  useEffect(() => {
+    localStorage.setItem('kanban-completed-expanded', JSON.stringify([...expandedCompletedBoards]));
+  }, [expandedCompletedBoards]);
 
   useEffect(() => {
     localStorage.setItem('kanban-main-board-collapsed', JSON.stringify(isMainBoardCollapsed));
@@ -528,7 +542,8 @@ export default function KanbanBoard({ onShowLogin }) {
               if (userDept === b) return 1;
               return 0;
             }).map(boardName => {
-              const boardPhases = filteredPhases.filter(p => (p.board_type || 'main') === boardName.toLowerCase());
+              const boardPhases = filteredPhases.filter(p => (p.board_type || 'main') === boardName.toLowerCase() && !p.is_completed);
+              const completedPhases = filteredPhases.filter(p => (p.board_type || 'main') === boardName.toLowerCase() && p.is_completed);
               const boardDisplayName = boardName === 'main' ? '전체 프로젝트 보드' : `${boardName} 보드`;
               const boardIcon = boardName === 'main' ? '🌐' : boardName === '개발팀' ? '⚙️' : '📂';
               const isMain = boardName === 'main';
@@ -601,6 +616,7 @@ export default function KanbanBoard({ onShowLogin }) {
                     const projectColumnProps = {
                       onAddItem: addItem, onUpdateItem: updateItem, onDeleteItem: deleteItem,
                       onUpdatePhase: updatePhase, onDeletePhase: deletePhase,
+                      onCompletePhase: completePhase,
                       onOpenDetail: (itemId) => setUrlState({ itemId }),
                       onShowConfirm: showConfirm, onShowToast: showToast,
                       isReadOnly: !user,
@@ -655,6 +671,61 @@ export default function KanbanBoard({ onShowLogin }) {
                                     <ProjectColumn key={phase.id} phase={phase} phaseIndex={idx + 1} {...projectColumnProps} />
                                   ))}
                                 </SortableContext>
+                              </div>
+                            )}
+
+                            {completedPhases.length > 0 && (
+                              <div className="mt-2">
+                                <button
+                                  className="flex items-center gap-2 px-2 py-2 text-sm font-bold text-gray-500 dark:text-text-secondary hover:text-gray-900 dark:hover:text-text-primary transition-colors cursor-pointer"
+                                  onClick={() => setExpandedCompletedBoards(prev => {
+                                    const next = new Set(prev);
+                                    next.has(boardName) ? next.delete(boardName) : next.add(boardName);
+                                    return next;
+                                  })}
+                                >
+                                  <ChevronRight
+                                    size={14}
+                                    className={`transition-transform duration-200 ${expandedCompletedBoards.has(boardName) ? 'rotate-90' : ''}`}
+                                  />
+                                  <span>완료된 프로젝트</span>
+                                  <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full text-xs font-bold tabular-nums">
+                                    {completedPhases.length}
+                                  </span>
+                                </button>
+
+                                {expandedCompletedBoards.has(boardName) && (
+                                  <div className="flex flex-wrap gap-3 px-2 mt-3">
+                                    {completedPhases.map(phase => (
+                                      <div key={phase.id} className="flex flex-col gap-2">
+                                        <button
+                                          className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-bg-elevated border border-gray-200 dark:border-border-subtle rounded-xl hover:border-green-300 dark:hover:border-green-700 transition-colors cursor-pointer"
+                                          onClick={() => setExpandedCompletedPhases(prev => {
+                                            const next = new Set(prev);
+                                            next.has(phase.id) ? next.delete(phase.id) : next.add(phase.id);
+                                            return next;
+                                          })}
+                                        >
+                                          <CheckCircle2 size={14} className="text-green-500 shrink-0" />
+                                          <span className="text-sm font-bold text-gray-600 dark:text-text-secondary">{phase.title}</span>
+                                          <span className="text-xs text-gray-400 dark:text-text-tertiary tabular-nums">{phase.items.length}개</span>
+                                          <ChevronDown
+                                            size={12}
+                                            className={`text-gray-400 dark:text-text-tertiary transition-transform duration-200 ${expandedCompletedPhases.has(phase.id) ? 'rotate-180' : ''}`}
+                                          />
+                                        </button>
+                                        {expandedCompletedPhases.has(phase.id) && (
+                                          <ProjectColumn
+                                            phase={phase}
+                                            phaseIndex={-1}
+                                            {...projectColumnProps}
+                                            isCompletedView={true}
+                                          />
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             )}
                           </>
