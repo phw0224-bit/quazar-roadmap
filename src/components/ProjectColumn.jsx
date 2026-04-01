@@ -41,6 +41,11 @@ export default function ProjectColumn({
   const [isEditingAssignees, setIsEditingAssignees] = useState(false);
   const [showAddItem, setShowAddItem] = useState(false);
 
+  const COLLAPSED_COUNT = 6;
+  const [isExpanded, setIsExpanded] = useState(false);
+  const hasMore = project.items.length > COLLAPSED_COUNT;
+  const visibleItems = isExpanded ? project.items : project.items.slice(0, COLLAPSED_COUNT);
+
   const { setNodeRef: setDroppableRef } = useDroppable({ id: project.id });
   const { attributes, listeners, setNodeRef: setSortableRef, transform, transition, isDragging: isSortableDragging } = useSortable({
     id: project.id,
@@ -234,8 +239,8 @@ export default function ProjectColumn({
 
       {/* Cards Area */}
       <div className={`flex-1 flex flex-col gap-4 p-3 min-h-[50px] overflow-y-auto no-scrollbar pb-12 rounded-b-[22px] ${projectTint.body} transition-colors duration-300`}>
-        <SortableContext items={project.items.map(i => i.id)} strategy={verticalListSortingStrategy} disabled={isReadOnly}>
-          {project.items.map((item, idx) => (
+        <SortableContext items={visibleItems.map(i => i.id)} strategy={verticalListSortingStrategy} disabled={isReadOnly}>
+          {visibleItems.map((item, idx) => (
             <KanbanCard
               key={item.id} item={item} itemIndex={idx + 1} phaseId={project.id}
               onUpdateItem={onUpdateItem} onDeleteItem={onDeleteItem}
@@ -246,6 +251,18 @@ export default function ProjectColumn({
             />
           ))}
         </SortableContext>
+
+        {hasMore && (
+          <button
+            className="w-full py-2.5 flex items-center justify-center gap-1.5 text-xs font-black text-gray-400 dark:text-text-tertiary hover:text-blue-500 dark:hover:text-blue-400 hover:bg-white/60 dark:hover:bg-bg-hover rounded-xl transition-all duration-200 cursor-pointer uppercase tracking-widest"
+            onPointerDown={stopProp}
+            onClick={() => setIsExpanded(prev => !prev)}
+          >
+            {isExpanded
+              ? '접기 ▲'
+              : `+ ${project.items.length - COLLAPSED_COUNT}개 더 보기 ▼`}
+          </button>
+        )}
 
         {!isReadOnly && (
           <div className="mt-1" onPointerDown={stopProp}>
