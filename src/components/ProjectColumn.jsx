@@ -15,7 +15,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { MoreHorizontal, Plus, Edit2, Trash2, User, Link, Maximize2, EyeOff, CheckCircle2 } from 'lucide-react';
+import { MoreHorizontal, Plus, Trash2, User, Link, Maximize2, EyeOff, CheckCircle2 } from 'lucide-react';
 import KanbanCard from './KanbanCard';
 import { PROJECT_TINTS } from '../lib/constants';
 
@@ -183,7 +183,6 @@ export default function ProjectColumn({
                 <CheckCircle2 size={14} strokeWidth={2.5} />
               </button>
             )}
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
             {completedCount > 0 && (
               <button
                 className={`p-1.5 rounded-lg transition-all cursor-pointer ${
@@ -215,26 +214,16 @@ export default function ProjectColumn({
               <Link size={14} strokeWidth={2.5} />
             </button>
             {!isReadOnly && (
-              <>
-                <button
-                  className="p-1.5 hover:bg-white/60 dark:hover:bg-bg-hover rounded-lg text-gray-400 dark:text-text-tertiary hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-all"
-                  title="프로젝트 이름 편집"
-                  onClick={() => setShowEditProject(true)}
-                >
-                  <Edit2 size={14} strokeWidth={2.5} />
-                </button>
-                <button
-                  className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-gray-400 dark:text-text-tertiary hover:text-red-500 dark:hover:text-red-400 cursor-pointer transition-all"
-                  onClick={() => onShowConfirm?.('프로젝트 삭제', `'${project.title}' 프로젝트를 삭제할까요? 관련 아이템도 모두 삭제됩니다.`, () => {
-                    onDeleteProject(project.id);
-                    onShowToast?.(`'${project.title}' 프로젝트가 삭제되었습니다.`);
-                  })}
-                >
-                  <Trash2 size={14} strokeWidth={2.5} />
-                </button>
-              </>
+              <button
+                className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-gray-400 dark:text-text-tertiary hover:text-red-500 dark:hover:text-red-400 cursor-pointer transition-all"
+                onClick={() => onShowConfirm?.('프로젝트 삭제', `'${project.title}' 프로젝트를 삭제할까요? 관련 아이템도 모두 삭제됩니다.`, () => {
+                  onDeleteProject(project.id);
+                  onShowToast?.(`'${project.title}' 프로젝트가 삭제되었습니다.`);
+                })}
+              >
+                <Trash2 size={14} strokeWidth={2.5} />
+              </button>
             )}
-            </div>
           </div>
         </div>
 
