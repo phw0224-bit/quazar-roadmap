@@ -99,7 +99,43 @@ const COMMANDS = [
     icon: '▶',
     keywords: ['toggle', '토글', 'collapse', 'accordion'],
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).insertToggle().run();
+      editor.chain().focus().deleteRange(range).insertToggle({ variant: 'default' }).run();
+    },
+  },
+  {
+    title: '토글 제목 1',
+    description: '제목 1 스타일 토글',
+    icon: 'H1',
+    keywords: ['toggle-h1', '토글 제목', 'h1', 'heading toggle'],
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).insertToggle({ variant: 'h1' }).run();
+    },
+  },
+  {
+    title: '토글 제목 2',
+    description: '제목 2 스타일 토글',
+    icon: 'H2',
+    keywords: ['toggle-h2', '토글 제목', 'h2', 'heading toggle'],
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).insertToggle({ variant: 'h2' }).run();
+    },
+  },
+  {
+    title: '토글 제목 3',
+    description: '제목 3 스타일 토글',
+    icon: 'H3',
+    keywords: ['toggle-h3', '토글 제목', 'h3', 'heading toggle'],
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).insertToggle({ variant: 'h3' }).run();
+    },
+  },
+  {
+    title: '토글 콜아웃',
+    description: '강조형 토글',
+    icon: '💬',
+    keywords: ['toggle-note', '토글 콜아웃', 'note toggle', 'callout toggle'],
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).insertToggle({ variant: 'note' }).run();
     },
   },
   {

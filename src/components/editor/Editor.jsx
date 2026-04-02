@@ -1,517 +1,779 @@
 /**
- * @fileoverview Tiptap v3 기반 리치텍스트 에디터. ItemDetailPanel의 description 필드 전용.
+ * @fileoverview 옵시디언 스타일 Markdown source editor.
  *
- * 핵심 기능:
- * - 마크다운 붙여넣기 지원 (marked로 HTML 변환)
- * - 복사 시 HTML→마크다운 변환 (turndown)
- * - 파일 업로드 (이미지: 인라인 삽입, 문서: 링크)
- * - `/` 슬래시 커맨드로 블록 삽입 (하위 페이지 생성, 기존 페이지 연결 지원)
- * - 툴바 + BubbleMenu (텍스트 선택 시 플로팅)
- * - @멘션: `@` 입력 시 팀원 목록 팝업 (Supabase profiles 연동)
- * - GlobalDragHandle: 에디터 블록 드래그 핸들
- * - **IME composition 처리**: 한글 입력 시 composition 중간 상태를 onChange로 emit하지 않음
- *
- * content prop: HTML 또는 마크다운. 에디터 내부는 항상 HTML로 처리.
- * onChange: 편집 시마다 HTML emit. lastEmittedHTML로 중복 emit 방지. IME composition 중에는 호출 안 함.
+ * description의 단일 원본은 Markdown이며, 이 컴포넌트는 CodeMirror 6로 원문을 직접 편집한다.
+ * 툴바와 슬래시 메뉴는 같은 명령 정의를 재사용하고, 파일/링크/하위 페이지도 Markdown 스니펫으로 삽입한다.
  */
-import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
-import { createPortal } from 'react-dom';
-import { useEditor, EditorContent, ReactRenderer } from '@tiptap/react';
-import { BubbleMenu } from '@tiptap/react/menus';
-import StarterKit from '@tiptap/starter-kit';
-import Placeholder from '@tiptap/extension-placeholder';
-import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table';
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
-import { createLowlight, common } from 'lowlight';
-import TaskList from '@tiptap/extension-task-list';
-import TaskItem from '@tiptap/extension-task-item';
-import { Underline } from '@tiptap/extension-underline';
-import { Link } from '@tiptap/extension-link';
-import { TextStyle } from '@tiptap/extension-text-style';
-import { Color } from '@tiptap/extension-color';
-import { Highlight } from '@tiptap/extension-highlight';
-import GlobalDragHandle from 'tiptap-extension-global-drag-handle';
-import { Mention } from '@tiptap/extension-mention';
-import tippy from 'tippy.js';
-import 'tippy.js/dist/tippy.css';
-import { marked } from 'marked';
-import TurndownService from 'turndown';
-import { DOMSerializer } from '@tiptap/pm/model';
-import { supabase } from '../../lib/supabase';
 import {
-  Bold, Italic, List, ListOrdered, Quote, Code, Minus,
-  Heading1, Heading2, Heading3, ImagePlus, CheckSquare, Strikethrough,
-  Underline as UnderlineIcon, Link as LinkIcon, Highlighter, Palette
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import CodeMirror from '@uiw/react-codemirror';
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
+import { EditorSelection, StateField } from '@codemirror/state';
+import {
+  Decoration,
+  EditorView,
+  WidgetType,
+} from '@codemirror/view';
+import { oneDark } from '@codemirror/theme-one-dark';
+import {
+  Bold,
+  Columns3,
+  CheckSquare,
+  Code,
+  Eye,
+  Eraser,
+  FilePlus2,
+  Heading1,
+  Heading2,
+  Heading3,
+  ImagePlus,
+  Link as LinkIcon,
+  List,
+  ListOrdered,
+  MessageSquareQuote,
+  Minus,
+  Quote,
+  Rows3,
+  Table2,
+  ChevronRightSquare,
+  Trash2,
 } from 'lucide-react';
+import SlashCommandMenu from './SlashCommandMenu';
+import { buildPageWikiLink } from './utils/markdownPreview';
+import {
+  EDITOR_COMMANDS,
+  filterEditorCommands,
+  getSlashCommandContext,
+  getWikiLinkContext,
+  rankWikiLinkItems,
+} from './utils/editorCommands';
+import {
+  addMarkdownTableColumn,
+  addMarkdownTableRow,
+  clearMarkdownTableCell,
+  deleteMarkdownTableColumn,
+  deleteMarkdownTableRow,
+  getMarkdownTableContext,
+  moveMarkdownTableSelection,
+} from './utils/tableEditing';
+import { getMarkdownLivePreviewPlan } from './utils/livePreview';
 
-import ResizableImage from './extensions/ResizableImage';
-import Callout from './extensions/Callout';
-import Toggle from './extensions/Toggle';
-import PageLink from './extensions/PageLink';
-import SlashCommand from './extensions/SlashCommand';
-
-const lowlight = createLowlight(common);
-const turndown = new TurndownService({
-  headingStyle: 'atx',
-  bulletListMarker: '-',
-  codeBlockStyle: 'fenced',
-});
-
-function convertToHTML(content) {
-  if (!content) return '';
-  if (content.trimStart().startsWith('<')) return content;
-  return marked(content);
-}
-
-function ToolbarButton({ onClick, isActive, title, children }) {
+function ToolbarButton({ title, onClick, children, disabled = false }) {
   return (
     <button
       type="button"
-      onMouseDown={(e) => { e.preventDefault(); onClick(); }}
+      onClick={onClick}
       title={title}
-      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-        isActive
-          ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900'
-          : 'text-gray-500 dark:text-text-secondary hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'
-      }`}
+      disabled={disabled}
+      className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border-subtle dark:bg-bg-base dark:text-text-secondary dark:hover:bg-bg-hover dark:hover:text-text-primary"
     >
       {children}
     </button>
   );
 }
 
-function Divider() {
-  return <div className="w-px h-5 bg-gray-200 dark:bg-border-subtle mx-0.5 self-center" />;
+function insertAroundSelection(view, prefix, suffix = '') {
+  if (!view) return;
+  const { from, to } = view.state.selection.main;
+  const selected = view.state.sliceDoc(from, to);
+  const text = `${prefix}${selected}${suffix}`;
+  view.dispatch({
+    changes: { from, to, insert: text },
+    selection: EditorSelection.range(from + prefix.length, from + prefix.length + selected.length),
+  });
+  view.focus();
 }
 
-function Toolbar({ editor, fileInputRef, onShowToast }) {
-  return (
-    <div className="flex items-center gap-0.5 flex-wrap px-2 py-1.5 bg-gray-50 dark:bg-bg-elevated border border-gray-200 dark:border-border-subtle rounded-xl mb-3">
-      <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive('bold')} title="굵게 (Ctrl+B)">
-        <Bold size={15} />
-      </ToolbarButton>
-      <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} isActive={editor.isActive('italic')} title="기울임 (Ctrl+I)">
-        <Italic size={15} />
-      </ToolbarButton>
-      <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} isActive={editor.isActive('underline')} title="밑줄 (Ctrl+U)">
-        <UnderlineIcon size={15} />
-      </ToolbarButton>
-      <Divider />
-      <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} isActive={editor.isActive('heading', { level: 1 })} title="제목 1">
-        <Heading1 size={15} />
-      </ToolbarButton>
-      <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} isActive={editor.isActive('heading', { level: 2 })} title="제목 2">
-        <Heading2 size={15} />
-      </ToolbarButton>
-      <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} isActive={editor.isActive('heading', { level: 3 })} title="제목 3">
-        <Heading3 size={15} />
-      </ToolbarButton>
-      <Divider />
-      <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} isActive={editor.isActive('bulletList')} title="글머리 기호">
-        <List size={15} />
-      </ToolbarButton>
-      <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} isActive={editor.isActive('orderedList')} title="번호 목록">
-        <ListOrdered size={15} />
-      </ToolbarButton>
-      <ToolbarButton onClick={() => editor.chain().focus().toggleTaskList().run()} isActive={editor.isActive('taskList')} title="체크리스트">
-        <CheckSquare size={15} />
-      </ToolbarButton>
-      <Divider />
-      <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} isActive={editor.isActive('blockquote')} title="인용">
-        <Quote size={15} />
-      </ToolbarButton>
-      <ToolbarButton onClick={() => editor.chain().focus().toggleCodeBlock().run()} isActive={editor.isActive('codeBlock')} title="코드 블록">
-        <Code size={15} />
-      </ToolbarButton>
-      <ToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()} isActive={false} title="구분선">
-        <Minus size={15} />
-      </ToolbarButton>
-      <Divider />
-      <ToolbarButton onClick={() => fileInputRef.current?.click()} isActive={false} title="이미지/파일 첨부">
-        <ImagePlus size={15} />
-      </ToolbarButton>
-    </div>
-  );
+function replaceRange(view, from, to, text, { selectFrom = null, selectTo = null } = {}) {
+  if (!view) return;
+  const anchor = selectFrom == null ? from + text.length : from + selectFrom;
+  const head = selectTo == null ? anchor : from + selectTo;
+
+  view.dispatch({
+    changes: { from, to, insert: text },
+    selection: EditorSelection.range(anchor, head),
+  });
+  view.focus();
 }
 
-const MentionSuggestion = {
-  items: async ({ query }) => {
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, name')
-      .ilike('name', `%${query}%`)
-      .limit(10);
-    return profiles || [];
-  },
-  render: () => {
-    let component;
-    let popup;
+function insertAtSelection(view, text, options = {}) {
+  if (!view) return;
+  const { from, to } = view.state.selection.main;
+  replaceRange(view, from, to, text, {
+    selectFrom: options.selectFrom ?? options.selectionFrom ?? null,
+    selectTo: options.selectTo ?? options.selectionTo ?? null,
+  });
+}
 
-    return {
-      onStart: (props) => {
-        component = new ReactRenderer(MentionList, {
-          props,
-          editor: props.editor,
-        });
+const TOOLBAR_COMMAND_IDS = [
+  'h1',
+  'h2',
+  'h3',
+  'bullet',
+  'numbered',
+  'todo',
+  'quote',
+  'code',
+  'table',
+  'divider',
+  'toggle',
+  'toggle-note',
+  'link-page',
+  'page',
+  'image',
+];
 
-        if (!props.clientRect) return;
-
-        popup = tippy('body', {
-          getReferenceClientRect: props.clientRect,
-          appendTo: () => document.body,
-          content: component.element,
-          showOnCreate: true,
-          interactive: true,
-          trigger: 'manual',
-          placement: 'bottom-start',
-        });
-      },
-      onUpdate(props) {
-        component.updateProps(props);
-        if (!props.clientRect) return;
-        popup[0].setProps({ getReferenceClientRect: props.clientRect });
-      },
-      onKeyDown(props) {
-        if (props.event.key === 'Escape') {
-          popup[0].hide();
-          return true;
-        }
-        return component.ref?.onKeyDown(props);
-      },
-      onExit() {
-        popup[0].destroy();
-        component.destroy();
-      },
-    };
-  },
+const TOOLBAR_ICONS = {
+  h1: Heading1,
+  h2: Heading2,
+  h3: Heading3,
+  bullet: List,
+  numbered: ListOrdered,
+  todo: CheckSquare,
+  quote: Quote,
+  code: Code,
+  table: Table2,
+  divider: Minus,
+  toggle: ChevronRightSquare,
+  'toggle-note': MessageSquareQuote,
+  'link-page': LinkIcon,
+  page: FilePlus2,
+  image: ImagePlus,
 };
 
-const MentionList = forwardRef(({ items, command }, ref) => {
-  const [selectedIndex, setSelectedIndex] = useState(0);
+class InlinePreviewWidget extends WidgetType {
+  constructor(label, className) {
+    super();
+    this.label = label;
+    this.className = className;
+  }
 
-  useEffect(() => { setSelectedIndex(0); }, [items]);
+  eq(other) {
+    return other.label === this.label && other.className === this.className;
+  }
 
-  const selectItem = (index) => {
-    const item = items[index];
-    if (item) command({ id: item.id, label: item.name });
-  };
+  toDOM() {
+    const element = document.createElement('span');
+    element.className = this.className;
+    element.textContent = this.label;
+    return element;
+  }
+}
 
-  useImperativeHandle(ref, () => ({
-    onKeyDown: ({ event }) => {
-      if (event.key === 'ArrowUp') {
-        setSelectedIndex((selectedIndex + items.length - 1) % items.length);
-        return true;
-      }
-      if (event.key === 'ArrowDown') {
-        setSelectedIndex((selectedIndex + 1) % items.length);
-        return true;
-      }
-      if (event.key === 'Enter') {
-        selectItem(selectedIndex);
-        return true;
-      }
-      return false;
+class HTMLPreviewWidget extends WidgetType {
+  constructor(html, className) {
+    super();
+    this.html = html;
+    this.className = className;
+  }
+
+  eq(other) {
+    return other.html === this.html && other.className === this.className;
+  }
+
+  toDOM() {
+    const element = document.createElement('div');
+    element.className = this.className;
+    element.innerHTML = this.html;
+    return element;
+  }
+
+  ignoreEvent() {
+    return false;
+  }
+}
+
+function createLivePreviewExtension(enabled) {
+  if (!enabled) return [];
+
+  const field = StateField.define({
+    create(state) {
+      return buildLivePreviewDecorationsFromState(state);
     },
-  }));
+    update(_value, transaction) {
+      if (transaction.docChanged || transaction.selection) {
+        return buildLivePreviewDecorationsFromState(transaction.state);
+      }
+      return buildLivePreviewDecorationsFromState(transaction.state);
+    },
+    provide: (fieldRef) => EditorView.decorations.from(fieldRef),
+  });
 
-  return (
-    <div className="bg-white dark:bg-bg-elevated border border-gray-200 dark:border-border-subtle rounded-xl shadow-2xl overflow-hidden py-1 min-w-[140px] z-[9999]">
-      {items.length > 0 ? (
-        items.map((item, index) => (
-          <button
-            key={item.id}
-            onClick={() => selectItem(index)}
-            className={`w-full text-left px-3 py-2 text-sm font-semibold transition-colors flex items-center gap-2 ${
-              index === selectedIndex
-                ? 'bg-blue-500 text-white'
-                : 'text-gray-700 dark:text-text-primary hover:bg-gray-100 dark:hover:bg-bg-hover'
-            }`}
-          >
-            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] uppercase font-black ${index === selectedIndex ? 'bg-white text-blue-500' : 'bg-gray-200 dark:bg-bg-hover text-gray-500'}`}>
-              {item.name.charAt(0)}
-            </div>
-            {item.name}
-          </button>
-        ))
-      ) : (
-        <div className="px-3 py-2 text-sm text-gray-400">검색 결과 없음</div>
-      )}
-    </div>
-  );
-});
-MentionList.displayName = 'MentionList';
+  return [field];
+}
 
-export default function Editor({ content, onChange, editable, itemId, onShowToast, onBlur, onAddChildPage, onShowPrompt, onOpenDetail, onLinkExistingPage }) {
-  const lastEmittedHTML = useRef(null);
-  const editorRef = useRef(null);
+function createTableSelectionExtension(enabled) {
+  if (!enabled) return [];
+
+  const field = StateField.define({
+    create(state) {
+      return buildTableSelectionDecoration(state);
+    },
+    update(_value, transaction) {
+      return buildTableSelectionDecoration(transaction.state);
+    },
+    provide: (fieldRef) => EditorView.decorations.from(fieldRef),
+  });
+
+  return [field];
+}
+
+function buildLivePreviewDecorationsFromState(state) {
+  const selection = state.selection.main;
+  const activeLineIndex = state.doc.lineAt(selection.head).number - 1;
+  const plan = getMarkdownLivePreviewPlan(state.doc.toString(), activeLineIndex);
+  const decorations = [];
+
+  plan.replacements.forEach((item) => {
+    decorations.push(
+      Decoration.replace({
+        widget: new InlinePreviewWidget(item.label, item.className),
+        inclusive: false,
+      }).range(item.from, item.to),
+    );
+  });
+
+  plan.lineClasses.forEach((item) => {
+    decorations.push(Decoration.line({ class: item.className }).range(item.lineStart));
+  });
+
+  plan.marks.forEach((item) => {
+    decorations.push(Decoration.mark({ class: item.className }).range(item.from, item.to));
+  });
+
+  plan.blockWidgets.forEach((item) => {
+    decorations.push(
+      Decoration.replace({
+        widget: new HTMLPreviewWidget(item.html, item.className),
+        block: true,
+      }).range(item.from, item.to),
+    );
+  });
+
+  return Decoration.set(decorations, true);
+}
+
+function buildTableSelectionDecoration(state) {
+  const context = getMarkdownTableContext(state.doc.toString(), state.selection.main.head);
+  if (!context?.activeCell) return Decoration.none;
+
+  return Decoration.set([
+    Decoration.mark({ class: 'cm-table-active-cell' }).range(
+      context.activeCell.from,
+      Math.max(context.activeCell.from + 1, context.activeCell.to),
+    ),
+  ]);
+}
+
+export default function Editor({
+  content,
+  onChange,
+  editable,
+  mode = 'live',
+  containerRef,
+  allItems = [],
+  itemId,
+  onShowToast,
+  onBlur,
+  onAddChildPage,
+  onShowPrompt,
+  onLinkExistingPage,
+}) {
+  const editorViewRef = useRef(null);
+  const wrapperRef = useRef(null);
   const fileInputRef = useRef(null);
-  const isComposing = useRef(false);
+  const isApplyingExternalValue = useRef(false);
+  const [isSurfaceHovered, setIsSurfaceHovered] = useState(false);
+  const [isEditorFocused, setIsEditorFocused] = useState(false);
+  const commandMap = useMemo(
+    () => Object.fromEntries(EDITOR_COMMANDS.map((command) => [command.id, command])),
+    [],
+  );
 
-  /**
-   * @description 이미지는 에디터에 직접 삽입, 그 외 문서는 다운로드 링크로 삽입.
-   * POST /upload/:itemId 성공 후 items.files jsonb 업데이트는 호출 측(ItemDetailPanel)에서 처리.
-   * @param {Event} e - input[type=file] change 이벤트
-   */
-  const handleFileChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const [slashState, setSlashState] = useState(null);
+  const slashStateRef = useRef(null);
+  const [selectedSlashIndex, setSelectedSlashIndex] = useState(0);
+  const filteredSlashCommandsRef = useRef([]);
+  const [tableContext, setTableContext] = useState(null);
+
+  useEffect(() => {
+    slashStateRef.current = slashState;
+  }, [slashState]);
+
+  const closeSlashMenu = useCallback(() => {
+    setSlashState(null);
+    setSelectedSlashIndex(0);
+  }, []);
+
+  const filteredSlashCommands = useMemo(
+    () => filterEditorCommands(slashState?.query || ''),
+    [slashState?.query],
+  );
+
+  const wikiSuggestions = useMemo(() => {
+    if (slashState?.type !== 'wiki') return [];
+    const query = (slashState.query || '').trim().toLowerCase();
+    return rankWikiLinkItems(allItems, query)
+      .filter((item) => {
+        const title = `${item?.title || item?.content || ''}`.trim();
+        if (!title) return false;
+        if (!query) return true;
+        return title.toLowerCase().includes(query);
+      })
+      .slice(0, 8)
+      .map((item) => ({
+        id: item.id,
+        label: item.title || item.content || '제목 없음',
+        description: item.page_type === 'page' ? '페이지' : '업무',
+        item,
+      }));
+  }, [allItems, slashState]);
+
+  useEffect(() => {
+    filteredSlashCommandsRef.current = slashState?.type === 'wiki'
+      ? wikiSuggestions
+      : filteredSlashCommands;
+  }, [filteredSlashCommands, slashState?.type, wikiSuggestions]);
+
+  useEffect(() => {
+    setSelectedSlashIndex((current) => {
+      const items = slashState?.type === 'wiki' ? wikiSuggestions : filteredSlashCommands;
+      if (!items.length) return 0;
+      return Math.min(current, items.length - 1);
+    });
+  }, [filteredSlashCommands, slashState?.type, wikiSuggestions]);
+
+  const syncSlashMenu = useCallback((view) => {
+    if (!editable || !view) {
+      closeSlashMenu();
+      return;
+    }
+
+    const selection = view.state.selection.main;
+    if (!selection.empty) {
+      closeSlashMenu();
+      return;
+    }
+
+    const doc = view.state.doc.toString();
+    const context = getSlashCommandContext(doc, selection.head);
+    const wikiContext = getWikiLinkContext(doc, selection.head);
+
+    if (!context && !wikiContext) {
+      closeSlashMenu();
+      return;
+    }
+
+    const coords = view.coordsAtPos(selection.head);
+    const wrapperRect = wrapperRef.current?.getBoundingClientRect();
+    const left = coords && wrapperRect
+      ? Math.max(12, Math.min(coords.left - wrapperRect.left, wrapperRect.width - 304))
+      : 12;
+    const top = coords && wrapperRect
+      ? coords.bottom - wrapperRect.top + 12
+      : 72;
+
+    const nextContext = context
+      ? { ...context, type: 'slash' }
+      : { ...wikiContext, type: 'wiki' };
+
+    setSlashState((current) => {
+      if (
+        current
+        && current.from === nextContext.from
+        && current.to === nextContext.to
+        && current.query === nextContext.query
+        && current.type === nextContext.type
+        && current.position.left === left
+        && current.position.top === top
+      ) {
+        return current;
+      }
+
+      return {
+        ...nextContext,
+        position: { left, top },
+      };
+    });
+  }, [closeSlashMenu, editable]);
+
+  const syncTableContext = useCallback((view) => {
+    if (!editable || !view) {
+      setTableContext(null);
+      return;
+    }
+
+    const selection = view.state.selection.main;
+    if (!selection.empty) {
+      setTableContext(null);
+      return;
+    }
+
+    setTableContext(getMarkdownTableContext(view.state.doc.toString(), selection.head));
+  }, [editable]);
+
+  const handleInsertPageLink = useCallback(() => {
+    if (!onLinkExistingPage || !editorViewRef.current) return;
+
+    onLinkExistingPage((item) => {
+      if (!item) return;
+      insertAtSelection(editorViewRef.current, buildPageWikiLink(item));
+    });
+  }, [onLinkExistingPage]);
+
+  const handleInsertChildPage = useCallback(() => {
+    if (!onAddChildPage || !onShowPrompt || !editorViewRef.current) return;
+
+    onShowPrompt('하위 페이지 추가', '페이지 제목을 입력하세요', async (title) => {
+      if (!title?.trim()) return;
+
+      try {
+        const newPage = await onAddChildPage(title.trim());
+        if (!newPage) return;
+        insertAtSelection(editorViewRef.current, buildPageWikiLink(newPage));
+      } catch (error) {
+        onShowToast?.(`하위 페이지 생성 실패: ${error.message}`);
+      }
+    });
+  }, [onAddChildPage, onShowPrompt, onShowToast]);
+
+  const runCommand = useCallback((command, range = null) => {
+    const view = editorViewRef.current;
+    if (!view || !command) return;
+
+    if (command.action) {
+      if (range) {
+        replaceRange(view, range.from, range.to, '');
+      }
+
+      if (command.action === 'link-page') {
+        handleInsertPageLink();
+      } else if (command.action === 'create-page') {
+        handleInsertChildPage();
+      } else if (command.action === 'image') {
+        fileInputRef.current?.click();
+      }
+
+      closeSlashMenu();
+      return;
+    }
+
+    if (range) {
+      replaceRange(view, range.from, range.to, command.insert, command);
+    } else {
+      insertAtSelection(view, command.insert, command);
+    }
+
+    closeSlashMenu();
+  }, [closeSlashMenu, handleInsertChildPage, handleInsertPageLink]);
+
+  const runCommandById = useCallback((commandId) => {
+    const command = commandMap[commandId];
+    if (!command) return;
+    runCommand(command);
+  }, [commandMap, runCommand]);
+
+  const executeSelectedSlashCommand = useCallback(() => {
+    const activeSlash = slashStateRef.current;
+    const items = filteredSlashCommandsRef.current;
+    if (!activeSlash || !items.length) return false;
+
+    const selected = items[selectedSlashIndex] || items[0];
+    if (!selected) return false;
+
+    if (activeSlash.type === 'wiki') {
+      replaceRange(
+        editorViewRef.current,
+        activeSlash.from,
+        activeSlash.to,
+        buildPageWikiLink(selected.item),
+      );
+      closeSlashMenu();
+      return true;
+    }
+
+    runCommand(selected, { from: activeSlash.from, to: activeSlash.to });
+    return true;
+  }, [closeSlashMenu, runCommand, selectedSlashIndex]);
+
+  const extensions = useMemo(() => [
+    markdown({
+      base: markdownLanguage,
+    }),
+    EditorView.lineWrapping,
+    ...createLivePreviewExtension(mode === 'live'),
+    ...createTableSelectionExtension(editable),
+    EditorView.domEventHandlers({
+      keydown: (event) => {
+        const view = editorViewRef.current;
+
+        if (slashStateRef.current && filteredSlashCommandsRef.current.length) {
+          if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            event.stopPropagation();
+            setSelectedSlashIndex((index) => {
+              const commands = filteredSlashCommandsRef.current;
+              return commands.length ? (index + 1) % commands.length : 0;
+            });
+            return true;
+          }
+
+          if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            event.stopPropagation();
+            setSelectedSlashIndex((index) => {
+              const commands = filteredSlashCommandsRef.current;
+              return commands.length ? (index - 1 + commands.length) % commands.length : 0;
+            });
+            return true;
+          }
+
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            event.stopPropagation();
+            return executeSelectedSlashCommand();
+          }
+
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            closeSlashMenu();
+            return true;
+          }
+        }
+
+        if (view && (event.key === 'Tab')) {
+          const selection = view.state.selection.main;
+          if (selection.empty) {
+            const move = moveMarkdownTableSelection(
+              view.state.doc.toString(),
+              selection.head,
+              event.shiftKey ? 'prev' : 'next',
+            );
+
+            if (move) {
+              event.preventDefault();
+              replaceRange(view, 0, view.state.doc.length, move.text, {
+                selectFrom: move.cursor,
+                selectTo: move.cursor,
+              });
+              syncTableContext(view);
+              return true;
+            }
+          }
+        }
+
+        return false;
+      },
+    }),
+  ], [closeSlashMenu, executeSelectedSlashCommand, mode, syncTableContext]);
+
+  useEffect(() => {
+    const view = editorViewRef.current;
+    if (!view) return;
+    const currentValue = view.state.doc.toString();
+    const nextValue = content || '';
+
+    if (currentValue === nextValue) return;
+    isApplyingExternalValue.current = true;
+    view.dispatch({
+      changes: { from: 0, to: currentValue.length, insert: nextValue },
+    });
+    isApplyingExternalValue.current = false;
+    syncSlashMenu(view);
+    syncTableContext(view);
+  }, [content, syncSlashMenu, syncTableContext]);
+
+  const applyTableChange = useCallback((operation) => {
+    const view = editorViewRef.current;
+    if (!view) return;
+    const result = operation(view.state.doc.toString(), view.state.selection.main.head);
+    if (!result) return;
+
+    replaceRange(view, 0, view.state.doc.length, result.text, {
+      selectFrom: result.cursor,
+      selectTo: result.cursor,
+    });
+    syncTableContext(view);
+  }, [syncTableContext]);
+
+  const handleFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !editorViewRef.current) return;
+
     if (file.size > 10 * 1024 * 1024) {
       onShowToast?.('파일 크기는 10MB를 초과할 수 없습니다.');
       return;
     }
+
     const formData = new FormData();
     formData.append('file', file);
+
     try {
       const response = await fetch(`/upload/${itemId}`, { method: 'POST', body: formData });
       if (!response.ok) throw new Error('업로드 실패');
       const result = await response.json();
-      if (result.mimetype?.startsWith('image/')) {
-        editorRef.current?.chain().focus().setImage({ src: result.url, alt: result.originalName, width: null }).run();
-      } else {
-        editorRef.current?.chain().focus().insertContent(
-          `<a href="${result.url}" target="_blank">${result.originalName}</a>`
-        ).run();
-      }
+
+      const markdownText = result.mimetype?.startsWith('image/')
+        ? `![${result.originalName}](${result.url})`
+        : `[${result.originalName}](${result.url})`;
+
+      insertAtSelection(editorViewRef.current, markdownText);
       onShowToast?.('파일이 업로드되었습니다.');
-    } catch (err) {
-      onShowToast?.('파일 업로드 실패: ' + err.message);
+    } catch (error) {
+      onShowToast?.(`파일 업로드 실패: ${error.message}`);
     }
-    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    event.target.value = '';
   };
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({ codeBlock: false }),
-      CodeBlockLowlight.configure({ lowlight }),
-      TaskList,
-      TaskItem.configure({ nested: true }),
-      ResizableImage.configure({ inline: false }),
-      Table.configure({ resizable: false }),
-      TableRow,
-      TableHeader,
-      TableCell,
-      Underline,
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: {
-          class: 'text-blue-500 hover:text-blue-600 underline cursor-pointer transition-colors',
-        },
-      }),
-      TextStyle,
-      Color,
-      Highlight.configure({ multicolor: true }),
-      GlobalDragHandle.configure({
-        dragHandleWidth: 28,
-        scrollTreshold: 100,
-        dragHandleSelector: '#global-drag-handle',
-      }),
-      Mention.configure({
-        HTMLAttributes: {
-          class: 'mention bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-1 py-0.5 rounded font-bold transition-all',
-        },
-        suggestion: MentionSuggestion,
-      }),
-      Placeholder.configure({
-        placeholder: '내용을 입력하세요... (/ 로 블록 추가, # 헤더, **볼드**, - 목록)',
-      }),
-      Callout,
-      Toggle,
-      PageLink.configure({
-        onOpenDetail: onOpenDetail,
-      }),
-      SlashCommand.configure({
-        onAddChildPage: (onAddChildPage && onShowPrompt) ? (editor, range) => {
-          onShowPrompt('하위 페이지 추가', '페이지 제목을 입력하세요', async (title) => {
-            if (title && title.trim()) {
-              try {
-                const newPage = await onAddChildPage(title.trim());
-                if (newPage) {
-                  editor.chain().focus().deleteRange(range).insertContent({
-                    type: 'pageLink',
-                    attrs: { id: newPage.id, title: newPage.title },
-                  }).run();
-                }
-              } catch (err) {
-                onShowToast?.('하위 페이지 생성 실패: ' + err.message);
-              }
-            } else {
-              editor.chain().focus().deleteRange(range).run();
-            }
-          });
-        } : null,
-        onLinkExistingPage: onLinkExistingPage ? (editor, range) => {
-          onLinkExistingPage((item) => {
-            if (item) {
-              editor.chain().focus().deleteRange(range).insertContent({
-                type: 'pageLink',
-                attrs: { id: item.id, title: item.title || item.content },
-              }).run();
-            } else {
-              editor.chain().focus().deleteRange(range).run();
-            }
-          });
-        } : null,
-      }),
-    ],
-    content: convertToHTML(content),
-    editable,
-    onCreate: ({ editor }) => { editorRef.current = editor; },
-    editorProps: {
-      handlePaste: (_view, event) => {
-        const text = event.clipboardData?.getData('text/plain');
-        if (!text) return false;
-        const html = marked(text);
-        editorRef.current?.commands.insertContent(html);
-        return true;
-      },
-      handleCopy: (view, event) => {
-        const { from, to } = view.state.selection;
-        if (from === to) return false;
-        const fragment = view.state.doc.slice(from, to).content;
-        const serializer = DOMSerializer.fromSchema(view.state.schema);
-        const div = document.createElement('div');
-        div.appendChild(serializer.serializeFragment(fragment));
-        const html = div.innerHTML;
-        event.clipboardData?.setData('text/plain', turndown.turndown(html));
-        event.clipboardData?.setData('text/html', html);
-        event.preventDefault();
-        return true;
-      },
-      handleCut: (view, event) => {
-        const { from, to } = view.state.selection;
-        if (from === to) return false;
-        const fragment = view.state.doc.slice(from, to).content;
-        const serializer = DOMSerializer.fromSchema(view.state.schema);
-        const div = document.createElement('div');
-        div.appendChild(serializer.serializeFragment(fragment));
-        const html = div.innerHTML;
-        event.clipboardData?.setData('text/plain', turndown.turndown(html));
-        event.clipboardData?.setData('text/html', html);
-        event.preventDefault();
-        view.dispatch(view.state.tr.deleteSelection());
-        return true;
-      },
-      handleDOMEvents: {
-        compositionstart: () => {
-          isComposing.current = true;
-          return false;
-        },
-        compositionend: () => {
-          isComposing.current = false;
-          // composition 완료 후 최종 상태를 onChange로 emit
-          if (editorRef.current) {
-            const html = editorRef.current.getHTML();
-            if (html !== lastEmittedHTML.current) {
-              lastEmittedHTML.current = html;
-              onChange?.(html);
-            }
-          }
-          return false;
-        },
-      },
-    },
-    onUpdate: ({ editor }) => {
-      // IME composition 중이면 onChange 호출 스킵
-      if (isComposing.current) return;
-
-      const html = editor.getHTML();
-      lastEmittedHTML.current = html;
-      onChange?.(html);
-    },
-    onBlur: ({ event }) => { onBlur?.(event); },
-  });
-
-  useEffect(() => {
-    if (editor && editor.isEditable !== editable) {
-      editor.setEditable(editable);
-    }
-  }, [editor, editable]);
-
-  useEffect(() => {
-    if (!editor) return;
-    const newHTML = convertToHTML(content);
-    if (newHTML === lastEmittedHTML.current) {
-      lastEmittedHTML.current = null;
-      return;
-    }
-    if (!editor.isFocused) {
-      editor.commands.setContent(newHTML, false);
-    }
-  }, [content]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (!editor) return null;
-
   return (
-    <div className="tiptap-wrapper relative">
-      {/* 파일 input: 슬래시 커맨드에서 querySelector로 접근하므로 항상 DOM에 유지 */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
-        className="hidden"
-        onChange={handleFileChange}
-      />
-
-      {/* BubbleMenu: 텍스트 선택 시 플로팅 툴바 */}
+    <div
+      className="space-y-3"
+      onMouseEnter={() => setIsSurfaceHovered(true)}
+      onMouseLeave={() => setIsSurfaceHovered(false)}
+    >
       {editable && (
-        <BubbleMenu
-          editor={editor}
-          options={{ placement: 'top', offset: 8 }}
-          shouldShow={({ state, from, to }) => from !== to && !state.selection.empty}
-          className="flex items-center gap-0.5 px-1.5 py-1 rounded-xl shadow-lg border bg-white dark:bg-bg-elevated border-gray-200 dark:border-border-strong animate-scale-in z-50"
-        >
-          <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive('bold')} title="굵게"><Bold size={13} /></ToolbarButton>
-          <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} isActive={editor.isActive('italic')} title="기울임"><Italic size={13} /></ToolbarButton>
-          <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} isActive={editor.isActive('underline')} title="밑줄"><UnderlineIcon size={13} /></ToolbarButton>
-          <ToolbarButton onClick={() => editor.chain().focus().toggleStrike().run()} isActive={editor.isActive('strike')} title="취소선"><Strikethrough size={13} /></ToolbarButton>
-          <ToolbarButton onClick={() => editor.chain().focus().toggleCode().run()} isActive={editor.isActive('code')} title="인라인 코드"><Code size={13} /></ToolbarButton>
-          <Divider />
-          <ToolbarButton
-            onClick={() => {
-              const url = window.prompt('URL을 입력하세요:');
-              if (url) editor.chain().focus().setLink({ href: url }).run();
-              else if (url === '') editor.chain().focus().unsetLink().run();
-            }}
-            isActive={editor.isActive('link')}
-            title="링크"
-          >
-            <LinkIcon size={13} />
+        <div className="relative rounded-2xl border border-gray-200 bg-gray-50 px-2 py-2 dark:border-border-subtle dark:bg-bg-elevated">
+          <div className="flex flex-wrap items-center gap-1">
+          {TOOLBAR_COMMAND_IDS.map((commandId) => {
+            const command = commandMap[commandId];
+            const Icon = TOOLBAR_ICONS[commandId];
+            const isDisabled = (commandId === 'link-page' && !onLinkExistingPage)
+              || (commandId === 'page' && !onAddChildPage)
+              || (commandId === 'image' && !itemId);
+
+            return (
+              <ToolbarButton
+                key={commandId}
+                title={command.label}
+                onClick={() => runCommandById(commandId)}
+                disabled={isDisabled}
+              >
+                <Icon size={15} />
+              </ToolbarButton>
+            );
+          })}
+          <ToolbarButton title="굵게" onClick={() => insertAroundSelection(editorViewRef.current, '**', '**')}>
+            <Bold size={15} />
           </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().setHighlight({ color: editor.isActive('highlight') ? 'transparent' : '#ffeb3b' }).run()}
-            isActive={editor.isActive('highlight')}
-            title="형광펜"
-          >
-            <Highlighter size={13} />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => {
-              const color = window.prompt('색상 코드(예: #ff0000)를 입력하세요:');
-              if (color) editor.chain().focus().setColor(color).run();
-              else if (color === '') editor.chain().focus().unsetColor().run();
-            }}
-            isActive={editor.isActive('textStyle', { color: /./ })}
-            title="글자 색상"
-          >
-            <Palette size={13} />
-          </ToolbarButton>
-          <Divider />
-          <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} isActive={editor.isActive('heading', { level: 1 })} title="제목 1"><Heading1 size={13} /></ToolbarButton>
-          <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} isActive={editor.isActive('heading', { level: 2 })} title="제목 2"><Heading2 size={13} /></ToolbarButton>
-          <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} isActive={editor.isActive('heading', { level: 3 })} title="제목 3"><Heading3 size={13} /></ToolbarButton>
-        </BubbleMenu>
+          </div>
+          {tableContext && (
+            <div
+              className={`pointer-events-none absolute left-2 right-2 top-full z-20 mt-2 flex flex-wrap items-center gap-1 rounded-xl border border-gray-200 bg-white px-2 py-2 shadow-lg transition-all duration-150 dark:border-border-subtle dark:bg-bg-base dark:shadow-black/20 ${
+                isSurfaceHovered || isEditorFocused ? 'pointer-events-auto opacity-100 translate-y-0' : '-translate-y-1 opacity-0'
+              }`}
+            >
+              <span className="px-1.5 text-[10px] font-black uppercase tracking-[0.22em] text-gray-400 dark:text-text-tertiary">
+                Table R{tableContext.activeEditableRowIndex + 1} C{tableContext.activeColumnIndex + 1}
+              </span>
+              <ToolbarButton title="행 추가" onClick={() => applyTableChange(addMarkdownTableRow)}>
+                <Rows3 size={15} />
+              </ToolbarButton>
+              <ToolbarButton title="열 추가" onClick={() => applyTableChange(addMarkdownTableColumn)}>
+                <Columns3 size={15} />
+              </ToolbarButton>
+              <ToolbarButton title="셀 비우기" onClick={() => applyTableChange(clearMarkdownTableCell)}>
+                <Eraser size={15} />
+              </ToolbarButton>
+              <ToolbarButton title="행 삭제" onClick={() => applyTableChange(deleteMarkdownTableRow)}>
+                <span className="inline-flex items-center gap-1">
+                  <Rows3 size={15} />
+                  <Trash2 size={11} />
+                </span>
+              </ToolbarButton>
+              <ToolbarButton title="열 삭제" onClick={() => applyTableChange(deleteMarkdownTableColumn)}>
+                <span className="inline-flex items-center gap-1">
+                  <Columns3 size={15} />
+                  <Trash2 size={11} />
+                </span>
+              </ToolbarButton>
+            </div>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+            onChange={handleFileChange}
+          />
+        </div>
       )}
 
-      <EditorContent
-        editor={editor}
-        className="prose dark:prose-invert max-w-none tiptap-content"
-      />
+      <div
+        ref={(node) => {
+          wrapperRef.current = node;
+          if (containerRef) {
+            if (typeof containerRef === 'function') containerRef(node);
+            else containerRef.current = node;
+          }
+        }}
+        className={`relative overflow-hidden ${mode === 'live'
+          ? 'cm-live-preview-shell bg-transparent'
+          : 'rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-border-subtle dark:bg-[#0f1115]'
+        }`}
+      >
+        <CodeMirror
+          value={content || ''}
+          height="420px"
+          basicSetup={{
+            lineNumbers: mode !== 'live',
+            foldGutter: true,
+            highlightActiveLine: mode !== 'live',
+            highlightActiveLineGutter: mode !== 'live',
+          }}
+          editable={editable}
+          extensions={extensions}
+          theme={editable ? oneDark : 'light'}
+          onCreateEditor={(view) => {
+            editorViewRef.current = view;
+            syncSlashMenu(view);
+            syncTableContext(view);
+          }}
+          onUpdate={(viewUpdate) => {
+            syncSlashMenu(viewUpdate.view);
+            syncTableContext(viewUpdate.view);
+          }}
+          onChange={(value, viewUpdate) => {
+            if (isApplyingExternalValue.current) return;
+            onChange?.(value);
+            syncSlashMenu(viewUpdate.view);
+            syncTableContext(viewUpdate.view);
+          }}
+          onBlur={(event) => {
+            if (event.relatedTarget?.closest?.('[data-slash-menu-root]')) return;
+            setIsEditorFocused(false);
+            onBlur?.(event);
+          }}
+          onFocus={() => {
+            setIsEditorFocused(true);
+          }}
+        />
 
-      {/* 포탈을 이용해 드래그 핸들을 document.body에 렌더링 (ItemDetailPanel의 transform으로 인한 위치 오류 방지) */}
-      {typeof document !== 'undefined' && createPortal(
-        <div id="global-drag-handle" className="drag-handle"></div>,
-        document.body
-      )}
+        {editable && slashState && (slashState.type === 'wiki' ? wikiSuggestions.length > 0 : filteredSlashCommands.length > 0) && (
+          <div data-slash-menu-root className="pointer-events-auto">
+            <SlashCommandMenu
+              items={slashState.type === 'wiki' ? wikiSuggestions : filteredSlashCommands}
+              selectedIndex={selectedSlashIndex}
+              position={slashState.position}
+              title={slashState.type === 'wiki' ? 'Wiki Links' : 'Slash Commands'}
+              onSelect={(command) => {
+                if (slashState.type === 'wiki') {
+                  replaceRange(editorViewRef.current, slashState.from, slashState.to, buildPageWikiLink(command.item));
+                  closeSlashMenu();
+                  return;
+                }
+                runCommand(command, { from: slashState.from, to: slashState.to });
+              }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

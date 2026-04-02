@@ -1,74 +1,61 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+/**
+ * @fileoverview Markdown source editor용 슬래시 명령 팔레트.
+ *
+ * CodeMirror 아래에 떠서 `/query` 검색 결과를 보여주고, 방향키/Enter/마우스 선택과
+ * 같은 상호작용은 상위 Editor.jsx가 제어한다.
+ */
+import { useEffect, useRef } from 'react';
 
-const SlashCommandMenu = forwardRef(({ items, command }, ref) => {
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const containerRef = useRef(null);
-
-  useEffect(() => setSelectedIndex(0), [items]);
-
-  useImperativeHandle(ref, () => ({
-    onKeyDown: (event) => {
-      if (event.key === 'ArrowUp') {
-        setSelectedIndex(i => (i - 1 + items.length) % items.length);
-        return true;
-      }
-      if (event.key === 'ArrowDown') {
-        setSelectedIndex(i => (i + 1) % items.length);
-        return true;
-      }
-      if (event.key === 'Enter') {
-        const item = items[selectedIndex];
-        if (item) { command(item); return true; }
-      }
-      return false;
-    },
-  }));
+export default function SlashCommandMenu({
+  items,
+  selectedIndex = 0,
+  position = { top: 0, left: 0 },
+  title = 'Slash Commands',
+  onSelect,
+}) {
+  const activeItemRef = useRef(null);
 
   useEffect(() => {
-    const el = containerRef.current?.querySelector(`[data-index="${selectedIndex}"]`);
-    el?.scrollIntoView({ block: 'nearest' });
+    activeItemRef.current?.scrollIntoView({ block: 'nearest' });
   }, [selectedIndex]);
 
-  if (!items.length) return null;
+  if (!items?.length) return null;
 
   return (
     <div
-      ref={containerRef}
-      className="
-        z-50 w-64 max-h-72 overflow-y-auto
-        bg-white dark:bg-bg-elevated
-        border border-gray-200 dark:border-border-subtle
-        rounded-xl shadow-xl py-1
-      "
+      className="absolute z-30 w-72 max-h-80 overflow-y-auto rounded-2xl border border-gray-200 bg-white/95 p-1 shadow-2xl backdrop-blur dark:border-border-subtle dark:bg-bg-elevated/95"
+      style={{ top: position.top, left: position.left }}
     >
+      <div className="px-3 pb-2 pt-2 text-[10px] font-black uppercase tracking-[0.25em] text-gray-400 dark:text-text-tertiary">
+        {title}
+      </div>
       {items.map((item, index) => (
         <button
-          key={item.title}
-          data-index={index}
+          key={item.id}
           type="button"
-          onClick={() => command(item)}
-          className={`
-            w-full flex items-center gap-3 px-3 py-2 text-left transition-colors
-            ${index === selectedIndex
-              ? 'bg-gray-100 dark:bg-bg-hover text-gray-900 dark:text-text-primary'
-              : 'text-gray-700 dark:text-text-secondary hover:bg-gray-50 dark:hover:bg-bg-hover'
-            }
-          `}
+          data-active={index === selectedIndex}
+          ref={index === selectedIndex ? activeItemRef : null}
+          onMouseDown={(event) => {
+            event.preventDefault();
+            onSelect?.(item);
+          }}
+          className={`flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
+            index === selectedIndex
+              ? 'bg-gray-100 text-gray-900 dark:bg-bg-hover dark:text-text-primary'
+              : 'text-gray-600 hover:bg-gray-50 dark:text-text-secondary dark:hover:bg-bg-hover'
+          }`}
         >
-          <span className="w-8 h-8 flex items-center justify-center text-sm bg-gray-100 dark:bg-bg-hover rounded-lg flex-shrink-0 font-mono font-bold text-gray-600 dark:text-text-secondary">
-            {item.icon}
+          <span className="mt-0.5 inline-flex min-w-0 rounded-md bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] font-black uppercase tracking-wider text-gray-500 dark:bg-[#17191d] dark:text-text-tertiary">
+            /{item.id}
           </span>
-          <div>
-            <div className="text-sm font-medium leading-tight">{item.title}</div>
-            {item.description && (
-              <div className="text-xs text-gray-400 dark:text-text-tertiary mt-0.5">{item.description}</div>
-            )}
-          </div>
+          <span className="min-w-0">
+            <span className="block text-sm font-bold">{item.label}</span>
+            <span className="mt-0.5 block text-xs text-gray-400 dark:text-text-tertiary">
+              {item.description || item.keywords?.join(' · ')}
+            </span>
+          </span>
         </button>
       ))}
     </div>
   );
-});
-
-SlashCommandMenu.displayName = 'SlashCommandMenu';
-export default SlashCommandMenu;
+}

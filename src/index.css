@@ -327,6 +327,247 @@ input:focus, textarea:focus {
   @apply dark:border-border-subtle;
 }
 
+.markdown-preview details[data-toggle-preview] {
+  margin: 0.75rem 0;
+  border: 1px solid rgba(229, 231, 235, 1);
+  border-radius: 1rem;
+  background: rgba(249, 250, 251, 0.85);
+  overflow: hidden;
+}
+
+.dark .markdown-preview details[data-toggle-preview] {
+  border-color: rgba(55, 65, 81, 1);
+  background: rgba(33, 33, 33, 0.75);
+}
+
+.markdown-preview details[data-toggle-preview] > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 0.85rem 1rem;
+  font-weight: 700;
+}
+
+.markdown-preview details[data-toggle-preview] > summary::-webkit-details-marker {
+  display: none;
+}
+
+.markdown-preview details[data-toggle-preview] > :not(summary) {
+  padding: 0 1rem 1rem 2rem;
+}
+
+.markdown-preview details[data-toggle-preview][data-variant="note"] {
+  border-color: rgba(59, 130, 246, 0.2);
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.dark .markdown-preview details[data-toggle-preview][data-variant="note"] {
+  border-color: rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.14);
+}
+
+.markdown-preview details[data-toggle-preview][data-variant="h1"] > summary {
+  font-size: 1.25rem;
+  letter-spacing: -0.03em;
+}
+
+.markdown-preview details[data-toggle-preview][data-variant="h2"] > summary {
+  font-size: 1.1rem;
+}
+
+.markdown-preview details[data-toggle-preview][data-variant="h3"] > summary {
+  font-size: 1rem;
+}
+
+.markdown-preview .wiki-link {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 700;
+  background: rgba(37, 99, 235, 0.08);
+  border-radius: 0.5rem;
+  padding: 0.1rem 0.35rem;
+}
+
+.dark .markdown-preview .wiki-link {
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.cm-editor {
+  height: 100%;
+  font-size: 0.95rem;
+}
+
+.cm-live-preview-shell .cm-editor {
+  font-size: 1rem;
+  background: transparent;
+}
+
+.cm-scroller {
+  font-family: var(--font-mono);
+  line-height: 1.65;
+}
+
+.cm-live-preview-shell .cm-scroller {
+  font-family: var(--font-sans);
+  line-height: 1.55;
+  padding: 0;
+}
+
+.cm-live-preview-shell .cm-gutters {
+  display: none;
+}
+
+.cm-live-preview-shell .cm-content {
+  padding: 0;
+}
+
+.cm-live-preview-shell .cm-line {
+  padding: 0.08rem 0;
+}
+
+.cm-live-preview-shell .cm-activeLine,
+.cm-live-active-line {
+  background: transparent !important;
+  border-left: 2px solid rgba(96, 165, 250, 0.78);
+  margin-left: -10px;
+  padding-left: 8px !important;
+  border-radius: 0.25rem;
+  box-shadow: none;
+}
+
+.cm-live-preview-shell .cm-cursor {
+  border-left-color: #93c5fd;
+}
+
+.cm-tooltip-autocomplete {
+  display: none;
+}
+
+.cm-live-hidden {
+  display: inline-block;
+  width: 0;
+  overflow: hidden;
+}
+
+.cm-live-heading {
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #f5f2eb;
+}
+
+.cm-live-heading-1 {
+  font-size: 2.15rem;
+  line-height: 1.04;
+}
+
+.cm-live-heading-2 {
+  font-size: 1.6rem;
+  line-height: 1.12;
+}
+
+.cm-live-heading-3 {
+  font-size: 1.25rem;
+  line-height: 1.18;
+}
+
+.cm-live-quote-line {
+  border-left: 3px solid rgba(96, 165, 250, 0.35);
+  padding-left: 0.65rem;
+  color: #cfc7ba;
+  font-style: italic;
+}
+
+.cm-live-toggle-line {
+  font-weight: 700;
+}
+
+.cm-live-toggle-prefix,
+.cm-live-task-prefix,
+.cm-live-bullet-prefix,
+.cm-live-ordered-prefix,
+.cm-live-wiki-link {
+  color: #93c5fd;
+  font-weight: 700;
+}
+
+.cm-live-wiki-link {
+  background: rgba(59, 130, 246, 0.12);
+  border-radius: 0.5rem;
+  padding: 0.08rem 0.35rem;
+}
+
+.cm-live-task-line {
+  color: var(--color-text-primary);
+}
+
+.cm-live-task-done {
+  color: var(--color-text-secondary);
+  text-decoration: line-through;
+}
+
+.cm-live-strong {
+  font-weight: 800;
+  color: #f5f2eb;
+}
+
+.cm-live-emphasis {
+  font-style: italic;
+  color: #efe6d8;
+}
+
+.cm-live-inline-code {
+  border-radius: 0.45rem;
+  background: rgba(148, 163, 184, 0.14);
+  color: #f8d58a;
+  padding: 0.08rem 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+.cm-table-active-cell {
+  border-radius: 0.35rem;
+  background: rgba(96, 165, 250, 0.16);
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.28) inset;
+}
+
+.cm-live-table-widget {
+  margin: 0.35rem 0 0.55rem;
+}
+
+.cm-table-widget-shell {
+  position: relative;
+}
+
+.cm-live-table-widget table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.cm-live-table-widget th,
+.cm-live-table-widget td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.7rem 0.85rem;
+  text-align: left;
+}
+
+.cm-live-table-widget th {
+  font-weight: 800;
+  color: #f5f2eb;
+}
+
+.cm-live-table-widget td {
+  color: #d6d0c7;
+}
+
+.cm-live-blockquote-widget,
+.cm-live-codeblock-widget,
+.cm-live-hr-widget {
+  margin: 0.3rem 0 0.55rem;
+}
+
 /* ── TaskList (체크리스트) ── */
 .tiptap-content ul[data-type="taskList"] {
   list-style: none;
@@ -420,6 +661,62 @@ input:focus, textarea:focus {
 .tiptap-content .tiptap > [data-callout]:hover,
 .tiptap-content .tiptap > [data-toggle]:hover {
   background-color: transparent;
+}
+
+/* ── Toggle ── */
+.tiptap-content .toggle-node-content > :first-child {
+  margin: 0;
+  min-height: 1.75rem;
+  padding: 0.125rem 0;
+  font-weight: 600;
+  color: #2f3437;
+}
+
+.dark .tiptap-content .toggle-node-content > :first-child {
+  color: var(--color-text-primary);
+}
+
+.tiptap-content .toggle-node[data-variant="h1"] .toggle-node-content > :first-child {
+  font-size: 1.5rem;
+  line-height: 1.3;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.tiptap-content .toggle-node[data-variant="h2"] .toggle-node-content > :first-child {
+  font-size: 1.25rem;
+  line-height: 1.35;
+  font-weight: 700;
+}
+
+.tiptap-content .toggle-node[data-variant="h3"] .toggle-node-content > :first-child {
+  font-size: 1.1rem;
+  line-height: 1.4;
+  font-weight: 700;
+}
+
+.tiptap-content .toggle-node[data-variant="note"] > div {
+  background: rgba(59, 130, 246, 0.06);
+  border-color: rgba(59, 130, 246, 0.18);
+}
+
+.dark .tiptap-content .toggle-node[data-variant="note"] > div {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.tiptap-content .toggle-node-content > :not(:first-child) {
+  margin-left: 0.35rem;
+  padding-left: 1rem;
+  border-left: 1px solid rgba(55, 53, 47, 0.12);
+}
+
+.dark .tiptap-content .toggle-node-content > :not(:first-child) {
+  border-left-color: rgba(255, 255, 255, 0.08);
+}
+
+.tiptap-content .toggle-node[data-open="false"] .toggle-node-content > :not(:first-child) {
+  display: none;
 }
 
 /* ── Tiptap Global Drag Handle ── */
