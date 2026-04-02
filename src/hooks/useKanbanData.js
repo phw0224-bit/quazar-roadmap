@@ -300,8 +300,8 @@ export const useKanbanData = () => {
     await API.movePhase(phaseId, targetIndex);
   };
 
-  const addItem = async (phaseId, title, content) => {
-    const newItem = await API.addItem(phaseId, title, content);
+  const addItem = async (phaseId, title, content, createdBy = null) => {
+    const newItem = await API.addItem(phaseId, title, content, createdBy);
     dispatch({ type: 'ADD_ITEM', payload: { phaseId, item: newItem } });
   };
 

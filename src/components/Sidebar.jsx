@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronRight, LayoutGrid, Clock, Users, PanelLeft, MousePointer2 } from 'lucide-react';
+import { ChevronRight, LayoutGrid, Clock, Users, PanelLeft, MousePointer2, Ellipsis, BellDot } from 'lucide-react';
 import { 
   DndContext, 
   PointerSensor, 
@@ -29,6 +29,7 @@ export default function Sidebar({
   onOpenItem,
   onAddChildPage,
   onShowPrompt,
+  onShowReleaseNotes,
   isReadOnly,
   hoverMode,
   onHoverModeToggle,
@@ -42,6 +43,7 @@ export default function Sidebar({
       return new Set();
     }
   });
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -52,6 +54,17 @@ export default function Sidebar({
   useEffect(() => {
     localStorage.setItem('sidebar-expanded', JSON.stringify([...expandedIds]));
   }, [expandedIds]);
+
+  useEffect(() => {
+    if (!showMoreMenu) return;
+
+    const handleWindowClick = () => {
+      setShowMoreMenu(false);
+    };
+
+    window.addEventListener('click', handleWindowClick);
+    return () => window.removeEventListener('click', handleWindowClick);
+  }, [showMoreMenu]);
 
   const pageTree = usePageTree(phases, sections);
 
@@ -156,17 +169,56 @@ export default function Sidebar({
             </span>
           </div>
 
-          {/* Hover mode toggle button */}
-          <button
-            className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-md
-              text-[color:var(--color-text-tertiary)] hover:text-[color:var(--color-text-primary)]
-              hover:bg-[color:var(--color-bg-hover)] transition-colors duration-100 cursor-pointer"
-            onClick={onHoverModeToggle}
-            onPointerDown={stopProp}
-            title={hoverMode ? '클릭 모드로 전환' : '호버 모드로 전환'}
-          >
-            {hoverMode ? <PanelLeft size={14} strokeWidth={2} /> : <MousePointer2 size={14} strokeWidth={2} />}
-          </button>
+          <div className="relative flex items-center">
+            <button
+              className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-md
+                text-[color:var(--color-text-tertiary)] hover:text-[color:var(--color-text-primary)]
+                hover:bg-[color:var(--color-bg-hover)] transition-colors duration-100 cursor-pointer"
+              onClick={(e) => {
+                stopProp(e);
+                setShowMoreMenu((prev) => !prev);
+              }}
+              onPointerDown={stopProp}
+              title="더보기"
+            >
+              <Ellipsis size={15} strokeWidth={2} />
+            </button>
+
+            {showMoreMenu && (
+              <div
+                className="absolute right-0 top-9 z-30 min-w-40 rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-bg-base)] p-1 shadow-xl"
+                onClick={stopProp}
+                onPointerDown={stopProp}
+              >
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] font-medium text-[color:var(--color-text-secondary)] hover:bg-[color:var(--color-bg-hover)] hover:text-[color:var(--color-text-primary)] transition-colors cursor-pointer"
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    onShowReleaseNotes?.();
+                  }}
+                >
+                  <BellDot size={14} strokeWidth={1.9} className="flex-shrink-0" />
+                  <span>업데이트 내역</span>
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] font-medium text-[color:var(--color-text-secondary)] hover:bg-[color:var(--color-bg-hover)] hover:text-[color:var(--color-text-primary)] transition-colors cursor-pointer"
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    onHoverModeToggle?.();
+                  }}
+                >
+                  {hoverMode ? (
+                    <PanelLeft size={14} strokeWidth={1.9} className="flex-shrink-0" />
+                  ) : (
+                    <MousePointer2 size={14} strokeWidth={1.9} className="flex-shrink-0" />
+                  )}
+                  <span>{hoverMode ? '클릭 모드로 전환' : '호버 모드로 전환'}</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Fixed nav items */}

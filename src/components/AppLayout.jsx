@@ -11,6 +11,7 @@ export default function AppLayout({
   onOpenItem,
   onAddChildPage,
   onShowPrompt,
+  onShowReleaseNotes,
   isReadOnly,
   children,
 }) {
@@ -24,7 +25,7 @@ export default function AppLayout({
 
   const sidebarProps = {
     sections, phases, activeView, activeItemId,
-    onNavigate, onOpenItem, onAddChildPage, onShowPrompt, isReadOnly,
+    onNavigate, onOpenItem, onAddChildPage, onShowPrompt, onShowReleaseNotes, isReadOnly,
     hoverMode,
     onHoverModeToggle: handleHoverModeToggle,
   };

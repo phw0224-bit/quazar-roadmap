@@ -11,7 +11,7 @@
  * DnD 타입 판별: activeId prefix ('section-', phase vs item)
  * localStorage: expandedSections Set, isMainBoardCollapsed boolean
  */
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { useTheme } from 'next-themes';
 import { Moon, Sun, Search, PanelLeft, CheckCircle2, ChevronRight, ChevronDown } from 'lucide-react';
 import {
@@ -36,21 +36,32 @@ import { useLayoutState } from '../hooks/useLayoutState';
 import API from '../api/kanbanAPI';
 import ProjectColumn from './ProjectColumn';
 import KanbanCard from './KanbanCard';
-import ItemDetailPanel from './ItemDetailPanel';
-import PeopleBoard from './PeopleBoard';
 import BoardSection from './BoardSection';
-import TimelineView from './TimelineView';
 import { TEAMS, GLOBAL_TAGS } from '../lib/constants';
 import FilterBar from './FilterBar';
-import SearchModal from './SearchModal';
 import AppLayout from './AppLayout';
 import { useFilterState, applyFilterSort } from '../hooks/useFilterState';
 
 import { Toast, ConfirmModal, InputModal } from './UI/Feedback';
 
 const DISPLAY_BOARDS = ['main', '개발팀', 'AI팀', '지원팀'];
+const ItemDetailPanel = lazy(() => import('./ItemDetailPanel'));
+const PeopleBoard = lazy(() => import('./PeopleBoard'));
+const TimelineView = lazy(() => import('./TimelineView'));
+const SearchModal = lazy(() => import('./SearchModal'));
 
-export default function KanbanBoard({ onShowLogin }) {
+function ViewLoadingFallback({ label, fullHeight = true }) {
+  return (
+    <div className={`flex items-center justify-center ${fullHeight ? 'min-h-[40vh]' : 'h-full'} px-6`}>
+      <div className="flex items-center gap-3 rounded-2xl border border-gray-100 dark:border-border-subtle bg-white/80 dark:bg-bg-elevated/80 px-4 py-3 text-sm font-semibold text-gray-500 dark:text-text-secondary shadow-sm">
+        <div className="h-4 w-4 rounded-full border-2 border-gray-200 dark:border-border-subtle border-t-gray-500 dark:border-t-text-secondary animate-spin" />
+        <span>{label}</span>
+      </div>
+    </div>
+  );
+}
+
+export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   const { toggleSidebar } = useLayoutState();
   const {
     phases, sections, loading, addPhase, addItem, updateItem, deleteItem,
@@ -348,10 +359,11 @@ export default function KanbanBoard({ onShowLogin }) {
         description: projectPhase.description || '',
         status: 'none',
         page_type: 'project',
-        assignees: [],
+        assignees: projectPhase.assignees || [],
         teams: [],
         tags: [],
         related_items: [],
+        creator_profile: null,
       };
       detailPhase = projectPhase;
     }
@@ -361,8 +373,8 @@ export default function KanbanBoard({ onShowLogin }) {
     if (detailItem?.page_type === 'project') {
       try {
         await updatePhase(itemId, updates);
-      } catch (err) {
-        onShowToast?.('프로젝트 속성 업데이트 실패 (DB 마이그레이션 필요)');
+      } catch {
+        showToast('프로젝트 속성 업데이트 실패 (DB 마이그레이션 필요)', 'error');
       }
       return;
     }
@@ -403,6 +415,7 @@ export default function KanbanBoard({ onShowLogin }) {
       onOpenItem={(itemId) => setUrlState({ itemId })}
       onAddChildPage={addChildPage}
       onShowPrompt={showPrompt}
+      onShowReleaseNotes={onShowReleaseNotes}
       isReadOnly={!user}
     >
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -515,14 +528,16 @@ export default function KanbanBoard({ onShowLogin }) {
 
           {/* Board Scroll Area */}
           {activeView === 'timeline' ? (
-            <TimelineView
-              phases={filteredPhases.filter(p => (p.board_type || 'main') !== 'main')}
-              sections={sections.filter(s => (s.board_type || 'main') !== 'main')}
-              onUpdateItem={updateItem}
-              onOpenDetail={(itemId) => setUrlState({ itemId })}
-              isReadOnly={!user}
-              showToast={showToast}
-            />
+            <Suspense fallback={<ViewLoadingFallback label="타임라인 준비 중..." />}>
+              <TimelineView
+                phases={filteredPhases.filter(p => (p.board_type || 'main') !== 'main')}
+                sections={sections.filter(s => (s.board_type || 'main') !== 'main')}
+                onUpdateItem={updateItem}
+                onOpenDetail={(itemId) => setUrlState({ itemId })}
+                isReadOnly={!user}
+                showToast={showToast}
+              />
+            </Suspense>
           ) : activeView === 'board' ? (
             <div
               className={`flex-1 overflow-x-auto overflow-y-auto pt-10 pb-10 pl-10 custom-scrollbar bg-white dark:bg-bg-base transition-all duration-300 ease-notion flex flex-col gap-20 ${detailItemId && !isDetailFullscreen ? 'pr-4' : 'pr-10'}`}
@@ -619,6 +634,7 @@ export default function KanbanBoard({ onShowLogin }) {
                       onCompletePhase: completePhase,
                       onOpenDetail: (itemId) => setUrlState({ itemId }),
                       onShowConfirm: showConfirm, onShowToast: showToast,
+                      currentUserId: user?.id || null,
                       isReadOnly: !user,
                     };
 
@@ -739,13 +755,15 @@ export default function KanbanBoard({ onShowLogin }) {
             
             </div>
           ) : (
-            <PeopleBoard
-              teams={peopleTeams}
-              loading={peopleLoading}
-              error={peopleError}
-              onOpenItem={(itemId) => setUrlState({ itemId })}
-              projectAssignees={phases.reduce((acc, p) => { acc[p.title] = p.assignees || []; return acc; }, {})}
-            />
+            <Suspense fallback={<ViewLoadingFallback label="인원관리 화면 준비 중..." />}>
+              <PeopleBoard
+                teams={peopleTeams}
+                loading={peopleLoading}
+                error={peopleError}
+                onOpenItem={(itemId) => setUrlState({ itemId })}
+                projectAssignees={phases.reduce((acc, p) => { acc[p.title] = p.assignees || []; return acc; }, {})}
+              />
+            </Suspense>
           )}
         </div>
 
@@ -772,26 +790,30 @@ export default function KanbanBoard({ onShowLogin }) {
             )}
             
             <div className="flex-1 w-full h-full min-w-0 bg-white dark:bg-bg-base transition-colors duration-200">
-              <ItemDetailPanel
-                item={detailItem}
-                phase={detailPhase}
-                allItems={phases.flatMap(p => p.items || [])}
-                onClose={closeDetailPanel}
-                isFullscreen={isDetailFullscreen}
-                onToggleFullscreen={() => setUrlState({ fullscreen: !isDetailFullscreen })}
-                onBreadcrumbNavigate={handleBreadcrumbNavigate}
-                onUpdateItem={handleUpdateItem}
-                onUpdatePhase={handleUpdatePhase}
-                onAddComment={addComment}
-                onUpdateComment={updateComment}
-                onDeleteComment={deleteComment}
-                onOpenDetail={(itemId) => setUrlState({ itemId })}
-                onShowConfirm={showConfirm}
-                onShowToast={showToast}
-                onAddChildPage={addChildPage}
-                onShowPrompt={showPrompt}
-                isReadOnly={!user}
-              />
+              <Suspense fallback={<ViewLoadingFallback label="상세 정보를 불러오는 중..." fullHeight={false} />}>
+                <ItemDetailPanel
+                  item={detailItem}
+                  phase={detailPhase}
+                  allItems={phases.flatMap(p => p.items || [])}
+                  onClose={closeDetailPanel}
+                  isFullscreen={isDetailFullscreen}
+                  onToggleFullscreen={() => setUrlState({ fullscreen: !isDetailFullscreen })}
+                  onBreadcrumbNavigate={handleBreadcrumbNavigate}
+                  onUpdateItem={handleUpdateItem}
+                  onUpdatePhase={handleUpdatePhase}
+                  onDeleteItem={deleteItem}
+                  onDeletePhase={deletePhase}
+                  onAddComment={addComment}
+                  onUpdateComment={updateComment}
+                  onDeleteComment={deleteComment}
+                  onOpenDetail={(itemId) => setUrlState({ itemId })}
+                  onShowConfirm={showConfirm}
+                  onShowToast={showToast}
+                  onAddChildPage={addChildPage}
+                  onShowPrompt={showPrompt}
+                  isReadOnly={!user}
+                />
+              </Suspense>
             </div>
           </div>
         )}
@@ -814,11 +836,13 @@ export default function KanbanBoard({ onShowLogin }) {
 
         {/* 전체 검색 모달 */}
         {showSearch && (
-          <SearchModal
-            phases={phases}
-            onOpenDetail={(itemId) => setUrlState({ itemId })}
-            onClose={() => setShowSearch(false)}
-          />
+          <Suspense fallback={<ViewLoadingFallback label="검색 창 준비 중..." />}>
+            <SearchModal
+              phases={phases}
+              onOpenDetail={(itemId) => setUrlState({ itemId })}
+              onClose={() => setShowSearch(false)}
+            />
+          </Suspense>
         )}
 
         {/* Global Feedback Components */}

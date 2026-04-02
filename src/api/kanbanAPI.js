@@ -7,6 +7,7 @@
  * order_index 관리: 이동 시 영향받는 배열 전체를 재계산하여 upsert. gap 없이 0부터 연속.
  * cross-phase moveItem: source/target 두 phase 배열 모두 갱신.
  * related_items: A→B 추가 시 B→A도 자동 추가 (양방향).
+ * items.created_by는 auth.users.id를 저장하고, 조회 시 creator_profile로 표시용 이름을 붙인다.
  */
 import { supabase } from '../lib/supabase';
 
@@ -42,12 +43,20 @@ const supabaseAPI = {
 
     if (iError) throw iError;
 
+    const { data: profiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, name, department');
+
+    if (profileError) throw profileError;
+
     // 3. 섹션 가져오기
     const { data: sections, error: sError } = await supabase
       .from('sections')
       .select('*')
       .order('order_index', { ascending: true });
     if (sError) throw sError;
+
+    const profilesById = new Map((profiles || []).map((profile) => [profile.id, profile]));
 
     // 4. 트리 구조로 조립
     const formattedProjects = projects.map(project => ({
@@ -59,6 +68,7 @@ const supabaseAPI = {
         .map(item => ({
           ...item,
           related_items: Array.isArray(item.related_items) ? item.related_items : [],
+          creator_profile: item.created_by ? profilesById.get(item.created_by) || null : null,
           comments: (item.comments || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
         }))
     }));
@@ -245,7 +255,7 @@ const supabaseAPI = {
     if (errors.length > 0) throw errors[0].error;
   },
 
-  addItem: async (phaseId, title, content = '') => {
+  addItem: async (phaseId, title, content = '', createdBy = null) => {
     const { data: existingItems } = await supabase.from('items').select('order_index').eq('project_id', phaseId).order('order_index', { ascending: false }).limit(1);
     const nextOrder = existingItems?.[0] ? existingItems[0].order_index + 1 : 0;
 
@@ -257,6 +267,7 @@ const supabaseAPI = {
         content,
         order_index: nextOrder,
         status: 'none',
+        created_by: createdBy,
         teams: [],
         assignees: [],
         tags: [],

@@ -1,3 +1,11 @@
+/**
+ * @fileoverview 사이드바 열림/닫힘과 hover 모드의 전역 UI 상태 저장소.
+ *
+ * AppLayout과 KanbanBoard가 같은 레이아웃 상태를 공유할 수 있도록 Context로 노출한다.
+ * `sidebar-open`, `sidebar-hover-mode`를 localStorage에 저장해 새로고침 후에도 유지한다.
+ *
+ * @returns {{ isOpen, setIsOpen, toggleSidebar, hoverMode, setHoverMode, toggleHoverMode }}
+ */
 import { createContext, useContext, useState, useEffect } from 'react';
 
 const LayoutContext = createContext(null);

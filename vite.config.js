@@ -14,6 +14,52 @@ export default defineConfig({
   optimizeDeps: {
     include: ['react', 'react-dom'],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+            return 'react-vendor';
+          }
+
+          if (id.includes('node_modules/@tiptap/')) {
+            return 'tiptap-vendor';
+          }
+
+          if (id.includes('node_modules/prosemirror-')) {
+            return 'prosemirror-vendor';
+          }
+
+          if (
+            id.includes('node_modules/lowlight/') ||
+            id.includes('node_modules/highlight.js/')
+          ) {
+            return 'syntax-vendor';
+          }
+
+          if (
+            id.includes('node_modules/tippy.js/') ||
+            id.includes('node_modules/@floating-ui/')
+          ) {
+            return 'floating-vendor';
+          }
+
+          if (
+            id.includes('node_modules/react-pdf/') ||
+            id.includes('node_modules/pdfjs-dist/')
+          ) {
+            return 'pdf-vendor';
+          }
+
+          if (id.includes('node_modules/@supabase/')) {
+            return 'supabase-vendor';
+          }
+        },
+      },
+    },
+  },
   server: {
     port: 1234,
     strictPort: true,
