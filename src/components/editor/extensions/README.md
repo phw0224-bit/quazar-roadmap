@@ -1,43 +1,24 @@
 # components/editor/extensions/
 
-> Tiptap 커스텀 확장 5개. 각각 독립적인 블록 타입을 구현.
+> 구 Tiptap 상세내용 경로의 커스텀 확장 보관소. 현재 상세내용 주 경로는 CodeMirror Markdown editor이므로 이 폴더는 레거시 호환 맥락에서만 의미가 있다.
 
 ## 책임
-- 노션 스타일 커스텀 블록 구현 (Callout, Toggle)
-- 리사이즈 가능한 이미지 노드 (ResizableImage)
-- 페이지 간 링크 노드 (PageLink)
-- 슬래시 커맨드 Tiptap 확장 (SlashCommand)
+- 이전 Tiptap 기반 description 편집기의 커스텀 노드/확장 보존
+- legacy HTML 구조를 이해할 때 참고할 스키마 제공
+- 완전 제거 전까지 다른 미확인 경로가 의존할 가능성 방어
 
 ## 주요 파일
 
 | 파일 | 역할 |
 |------|------|
-| `SlashCommand.js` | `/` 입력 시 커맨드 팔레트 트리거. `@tiptap/suggestion` 기반. 12개 블록 타입 지원 |
-| `Callout.jsx` | 강조 박스 노드. 타입(tip/warning/danger/info)에 따라 색상/이모지 변경 |
-| `Toggle.jsx` | 접기/펼치기 블록. 클릭으로 content 영역 toggle |
-| `PageLink.jsx` | 다른 item을 링크하는 인라인 노드. `id`, `title` attribute 저장. 클릭 시 onOpenDetail 호출 |
-| `ResizableImage.jsx` | Tiptap Image 확장. width attribute + 드래그 리사이즈 핸들 추가 |
+| `Toggle.jsx` | 이전 노션형 토글 컨테이너 구현 |
+| `Callout.jsx` | 이전 callout 블록 노드 |
+| `PageLink.jsx` | 이전 inline 페이지 링크 노드 |
+| `ResizableImage.jsx` | 이전 이미지 리사이즈 노드 |
+| `SlashCommand.js` | 이전 Tiptap suggestion 기반 슬래시 커맨드 |
 
 ## 패턴 & 규칙
 
-**SlashCommand 동작:**
-
-```
-사용자 `/` 입력
-  → suggestion.items() 로 필터링된 커맨드 목록 반환
-  → ReactRenderer로 SlashCommandMenu 마운트
-  → 선택 시 command.action(editor) 실행
-  → PageLink 커맨드는 onAddChildPage 콜백이 있을 때만 노출
-```
-
-**새 확장 추가 시:** `Editor.jsx`의 `extensions` 배열에 import 후 추가.
-SlashCommand에 블록 타입 지원 추가 시 `defaultCommands` 배열에 항목 추가.
-
-**Callout 타입:**
-
-```javascript
-{ type: 'tip',     emoji: '💡', bg: 'bg-yellow-50 dark:bg-yellow-900/20' }
-{ type: 'warning', emoji: '⚠️', bg: 'bg-orange-50 dark:bg-orange-900/20' }
-{ type: 'danger',  emoji: '❌', bg: 'bg-red-50    dark:bg-red-900/20'    }
-{ type: 'info',    emoji: 'ℹ️', bg: 'bg-blue-50   dark:bg-blue-900/20'   }
-```
+- 새 description 기능은 이 폴더에 추가하지 않는다.
+- 현재 상세내용 편집 확장은 `src/components/editor/Editor.jsx`와 `src/components/editor/utils/editorCommands.js`에서 Markdown 스니펫으로 처리한다.
+- 이 폴더 파일을 수정해야 할 때는 “legacy import/호환 유지” 목적이 명확할 때만 수정한다.

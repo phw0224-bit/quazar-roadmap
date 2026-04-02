@@ -3,7 +3,7 @@
  *
  * 담당:
  * - 제목/부제목/담당자/팀/태그/상태/우선순위/날짜 인라인 편집
- * - Tiptap 에디터 (description HTML)
+ * - 옵시디언형 Markdown live/source/view 편집 (description Markdown 원본)
  * - AI 요약 생성 + [N] 인용 → 에디터 블록 스크롤
  * - 관계 아이템 검색/추가/제거
  * - 자식 페이지 목록 + 생성 (속성 상속 대응)
@@ -12,18 +12,16 @@
  * - 댓글 목록 (CommentSection)
  * - 브레드크럼 네비게이션 (parent_item_id 체인 추적)
  */
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   ChevronsRight, Maximize2, Minimize2, ChevronRight, CheckCircle2,
-  Clock, Users, Building2, Tag, Link2, FileText, Plus, X,
+  Clock, Users, Building2, Tag, Link2, Plus, X,
   MessageSquare, Search, ArrowUpRight, AlignCenter, AlignJustify,
-  Sparkles, RefreshCw, Calendar, Flag, LayoutList
+  Calendar, Flag, LayoutList
 } from 'lucide-react';
 import CommentSection from './CommentSection';
-import TiptapEditor from './editor/Editor';
+import ItemDescriptionSection from './ItemDescriptionSection';
 import { TEAMS, STATUS_MAP, PRIORITY_MAP } from '../lib/constants';
-import { summarizeContent } from '../api/summarizeAPI';
-import SearchModal from './SearchModal';
 
 function ItemDetailPanel({
   item, phase, allItems = [], onClose, onUpdateItem, onUpdatePhase, isReadOnly,
@@ -35,7 +33,6 @@ function ItemDetailPanel({
   onShowPrompt,
 }) {
   const stopProp = (e) => e.stopPropagation();
-  const [description, setDescription] = useState(item?.description || '');
   const [isEditingAssignees, setIsEditingAssignees] = useState(false);
   const [assigneeInput, setAssigneeInput] = useState((item?.assignees || []).join(', '));
   const [isEditingTags, setIsEditingTags] = useState(false);
@@ -46,70 +43,15 @@ function ItemDetailPanel({
   const [titleInput, setTitleInput] = useState(item?.title || item?.content || '');
   const [isWideView, setIsWideView] = useState(false);
 
-  // 기존 페이지 연결 모달 관련 상태
-  const [showLinkModal, setShowLinkModal] = useState(false);
-  const linkCallbackRef = useRef(null);
-
-  const handleLinkExistingPage = useCallback((callback) => {
-    linkCallbackRef.current = callback;
-    setShowLinkModal(true);
-  }, []);
-
-  const handleLinkSelect = async (itemId) => {
-    const itemToLink = allItems.find(i => i.id === itemId);
-    if (itemToLink) {
-      linkCallbackRef.current?.(itemToLink);
-      
-      const currentRelations = item.related_items || [];
-      if (!currentRelations.includes(itemId) && item.id !== itemId) {
-        await onUpdateItem(phase.id, item.id, { related_items: [...currentRelations, itemId] });
-        onShowToast?.('연관 업무가 추가되었습니다.');
-      }
-    } else {
-      linkCallbackRef.current?.(null);
-    }
-    setShowLinkModal(false);
-    linkCallbackRef.current = null;
-  };
-
-  // AI 요약 관련 state
-  const [aiSummary, setAiSummary] = useState(item?.ai_summary || null);
-  const [isSummarizing, setIsSummarizing] = useState(false);
-  const [summaryError, setSummaryError] = useState(null);
-
-  // 본문 DOM 참조 (citation 클릭 시 해당 블록으로 스크롤)
-  const descriptionRef = useRef(null);
-
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
-    setDescription(item?.description || '');
     setAssigneeInput((item?.assignees || []).join(', '));
     setTitleInput(item?.title || item?.content || '');
     setIsEditingRelations(false);
     setRelationSearchQuery('');
     setIsEditingTitle(false);
-    // 아이템이 바뀌면 저장된 요약 불러오기
-    setAiSummary(item?.ai_summary || null);
-    setSummaryError(null);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [item]);
-
-  // description 블록에 id 부여 (citation 스크롤용)
-  useEffect(() => {
-    if (!descriptionRef.current) return;
-    const blocks = descriptionRef.current.querySelectorAll('h1, h2, h3, h4, p, li');
-    blocks.forEach((block, i) => {
-      block.id = `ai-block-${i + 1}`;
-    });
-  }, [description]);
-
-  const handleDescriptionBlur = async () => {
-    if (description !== (item.description || '')) {
-      await onUpdateItem(phase.id, item.id, { description });
-    }
-  };
-
-
 
   const handleSaveAssignees = async () => {
     const updated = assigneeInput.split(',').map(s => s.trim()).filter(s => s !== '');
@@ -171,52 +113,6 @@ function ItemDetailPanel({
       onShowToast?.('연관 업무 저장에 실패했습니다.');
     }
   };
-
-  // ─── AI 요약 ──────────────────────────────────────────────────────────────
-
-  // 요약 결과의 [N] 텍스트를 클릭 가능한 인용 배지로 변환
-  const renderWithCitations = (text) => {
-    const parts = text.split(/(\[\d+\])/g);
-    return parts.map((part, i) => {
-      const match = part.match(/^\[(\d+)\]$/);
-      if (match) {
-        const n = parseInt(match[1]);
-        return (
-          <button
-            key={i}
-            onClick={() => {
-              const el = document.getElementById(`ai-block-${n}`);
-              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }}
-            title={`본문 [${n}] 섹션으로 이동`}
-            className="inline-flex items-center justify-center w-5 h-5 mx-0.5 text-[10px] font-black bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 rounded-full border border-violet-200 dark:border-violet-700 hover:bg-violet-200 dark:hover:bg-violet-800/50 cursor-pointer transition-colors align-middle"
-          >
-            {n}
-          </button>
-        );
-      }
-      return <span key={i}>{part}</span>;
-    });
-  };
-
-  const handleSummarize = async () => {
-    if (!description || isSummarizing) return;
-    setIsSummarizing(true);
-    setSummaryError(null);
-    try {
-      const result = await summarizeContent(description);
-      setAiSummary(result);
-      // 요약 결과를 item에 저장 (페이지 새로고침 후에도 유지)
-      await onUpdateItem(phase.id, item.id, { ai_summary: result });
-      onShowToast?.('AI 요약이 완료되었습니다.');
-    } catch (err) {
-      setSummaryError(err.message);
-    } finally {
-      setIsSummarizing(false);
-    }
-  };
-
-  // ──────────────────────────────────────────────────────────────────────────
 
   const boardType = (phase?.board_type || 'main').toLowerCase();
   const boardLabel = boardType === 'main' ? '전체 보드' : `${phase?.board_type || '팀'} 보드`;
@@ -653,105 +549,17 @@ function ItemDetailPanel({
           </div>
 
           {/* Description Section */}
-          <div className="flex flex-col gap-6">
-            <div className="flex items-center justify-between border-b border-gray-100 dark:border-border-subtle pb-4">
-              <div className="flex items-center gap-3">
-                <FileText size={18} className="text-gray-400" />
-                <h3 className="text-[13px] font-black text-gray-400 dark:text-text-tertiary uppercase tracking-[0.2em]">상세 설명 (Wiki)</h3>
-              </div>
-
-              {/* AI 요약 버튼 */}
-              {description && !isReadOnly && (
-                <button
-                  onClick={handleSummarize}
-                  disabled={isSummarizing}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black text-violet-500 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20 hover:bg-violet-100 dark:hover:bg-violet-900/30 rounded-xl transition-all cursor-pointer disabled:opacity-50 uppercase tracking-widest border border-violet-100 dark:border-violet-800/40"
-                >
-                  {isSummarizing ? (
-                    <RefreshCw size={13} className="animate-spin" />
-                  ) : (
-                    <Sparkles size={13} />
-                  )}
-                  {isSummarizing ? '요약 중...' : 'AI 요약'}
-                </button>
-              )}
-            </div>
-
-            {/* AI 요약 에러 메시지 */}
-            {summaryError && (
-              <div className="flex items-start gap-3 px-5 py-4 bg-red-50 dark:bg-red-900/20 rounded-2xl text-sm text-red-500 dark:text-red-400 font-bold border border-red-100 dark:border-red-900/30">
-                <span className="shrink-0 mt-0.5">⚠️</span>
-                <div>
-                  <p className="font-black text-[13px] mb-0.5">요약 실패</p>
-                  <p className="font-medium text-[12px] opacity-80">{summaryError}</p>
-                </div>
-              </div>
-            )}
-
-            {/* AI 요약 카드 — 본문 위에 표시 */}
-            {aiSummary && (
-              <div className="rounded-3xl border border-violet-100 dark:border-violet-900/40 bg-gradient-to-br from-violet-50/60 to-white dark:from-violet-950/20 dark:to-bg-base overflow-hidden">
-                {/* 카드 헤더 */}
-                <div className="flex items-center justify-between px-7 py-5 border-b border-violet-100 dark:border-violet-900/30">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-violet-100 dark:bg-violet-900/40 rounded-xl">
-                      <Sparkles size={15} className="text-violet-500 dark:text-violet-400" />
-                    </div>
-                    <div>
-                      <h3 className="text-[13px] font-black text-violet-700 dark:text-violet-300 uppercase tracking-[0.2em]">AI 요약</h3>
-                      <p className="text-[11px] text-violet-400 dark:text-violet-500 mt-0.5">
-                        {new Date(aiSummary.generatedAt).toLocaleString('ko-KR')} 생성
-                      </p>
-                    </div>
-                  </div>
-                  {!isReadOnly && (
-                    <button
-                      onClick={handleSummarize}
-                      disabled={isSummarizing}
-                      className="flex items-center gap-1.5 text-[11px] font-black text-violet-400 dark:text-violet-500 hover:text-violet-600 dark:hover:text-violet-300 uppercase tracking-widest cursor-pointer disabled:opacity-50 transition-colors"
-                    >
-                      <RefreshCw size={11} className={isSummarizing ? 'animate-spin' : ''} />
-                      {isSummarizing ? '요약 중...' : '다시 요약'}
-                    </button>
-                  )}
-                </div>
-                {/* 요약 포인트 목록 */}
-                <div className="px-7 py-6 flex flex-col gap-4">
-                  {aiSummary.summary.map((point, i) => (
-                    <div key={i} className="flex gap-3 items-start">
-                      <span className="shrink-0 mt-0.5 w-5 h-5 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-500 dark:text-violet-400 text-[10px] font-black flex items-center justify-center border border-violet-200 dark:border-violet-800/40">
-                        {i + 1}
-                      </span>
-                      <p className="text-sm font-medium text-gray-700 dark:text-text-secondary leading-relaxed">
-                        {renderWithCitations(point)}
-                      </p>
-                    </div>
-                  ))}
-                  <p className="text-[11px] text-violet-300 dark:text-violet-600 mt-2 font-bold">
-                    숫자 배지를 클릭하면 해당 본문 섹션으로 이동합니다.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div ref={descriptionRef}>
-              <TiptapEditor
-                key={`editor-${item.id}`}
-                content={description}
-                onChange={setDescription}
-                editable={!isReadOnly}
-                itemId={item.id}
-                onShowToast={onShowToast}
-                onBlur={handleDescriptionBlur}
-                onAddChildPage={onAddChildPage ? async (title) => {
-                  return await onAddChildPage(phase?.id, item?.id, title);
-                } : null}
-                onShowPrompt={onShowPrompt}
-                onOpenDetail={onOpenDetail}
-                onLinkExistingPage={handleLinkExistingPage}
-              />
-            </div>
-          </div>
+          <ItemDescriptionSection
+            item={item}
+            phaseId={phase.id}
+            allItems={allItems}
+            isReadOnly={isReadOnly}
+            onOpenDetail={onOpenDetail}
+            onShowToast={onShowToast}
+            onUpdateItem={onUpdateItem}
+            onAddChildPage={onAddChildPage}
+            onShowPrompt={onShowPrompt}
+          />
 
           {/* Project Items List (Only for project page_type) */}
           {item.page_type === 'project' && phase?.items && phase.items.length > 0 && (
@@ -828,17 +636,6 @@ function ItemDetailPanel({
         </div>
       </div>
 
-      {showLinkModal && (
-        <SearchModal
-          phases={[{ title: '전체 아이템', items: allItems }]}
-          onOpenDetail={handleLinkSelect}
-          onClose={() => {
-            linkCallbackRef.current?.(null);
-            setShowLinkModal(false);
-            linkCallbackRef.current = null;
-          }}
-        />
-      )}
     </div>
   );
 }
