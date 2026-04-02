@@ -4,6 +4,7 @@
 
 ## 책임
 - 팀/태그/상태/우선순위 등 비즈니스 상수 정의
+- 현재 배포용 릴리즈 노트와 마지막 확인 버전 key 관리
 - Supabase 클라이언트 단일 인스턴스 제공
 
 ## 주요 파일
@@ -11,6 +12,7 @@
 | 파일 | 역할 | 주요 의존성 |
 |------|------|------------|
 | `constants.js` | TEAMS, GLOBAL_TAGS, STATUS_MAP, PRIORITY_MAP, PROJECT_TINTS 정의 | - |
+| `releaseNotes.js` | **핵심.** 현재 릴리즈 노트 데이터와 `kanban-release-notes-last-seen` key 정의 | - |
 | `supabase.js` | `createClient(url, key)` 결과를 export. `.env` 환경변수 필요 | @supabase/supabase-js |
 
 ## 패턴 & 규칙
@@ -28,6 +30,12 @@
 
 ```javascript
 STATUS_MAP['in-progress'] // → { label: '진행 중', color: 'text-blue-500', ... }
+```
+
+**RELEASE_NOTES:** 배열 맨 앞 원소가 현재 배포 기준 릴리즈다. `App.jsx`는 `CURRENT_RELEASE_NOTE.id`와 localStorage 값을 비교해 자동 노출 여부를 결정한다.
+
+```javascript
+export const CURRENT_RELEASE_NOTE = RELEASE_NOTES[0];
 ```
 
 **환경변수:**

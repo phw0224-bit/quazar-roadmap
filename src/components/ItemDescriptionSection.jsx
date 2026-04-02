@@ -17,6 +17,7 @@ import MarkdownEditor from './editor/Editor';
 import MarkdownPreview from './editor/MarkdownPreview';
 import SearchModal from './SearchModal';
 import { summarizeContent } from '../api/summarizeAPI';
+import { getInitialDescriptionMode } from './itemDescriptionMode';
 import {
   convertMarkdownToEditorHTML,
   isLikelyHTML,
@@ -35,7 +36,10 @@ export default function ItemDescriptionSection({
   onShowPrompt,
 }) {
   const [description, setDescription] = useState(normalizeDescriptionSource(item?.description || ''));
-  const [descriptionMode, setDescriptionMode] = useState(isReadOnly ? 'preview' : 'live');
+  const [descriptionMode, setDescriptionMode] = useState(() => getInitialDescriptionMode({
+    isReadOnly,
+    description: item?.description || '',
+  }));
   const [aiSummary, setAiSummary] = useState(item?.ai_summary || null);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState(null);
@@ -45,7 +49,10 @@ export default function ItemDescriptionSection({
 
   useEffect(() => {
     setDescription(normalizeDescriptionSource(item?.description || ''));
-    setDescriptionMode(isReadOnly ? 'preview' : 'live');
+    setDescriptionMode(getInitialDescriptionMode({
+      isReadOnly,
+      description: item?.description || '',
+    }));
     setAiSummary(item?.ai_summary || null);
     setSummaryError(null);
   }, [isReadOnly, item]);

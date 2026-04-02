@@ -19,8 +19,10 @@
 | `KanbanBoard.jsx` | **최상위 오케스트레이터.** DnD 컨텍스트, 뷰 전환, 전역 모달 관리 |
 | `ItemDetailPanel.jsx` | 우측 슬라이드 패널. 에디터+메타데이터+AI요약+댓글. 가장 복잡한 컴포넌트 |
 | `ItemDescriptionSection.jsx` | ItemDetailPanel 내부의 Markdown live/source/view editor, AI 요약, 링크 모달 전담 섹션 |
+| `itemDescriptionMode.js` | 상세 설명 섹션이 본문 유무와 읽기 전용 여부에 따라 기본 모드를 정하는 규칙 |
 | `BoardSection.jsx` | 섹션 그룹 (프로젝트 컬럼들을 묶음) |
 | `ProjectColumn.jsx` | **핵심.** 칸반 컬럼 하나 (Phase). 완료 프로젝트 전환, 프로젝트 가상 페이지 진입 포함 |
+| `projectColumnMenu.js` | ProjectColumn 메뉴를 body 포털의 fixed 오버레이로 배치하는 위치 계산/스타일 규칙 |
 | `KanbanCard.jsx` | 카드 (Item). DnD sortable |
 | `TimelineView.jsx` | 간트 스타일 타임라인 뷰 |
 | `PeopleBoard.jsx` | 팀원별 업무 현황 뷰 |

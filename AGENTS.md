@@ -25,7 +25,8 @@
 ```
 Browser
   └── React 19 (Vite 8, port 5173)
-       ├── App.jsx                       ← Supabase auth 분기 (로딩/설정/보드)
+       ├── App.jsx                       ← Supabase auth 분기 + 현재 릴리즈 노트 자동 노출
+       ├── lib/releaseNotes.js           ← 릴리즈 노트 데이터 단일 소스
        ├── ReleaseNotesModal.jsx         ← 버전 기반 업데이트 내역 모달
        └── components/AppLayout.jsx      ← Sidebar + 메인 컨텐츠 레이아웃
             ├── Sidebar.jsx              ← 사이드바 (보드 뷰 + 페이지 트리 + 페이지 DnD)
@@ -34,7 +35,7 @@ Browser
                  ├── AssigneePicker                           (담당자 선택 + 직접입력 공용 UI)
                  ├── TimelineView                               (간트 뷰)
                  ├── PeopleBoard                                (팀원 뷰)
-                 ├── ItemDetailPanel                            (우측 패널, 리사이즈 가능)
+                 ├── ItemDetailPanel → ItemDescriptionSection   (우측 패널 본문/AI 요약)
                  ├── SearchModal                                (Ctrl+K)
                  ├── FilterBar
                  └── editor/Editor.jsx                          (Tiptap 본문 편집기)
@@ -202,6 +203,10 @@ profiles (
 - 현재 `Sidebar`는 `board_type !== 'main'` 보드의 페이지 트리만 렌더
 - 사이드바에서 페이지를 드래그하면 `parent_item_id`, `project_id`, `order_index`가 함께 갱신되어 중첩/이동 가능
 
+**상세 설명 기본 모드:**
+- `ItemDescriptionSection`은 읽기 전용일 때 항상 `preview`
+- 편집 가능 상태에서는 `description`에 내용이 있으면 `preview`, 비어 있으면 `live`로 시작
+
 ---
 
 ## 6. Key Flows
@@ -288,6 +293,9 @@ src/
 │   ├── ProjectColumn.jsx      칸반 컬럼 (Phase). 완료 프로젝트 토글 포함
 │   ├── KanbanCard.jsx         카드 (Item). DnD sortable
 │   ├── ItemDetailPanel.jsx    우측 슬라이드 패널 (에디터+댓글+AI요약+관계아이템)
+│   ├── ItemDescriptionSection.jsx  상세 설명 전용 섹션 (라이브/원문/미리보기, AI 요약)
+│   ├── itemDescriptionMode.js 초기 descriptionMode 결정 규칙
+│   ├── projectColumnMenu.js   프로젝트 컬럼 메뉴 포털 위치 계산/표면 규칙
 │   ├── FilterBar.jsx          필터/정렬/그룹 UI
 │   ├── SearchModal.jsx        Ctrl+K 전역 검색
 │   ├── TimelineView.jsx       간트 스타일 타임라인
@@ -331,6 +339,7 @@ src/
 │
 └── lib/
     ├── constants.js           TEAMS, GLOBAL_TAGS, STATUS_MAP, PRIORITY_MAP, PROJECT_TINTS
+    ├── releaseNotes.js        현재 릴리즈 노트 데이터 + localStorage key
     └── supabase.js            Supabase 클라이언트 초기화
 ```
 
@@ -358,12 +367,37 @@ const stopProp = (e) => e.stopPropagation();
 // 없으면 클릭 이벤트가 drag start로 인식됨
 ```
 
+**Portal 메뉴 패턴 (드래그/블러 레이어 분리):**
+
+```javascript
+{showMenu && createPortal(
+  <>
+    <button type="button" className="fixed inset-0 z-[1200] bg-transparent" />
+    <div className="fixed z-[1210] bg-white dark:bg-bg-elevated pointer-events-auto" />
+  </>,
+  document.body,
+)}
+```
+
+프로젝트 컬럼 메뉴처럼 `backdrop-blur` 헤더나 DnD 컨텍스트 위에 떠야 하는 메뉴는 헤더 내부 `absolute` 대신 body 포털의 `fixed` 오버레이로 렌더한다.
+
 **isReadOnly 패턴:**
 
 ```javascript
 {!isReadOnly && <button onClick={handleDelete}>삭제</button>}
 // 비활성화(disabled)가 아닌 렌더링 제거로 처리
 ```
+
+**상세 설명 초기 모드 규칙:**
+
+```javascript
+const mode = getInitialDescriptionMode({
+  isReadOnly,
+  description: item?.description || '',
+});
+```
+
+본문이 있는 상세페이지는 읽기 흐름을 우선해 `preview`, 빈 본문은 바로 입력할 수 있게 `live`로 시작한다.
 
 **Optimistic Update 순서:**
 

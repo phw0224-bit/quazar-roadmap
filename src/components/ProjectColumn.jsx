@@ -8,7 +8,8 @@
  *
  * 색상 테마: PROJECT_TINTS 배열에서 phaseIndex % 4 로 결정.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useDroppable } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -20,6 +21,10 @@ import { MoreHorizontal, Plus, User, Link, EyeOff, CheckCircle2 } from 'lucide-r
 import KanbanCard from './KanbanCard';
 import AssigneePicker from './AssigneePicker';
 import { PROJECT_TINTS } from '../lib/constants';
+import {
+  getProjectMenuPosition,
+  PROJECT_MENU_SURFACE_CLASS,
+} from './projectColumnMenu';
 
 function getProjectTint(projectId, projectIndex) {
   if (Number.isInteger(projectIndex)) {
@@ -45,6 +50,8 @@ export default function ProjectColumn({
   const [showMenu, setShowMenu] = useState(false);
   const [isEditingAssignees, setIsEditingAssignees] = useState(false);
   const [showAddItem, setShowAddItem] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, transformOrigin: 'top right' });
+  const menuButtonRef = useRef(null);
 
   const COLLAPSED_COUNT = 6;
   const [isExpanded, setIsExpanded] = useState(false);
@@ -90,6 +97,38 @@ export default function ProjectColumn({
     setIsEditingAssignees(false);
     setShowMenu(false);
   }, [project.id, project.title, project.assignees]);
+
+  useEffect(() => {
+    if (!showMenu) return undefined;
+
+    const updateMenuPosition = () => {
+      if (!menuButtonRef.current || typeof window === 'undefined') return;
+
+      const rect = menuButtonRef.current.getBoundingClientRect();
+      setMenuPosition(getProjectMenuPosition(rect, {
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+      }));
+    };
+
+    updateMenuPosition();
+    window.addEventListener('resize', updateMenuPosition);
+    window.addEventListener('scroll', updateMenuPosition, true);
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setShowMenu(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('resize', updateMenuPosition);
+      window.removeEventListener('scroll', updateMenuPosition, true);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showMenu]);
 
   const handleSaveAssignees = async (updated) => {
     const current = (project.assignees || []);
@@ -141,16 +180,31 @@ export default function ProjectColumn({
           <div className="relative flex items-center gap-1" onClick={stopProp} onPointerDown={stopProp}>
             <button
               type="button"
+              ref={menuButtonRef}
               className="p-1.5 rounded-lg text-gray-400 transition-all hover:bg-white/60 hover:text-gray-900 dark:text-text-tertiary dark:hover:bg-bg-hover dark:hover:text-text-primary cursor-pointer"
               title="프로젝트 메뉴"
               onClick={() => setShowMenu(prev => !prev)}
             >
               <MoreHorizontal size={15} strokeWidth={2.5} />
             </button>
-            {showMenu && (
+            {showMenu && typeof document !== 'undefined' && createPortal(
               <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-                <div className="absolute right-0 top-9 z-50 min-w-[180px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-border-subtle dark:bg-bg-elevated">
+                <button
+                  type="button"
+                  aria-label="프로젝트 메뉴 닫기"
+                  className="fixed inset-0 z-[1200] bg-transparent"
+                  onClick={() => setShowMenu(false)}
+                />
+                <div
+                  className={PROJECT_MENU_SURFACE_CLASS}
+                  style={{
+                    top: menuPosition.top,
+                    left: menuPosition.left,
+                    transformOrigin: menuPosition.transformOrigin,
+                  }}
+                  onClick={stopProp}
+                  onPointerDown={stopProp}
+                >
                   <button
                     type="button"
                     className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:text-text-secondary dark:hover:bg-bg-hover"
@@ -202,7 +256,8 @@ export default function ProjectColumn({
                     링크 복사
                   </button>
                 </div>
-              </>
+              </>,
+              document.body,
             )}
           </div>
         </div>
