@@ -22,6 +22,8 @@ import {
 import CommentSection from './CommentSection';
 import ItemDescriptionSection from './ItemDescriptionSection';
 import { TEAMS, STATUS_MAP, PRIORITY_MAP } from '../lib/constants';
+import { usePresenceContext } from '../hooks/usePresenceContext';
+import ItemViewers from './ItemViewers';
 
 function ItemDetailPanel({
   item, phase, allItems = [], onClose, onUpdateItem, onUpdatePhase, isReadOnly,
@@ -33,6 +35,7 @@ function ItemDetailPanel({
   onShowPrompt,
 }) {
   const stopProp = (e) => e.stopPropagation();
+  const { updateEditing } = usePresenceContext();
   const [isEditingAssignees, setIsEditingAssignees] = useState(false);
   const [assigneeInput, setAssigneeInput] = useState((item?.assignees || []).join(', '));
   const [isEditingTags, setIsEditingTags] = useState(false);
@@ -53,6 +56,18 @@ function ItemDetailPanel({
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [item]);
 
+
+  useEffect(() => {
+    if (isEditingTitle) {
+      updateEditing('title');
+    } else if (isEditingAssignees) {
+      updateEditing('assignees');
+    } else if (isEditingTags) {
+      updateEditing('tags');
+    } else {
+      updateEditing(null);
+    }
+  }, [isEditingTitle, isEditingAssignees, isEditingTags, updateEditing]);
   const handleSaveAssignees = async () => {
     const updated = assigneeInput.split(',').map(s => s.trim()).filter(s => s !== '');
     await onUpdateItem(phase.id, item.id, { assignees: updated });
@@ -148,6 +163,7 @@ function ItemDetailPanel({
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-bg-base relative animate-slide-in">
+      <ItemViewers itemId={item.id} />
       {/* Top Header */}
       <div className="px-8 py-4 flex justify-between items-start gap-4 bg-white/80 dark:bg-bg-base/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-border-subtle">
         <div className="flex items-start gap-4 min-w-0">
