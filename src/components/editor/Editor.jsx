@@ -279,7 +279,9 @@ export default function Editor({
   allItems = [],
   itemId,
   onShowToast,
+  onFocus,
   onBlur,
+  onEditorBlur,
   onAddChildPage,
   onShowPrompt,
   onLinkExistingPage,
@@ -748,10 +750,12 @@ export default function Editor({
           onBlur={(event) => {
             if (event.relatedTarget?.closest?.('[data-slash-menu-root]')) return;
             setIsEditorFocused(false);
+            onEditorBlur?.(event);
             onBlur?.(event);
           }}
-          onFocus={() => {
+          onFocus={(event) => {
             setIsEditorFocused(true);
+            onFocus?.(event);
           }}
         />
 

@@ -43,6 +43,7 @@ function ItemDetailPanel({
   const [isEditingRelations, setIsEditingRelations] = useState(false);
   const [relationSearchQuery, setRelationSearchQuery] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [titleInput, setTitleInput] = useState(item?.title || item?.content || '');
   const [isWideView, setIsWideView] = useState(false);
 
@@ -53,6 +54,7 @@ function ItemDetailPanel({
     setIsEditingRelations(false);
     setRelationSearchQuery('');
     setIsEditingTitle(false);
+    setIsEditingDescription(false);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [item]);
 
@@ -64,10 +66,16 @@ function ItemDetailPanel({
       updateEditing('assignees');
     } else if (isEditingTags) {
       updateEditing('tags');
+    } else if (isEditingDescription) {
+      updateEditing('description');
     } else {
       updateEditing(null);
     }
-  }, [isEditingTitle, isEditingAssignees, isEditingTags, updateEditing]);
+  }, [isEditingTitle, isEditingAssignees, isEditingTags, isEditingDescription, updateEditing]);
+
+  useEffect(() => () => {
+    updateEditing(null);
+  }, [updateEditing]);
   const handleSaveAssignees = async () => {
     const updated = assigneeInput.split(',').map(s => s.trim()).filter(s => s !== '');
     await onUpdateItem(phase.id, item.id, { assignees: updated });
@@ -163,93 +171,94 @@ function ItemDetailPanel({
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-bg-base relative animate-slide-in">
-      <ItemViewers itemId={item.id} />
       {/* Top Header */}
-      <div className="px-8 py-4 flex justify-between items-start gap-4 bg-white/80 dark:bg-bg-base/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-border-subtle">
-        <div className="flex items-start gap-4 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-bg-hover rounded-xl text-gray-400 hover:text-gray-900 dark:hover:text-text-primary transition-all duration-200 cursor-pointer">
-              <ChevronsRight size={20} strokeWidth={2.5} />
-            </button>
-            <button
-              onClick={onToggleFullscreen}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-bg-hover rounded-xl text-gray-400 hover:text-gray-900 dark:hover:text-text-primary transition-all duration-200 cursor-pointer"
-              aria-label={isFullscreen ? '창 모드로 전환' : '전체 화면으로 전환'}
-              title={isFullscreen ? '창 모드로 전환' : '전체 화면으로 전환'}
-            >
-              {isFullscreen ? <Minimize2 size={20} strokeWidth={2.5} /> : <Maximize2 size={20} strokeWidth={2.5} />}
-            </button>
-            <button
-              onClick={() => setIsWideView(v => !v)}
-              className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${isWideView ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
-              title={isWideView ? '기본 너비로 보기' : '넓게 보기'}
-            >
-              {isWideView ? <AlignCenter size={20} strokeWidth={2.5} /> : <AlignJustify size={20} strokeWidth={2.5} />}
-            </button>
-          </div>
-
-          <div className="min-w-0 flex flex-col gap-2.5">
-            <nav className="flex items-center gap-2 text-[13px] font-black uppercase tracking-widest min-w-0">
-              <button
-                onClick={() => onBreadcrumbNavigate?.('board', { boardType })}
-                className="bg-gray-100 dark:bg-bg-hover px-2.5 py-1 rounded-lg text-gray-500 dark:text-text-secondary shrink-0 hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-all border border-transparent hover:border-gray-200 dark:hover:border-border-strong"
-              >
-                📂 {boardLabel}
+      <div className="bg-white/80 dark:bg-bg-base/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-border-subtle">
+        <ItemViewers itemId={item.id} />
+        <div className="px-8 py-4 flex justify-between items-start gap-4">
+          <div className="flex items-start gap-4 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-bg-hover rounded-xl text-gray-400 hover:text-gray-900 dark:hover:text-text-primary transition-all duration-200 cursor-pointer">
+                <ChevronsRight size={20} strokeWidth={2.5} />
               </button>
-              <ChevronRight size={12} strokeWidth={3} className="text-gray-300 dark:text-text-tertiary" />
               <button
-                onClick={() => onBreadcrumbNavigate?.('project', { projectId: phase?.id, boardType })}
-                className="bg-gray-100 dark:bg-bg-hover px-2.5 py-1 rounded-lg text-gray-500 dark:text-text-secondary shrink-0 hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-all border border-transparent hover:border-gray-200 dark:hover:border-border-strong"
+                onClick={onToggleFullscreen}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-bg-hover rounded-xl text-gray-400 hover:text-gray-900 dark:hover:text-text-primary transition-all duration-200 cursor-pointer"
+                aria-label={isFullscreen ? '창 모드로 전환' : '전체 화면으로 전환'}
+                title={isFullscreen ? '창 모드로 전환' : '전체 화면으로 전환'}
               >
-                🧭 {phase?.title}
+                {isFullscreen ? <Minimize2 size={20} strokeWidth={2.5} /> : <Maximize2 size={20} strokeWidth={2.5} />}
               </button>
-              
-              {/* 계층형 부모 아이템 경로 표시 */}
-              {itemPath.map((p) => (
-                <div key={p.id} className="flex items-center gap-2 shrink-0">
-                  <ChevronRight size={12} strokeWidth={3} className="text-gray-300 dark:text-text-tertiary" />
-                  <button
-                    onClick={() => onOpenDetail?.(p.id)}
-                    className="bg-gray-100 dark:bg-bg-hover px-2.5 py-1 rounded-lg text-gray-500 dark:text-text-secondary shrink-0 hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-all border border-transparent hover:border-gray-200 dark:hover:border-border-strong"
-                  >
-                    📄 {p.title || p.content}
-                  </button>
-                </div>
-              ))}
+              <button
+                onClick={() => setIsWideView(v => !v)}
+                className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${isWideView ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
+                title={isWideView ? '기본 너비로 보기' : '넓게 보기'}
+              >
+                {isWideView ? <AlignCenter size={20} strokeWidth={2.5} /> : <AlignJustify size={20} strokeWidth={2.5} />}
+              </button>
+            </div>
 
-              <ChevronRight size={12} strokeWidth={3} className="text-gray-300 dark:text-text-tertiary" />
-              <span className="text-gray-900 dark:text-text-primary truncate font-black">{item.title || item.content}</span>
-            </nav>
+            <div className="min-w-0 flex flex-col gap-2.5">
+              <nav className="flex items-center gap-2 text-[13px] font-black uppercase tracking-widest min-w-0">
+                <button
+                  onClick={() => onBreadcrumbNavigate?.('board', { boardType })}
+                  className="bg-gray-100 dark:bg-bg-hover px-2.5 py-1 rounded-lg text-gray-500 dark:text-text-secondary shrink-0 hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-all border border-transparent hover:border-gray-200 dark:hover:border-border-strong"
+                >
+                  📂 {boardLabel}
+                </button>
+                <ChevronRight size={12} strokeWidth={3} className="text-gray-300 dark:text-text-tertiary" />
+                <button
+                  onClick={() => onBreadcrumbNavigate?.('project', { projectId: phase?.id, boardType })}
+                  className="bg-gray-100 dark:bg-bg-hover px-2.5 py-1 rounded-lg text-gray-500 dark:text-text-secondary shrink-0 hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-all border border-transparent hover:border-gray-200 dark:hover:border-border-strong"
+                >
+                  🧭 {phase?.title}
+                </button>
+                
+                {/* 계층형 부모 아이템 경로 표시 */}
+                {itemPath.map((p) => (
+                  <div key={p.id} className="flex items-center gap-2 shrink-0">
+                    <ChevronRight size={12} strokeWidth={3} className="text-gray-300 dark:text-text-tertiary" />
+                    <button
+                      onClick={() => onOpenDetail?.(p.id)}
+                      className="bg-gray-100 dark:bg-bg-hover px-2.5 py-1 rounded-lg text-gray-500 dark:text-text-secondary shrink-0 hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-all border border-transparent hover:border-gray-200 dark:hover:border-border-strong"
+                    >
+                      📄 {p.title || p.content}
+                    </button>
+                  </div>
+                ))}
 
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={`px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest shadow-sm border border-white/20 dark:border-black/10 transition-colors ${statusInfo.color}`}>
-                상태: {statusInfo.label}
-              </span>
-              <span className="px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest bg-gray-50 dark:bg-bg-hover text-gray-500 dark:text-text-secondary border border-gray-200 dark:border-border-subtle shadow-sm tabular-nums">
-                담당자 {assigneeCount}
-              </span>
-              <span className="px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest bg-gray-50 dark:bg-bg-hover text-gray-500 dark:text-text-secondary border border-gray-200 dark:border-border-subtle shadow-sm tabular-nums">
-                팀 {teamCount}
-              </span>
+                <ChevronRight size={12} strokeWidth={3} className="text-gray-300 dark:text-text-tertiary" />
+                <span className="text-gray-900 dark:text-text-primary truncate font-black">{item.title || item.content}</span>
+              </nav>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest shadow-sm border border-white/20 dark:border-black/10 transition-colors ${statusInfo.color}`}>
+                  상태: {statusInfo.label}
+                </span>
+                <span className="px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest bg-gray-50 dark:bg-bg-hover text-gray-500 dark:text-text-secondary border border-gray-200 dark:border-border-subtle shadow-sm tabular-nums">
+                  담당자 {assigneeCount}
+                </span>
+                <span className="px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest bg-gray-50 dark:bg-bg-hover text-gray-500 dark:text-text-secondary border border-gray-200 dark:border-border-subtle shadow-sm tabular-nums">
+                  팀 {teamCount}
+                </span>
+              </div>
             </div>
           </div>
+          {!isReadOnly && (
+            <div className="flex items-center gap-3 shrink-0 pt-1">
+              <button
+                onClick={handleQuickToggleDone}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-md hover:shadow-lg active:scale-95 border ${
+                  item.status === 'done'
+                    ? 'bg-emerald-500 border-emerald-600 text-white hover:bg-emerald-600'
+                    : 'bg-white dark:bg-bg-elevated border-gray-200 dark:border-border-subtle text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                }`}
+              >
+                <CheckCircle2 size={16} strokeWidth={3} />
+                {item.status === 'done' ? '완료 취소' : '완료 처리'}
+              </button>
+            </div>
+          )}
         </div>
-
-        {!isReadOnly && (
-          <div className="flex items-center gap-3 shrink-0 pt-1">
-            <button
-              onClick={handleQuickToggleDone}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-md hover:shadow-lg active:scale-95 border ${
-                item.status === 'done'
-                  ? 'bg-emerald-500 border-emerald-600 text-white hover:bg-emerald-600'
-                  : 'bg-white dark:bg-bg-elevated border-gray-200 dark:border-border-subtle text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
-              }`}
-            >
-              <CheckCircle2 size={16} strokeWidth={3} />
-              {item.status === 'done' ? '완료 취소' : '완료 처리'}
-            </button>
-          </div>
-        )}
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar bg-white dark:bg-bg-base transition-colors duration-200">
@@ -570,6 +579,7 @@ function ItemDetailPanel({
             phaseId={phase.id}
             allItems={allItems}
             isReadOnly={isReadOnly}
+            onEditingChange={setIsEditingDescription}
             onOpenDetail={onOpenDetail}
             onShowToast={onShowToast}
             onUpdateItem={onUpdateItem}

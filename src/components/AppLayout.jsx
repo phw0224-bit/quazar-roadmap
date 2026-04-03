@@ -13,6 +13,11 @@ export default function AppLayout({
   onShowPrompt,
   onShowReleaseNotes,
   isReadOnly,
+  user,
+  theme,
+  mounted,
+  onToggleTheme,
+  onLogout,
   children,
 }) {
   const { isOpen, hoverMode, toggleHoverMode } = useLayoutState();
@@ -26,6 +31,7 @@ export default function AppLayout({
   const sidebarProps = {
     sections, phases, activeView, activeItemId,
     onNavigate, onOpenItem, onAddChildPage, onShowPrompt, onShowReleaseNotes, isReadOnly,
+    user, theme, mounted, onToggleTheme, onLogout,
     hoverMode,
     onHoverModeToggle: handleHoverModeToggle,
   };

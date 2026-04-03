@@ -13,7 +13,7 @@
  */
 import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { useTheme } from 'next-themes';
-import { Moon, Sun, Search, PanelLeft, CheckCircle2, ChevronRight, ChevronDown } from 'lucide-react';
+import { Search, PanelLeft, CheckCircle2, ChevronRight, ChevronDown } from 'lucide-react';
 import {
   DndContext,
   closestCorners,
@@ -423,6 +423,11 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
       onShowPrompt={showPrompt}
       onShowReleaseNotes={onShowReleaseNotes}
       isReadOnly={isReadOnly}
+      user={user}
+      theme={theme}
+      mounted={mounted}
+      onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+      onLogout={logout}
     >
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="w-full h-full bg-white dark:bg-bg-base font-sans flex overflow-hidden transition-colors duration-200">
@@ -496,20 +501,10 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                 <span className="text-xs font-medium hidden sm:inline">검색</span>
                 <kbd className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-bg-hover text-gray-400 dark:text-text-tertiary font-mono">⌘K</kbd>
               </button>
-              {mounted && (
-                <button
-                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                  className="p-2.5 rounded-xl bg-gray-50 dark:bg-bg-elevated text-gray-500 dark:text-text-secondary hover:text-gray-900 dark:hover:text-text-primary transition-all cursor-pointer border border-gray-100 dark:border-border-subtle"
-                  aria-label="테마 전환"
-                >
-                  {theme === 'dark' ? <Sun size={20} strokeWidth={2.5} /> : <Moon size={20} strokeWidth={2.5} />}
-                </button>
-              )}
               {user ? (
                 <div className="flex items-center gap-3 bg-gray-50 dark:bg-bg-elevated px-4 py-2 rounded-xl border border-gray-100 dark:border-border-subtle shadow-sm transition-colors duration-200">
                   <div className="flex flex-col items-end">
                     <span className="text-sm font-bold text-gray-800 dark:text-text-primary leading-tight">{user?.user_metadata?.name || user?.email?.split('@')[0]}</span>
-                    <button onClick={logout} className="text-[13px] font-semibold text-gray-400 dark:text-text-tertiary hover:text-red-500 transition-colors">로그아웃</button>
                   </div>
                   <div className="w-10 h-10 rounded-full bg-gray-900 dark:bg-brand-accent flex items-center justify-center text-white text-sm font-black shadow-inner uppercase border-2 border-white dark:border-border-strong">
                     {(user?.user_metadata?.name || user?.email || 'U').charAt(0)}

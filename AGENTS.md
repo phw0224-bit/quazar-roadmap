@@ -1,7 +1,7 @@
 # Quazar Roadmap — Project Map
 
 > AI/MCP 세션이 최소 탐색으로 최대 컨텍스트를 얻기 위한 현재 상태 지도.
-> 현재 코드베이스 기준 최신화 (2026-04-02).
+> 현재 코드베이스 기준 최신화 (2026-04-03).
 
 ---
 
@@ -30,16 +30,17 @@ Browser
        ├── ReleaseNotesModal.jsx         ← 버전 기반 업데이트 내역 모달
        └── components/AppLayout.jsx      ← Sidebar + 메인 컨텐츠 레이아웃
             ├── Sidebar.jsx              ← 사이드바 (보드 뷰 + 페이지 트리 + 페이지 DnD)
-            └── KanbanBoard.jsx          ← 뷰 오케스트레이터 (board/timeline/people)
+            └── KanbanBoard.jsx          ← 뷰 오케스트레이터 (board/timeline/people + presence)
                  ├── BoardSection → ProjectColumn → KanbanCard (칸반 뷰)
                  ├── AssigneePicker                           (담당자 선택 + 직접입력 공용 UI)
                  ├── TimelineView                               (간트 뷰)
                  ├── PeopleBoard                                (팀원 뷰)
-                 ├── ItemDetailPanel → ItemDescriptionSection   (우측 패널 본문/AI 요약)
+                 ├── PresenceAvatars                            (상단 전체 접속자 표시)
+                 ├── ItemDetailPanel → ItemViewers → ItemDescriptionSection
                  ├── SearchModal                                (Ctrl+K)
                  ├── FilterBar
                  └── editor/Editor.jsx                          (Tiptap 본문 편집기)
-       └── useKanbanData ← useReducer + Supabase Realtime 구독
+       └── useKanbanData / usePresence ← 보드 상태 + 접속 상태
             └── kanbanAPI.js  ← Supabase JS Client 직접 호출
 
 Express (port 3001)
@@ -239,6 +240,12 @@ await kanbanAPI.addItem(phaseId, title, content, user.id);
 - **projects** 채널: 변경 감지 → `fetchBoardData()` 전체 재조회
 - **sections**는 별도 Realtime 구독이 없음. 현재 클라이언트의 로컬 dispatch 또는 이후 전체 재조회로 반영됨
 
+### Presence (Supabase Realtime)
+- `usePresence`가 `board-presence` 채널을 구독해 `{ userId, name, itemId, editingField }`를 추적
+- 비로그인(`isReadOnly=true`) 사용자는 Presence 채널 구독과 UI 렌더를 모두 건너뜀
+- `KanbanBoard` 헤더의 `PresenceAvatars`는 전체 접속자 표시, `ItemDetailPanel`의 `ItemViewers`는 같은 아이템 접속자만 표시
+- `editingField`는 `'title'|'assignees'|'tags'|'description'|null` 값을 사용
+
 ### DnD (KanbanBoard.handleDragEnd)
 
 ```javascript
@@ -289,10 +296,12 @@ src/
 │   ├── AppLayout.jsx          Sidebar + children 레이아웃 (useLayoutState 컨텍스트)
 │   ├── AssigneePicker.jsx     담당자 선택 + 직접입력 공용 편집 UI
 │   ├── KanbanBoard.jsx        뷰 오케스트레이터, DnD 컨텍스트, 전역 모달
+│   ├── PresenceAvatars.jsx    상단 헤더의 전체 접속자 아바타
 │   ├── BoardSection.jsx       섹션 그룹 (접기/펼치기, DnD 재정렬)
 │   ├── ProjectColumn.jsx      칸반 컬럼 (Phase). 완료 프로젝트 토글 포함
 │   ├── KanbanCard.jsx         카드 (Item). DnD sortable
 │   ├── ItemDetailPanel.jsx    우측 슬라이드 패널 (에디터+댓글+AI요약+관계아이템)
+│   ├── ItemViewers.jsx        현재 아이템을 보는 중/편집 중인 사용자 표시
 │   ├── ItemDescriptionSection.jsx  상세 설명 전용 섹션 (라이브/원문/미리보기, AI 요약)
 │   ├── itemDescriptionMode.js 초기 descriptionMode 결정 규칙
 │   ├── projectColumnMenu.js   프로젝트 컬럼 메뉴 포털 위치 계산/표면 규칙
@@ -326,6 +335,8 @@ src/
 ├── hooks/
 │   ├── useKanbanData.js       전체 보드 상태 (useReducer + Realtime)
 │   ├── useAuth.js             Supabase Auth + 프로필 설정
+│   ├── usePresence.js         Supabase Presence 채널 관리
+│   ├── usePresenceContext.jsx Presence 상태 Context
 │   ├── useUrlState.js         URL 파라미터 ↔ 상태 동기화
 │   ├── usePeopleData.js       피플 보드 전용 데이터 훅 (현재 PeopleView에서는 직접 미사용)
 │   ├── usePageTree.js         계층적 페이지 트리 빌더

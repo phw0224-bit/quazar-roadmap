@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronRight, LayoutGrid, Clock, Users, PanelLeft, MousePointer2, Ellipsis, BellDot } from 'lucide-react';
+import { ChevronRight, LayoutGrid, Clock, Users, PanelLeft, MousePointer2, Ellipsis, BellDot, Moon, Sun, LogOut } from 'lucide-react';
 import { 
   DndContext, 
   PointerSensor, 
@@ -31,6 +31,11 @@ export default function Sidebar({
   onShowPrompt,
   onShowReleaseNotes,
   isReadOnly,
+  user,
+  theme,
+  mounted,
+  onToggleTheme,
+  onLogout,
   hoverMode,
   onHoverModeToggle,
   onRefresh, // 데이터 갱신을 위한 콜백
@@ -216,6 +221,36 @@ export default function Sidebar({
                   )}
                   <span>{hoverMode ? '클릭 모드로 전환' : '호버 모드로 전환'}</span>
                 </button>
+                {mounted && (
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] font-medium text-[color:var(--color-text-secondary)] hover:bg-[color:var(--color-bg-hover)] hover:text-[color:var(--color-text-primary)] transition-colors cursor-pointer"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      onToggleTheme?.();
+                    }}
+                  >
+                    {theme === 'dark' ? (
+                      <Sun size={14} strokeWidth={1.9} className="flex-shrink-0" />
+                    ) : (
+                      <Moon size={14} strokeWidth={1.9} className="flex-shrink-0" />
+                    )}
+                    <span>{theme === 'dark' ? '라이트 모드' : '다크 모드'}</span>
+                  </button>
+                )}
+                {user && (
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors cursor-pointer"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      onLogout?.();
+                    }}
+                  >
+                    <LogOut size={14} strokeWidth={1.9} className="flex-shrink-0" />
+                    <span>로그아웃</span>
+                  </button>
+                )}
               </div>
             )}
           </div>

@@ -29,6 +29,7 @@ export default function ItemDescriptionSection({
   phaseId,
   allItems = [],
   isReadOnly,
+  onEditingChange,
   onOpenDetail,
   onShowToast,
   onUpdateItem,
@@ -44,6 +45,7 @@ export default function ItemDescriptionSection({
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
+  const [isEditorFocused, setIsEditorFocused] = useState(false);
   const linkCallbackRef = useRef(null);
   const descriptionRef = useRef(null);
 
@@ -55,6 +57,7 @@ export default function ItemDescriptionSection({
     }));
     setAiSummary(item?.ai_summary || null);
     setSummaryError(null);
+    setIsEditorFocused(false);
   }, [isReadOnly, item]);
 
   useEffect(() => {
@@ -69,6 +72,14 @@ export default function ItemDescriptionSection({
 
   const showEditorPane = !isReadOnly && (descriptionMode === 'live' || descriptionMode === 'source');
   const showPreviewPane = isReadOnly || descriptionMode === 'preview';
+
+  useEffect(() => {
+    onEditingChange?.(showEditorPane && isEditorFocused);
+  }, [isEditorFocused, onEditingChange, showEditorPane]);
+
+  useEffect(() => () => {
+    onEditingChange?.(false);
+  }, [onEditingChange]);
 
   const handleDescriptionBlur = async () => {
     const originalDescription = normalizeDescriptionSource(item.description || '');
@@ -296,7 +307,9 @@ export default function ItemDescriptionSection({
               allItems={allItems}
               itemId={item.id}
               onShowToast={onShowToast}
+              onFocus={() => setIsEditorFocused(true)}
               onBlur={handleDescriptionBlur}
+              onEditorBlur={() => setIsEditorFocused(false)}
               onAddChildPage={onAddChildPage ? async (title) => onAddChildPage(phaseId, item.id, title) : null}
               onShowPrompt={onShowPrompt}
               onLinkExistingPage={handleLinkExistingPage}
