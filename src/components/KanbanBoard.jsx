@@ -32,6 +32,9 @@ import {
 import { useKanbanData } from '../hooks/useKanbanData';
 import { useUrlState } from '../hooks/useUrlState';
 import { useAuth } from '../hooks/useAuth';
+import { usePresence } from '../hooks/usePresence';
+import { PresenceContext } from '../hooks/usePresenceContext';
+import PresenceAvatars from './PresenceAvatars';
 import { useLayoutState } from '../hooks/useLayoutState';
 import API from '../api/kanbanAPI';
 import ProjectColumn from './ProjectColumn';
@@ -74,6 +77,8 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   const [urlState, setUrlState, replaceUrlState] = useUrlState();
   const activeView = urlState.view;
   const detailItemId = urlState.itemId;
+  const isReadOnly = !user;
+  const { onlineUsers, updateEditing } = usePresence({ user, itemId: detailItemId, isReadOnly });
   const isDetailFullscreen = urlState.fullscreen;
   const [peopleTeams, setPeopleTeams] = useState([]);
   const [peopleLoading, setPeopleLoading] = useState(true);
@@ -406,6 +411,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   };
 
   return (
+    <PresenceContext.Provider value={{ onlineUsers, updateEditing, currentUserId: user?.id ?? null }}>
     <AppLayout
       sections={sections}
       phases={phases}
@@ -478,6 +484,8 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
             </div>
 
             <div className="flex items-center gap-4">
+              {/* 접속자 아바타 */}
+              {!isReadOnly && <PresenceAvatars />}
               {/* 검색 버튼 */}
               <button
                 onClick={() => setShowSearch(true)}
@@ -867,5 +875,6 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
       </div>
     </DndContext>
     </AppLayout>
+    </PresenceContext.Provider>
   );
 }
