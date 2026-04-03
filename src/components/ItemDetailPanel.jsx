@@ -14,7 +14,7 @@
  */
 import { useState, useEffect, useMemo } from 'react';
 import {
-  ChevronsRight, Maximize2, Minimize2, ChevronRight, CheckCircle2,
+  ChevronsRight, Maximize2, Minimize2, ChevronRight, Trash2,
   Clock, Users, Building2, Tag, Link2, Plus, X,
   MessageSquare, Search, ArrowUpRight, AlignCenter, AlignJustify,
   Calendar, Flag, LayoutList
@@ -33,6 +33,7 @@ function ItemDetailPanel({
   onShowConfirm, onShowToast,
   onAddChildPage,
   onShowPrompt,
+  onDeleteItem,
 }) {
   const stopProp = (e) => e.stopPropagation();
   const { updateEditing } = usePresenceContext();
@@ -178,24 +179,36 @@ function ItemDetailPanel({
           <div className="flex items-start gap-4 min-w-0">
             <div className="flex items-center gap-1.5">
               <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-bg-hover rounded-xl text-gray-400 hover:text-gray-900 dark:hover:text-text-primary transition-all duration-200 cursor-pointer">
-                <ChevronsRight size={20} strokeWidth={2.5} />
-              </button>
+              <ChevronsRight size={20} strokeWidth={2.5} />
+            </button>
+            <button
+              onClick={onToggleFullscreen}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-bg-hover rounded-xl text-gray-400 hover:text-gray-900 dark:hover:text-text-primary transition-all duration-200 cursor-pointer"
+              aria-label={isFullscreen ? '창 모드로 전환' : '전체 화면으로 전환'}
+              title={isFullscreen ? '창 모드로 전환' : '전체 화면으로 전환'}
+            >
+              {isFullscreen ? <Minimize2 size={20} strokeWidth={2.5} /> : <Maximize2 size={20} strokeWidth={2.5} />}
+            </button>
+            <button
+              onClick={() => setIsWideView(v => !v)}
+              className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${isWideView ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
+              title={isWideView ? '기본 너비로 보기' : '넓게 보기'}
+            >
+              {isWideView ? <AlignCenter size={20} strokeWidth={2.5} /> : <AlignJustify size={20} strokeWidth={2.5} />}
+            </button>
+            {!isReadOnly && (
               <button
-                onClick={onToggleFullscreen}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-bg-hover rounded-xl text-gray-400 hover:text-gray-900 dark:hover:text-text-primary transition-all duration-200 cursor-pointer"
-                aria-label={isFullscreen ? '창 모드로 전환' : '전체 화면으로 전환'}
-                title={isFullscreen ? '창 모드로 전환' : '전체 화면으로 전환'}
+                onClick={() => onShowConfirm('아이템 삭제', '정말로 이 아이템을 삭제하시겠습니까?', async () => {
+                  await onDeleteItem(phase.id, item.id);
+                  onClose();
+                }, 'danger')}
+                className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl text-gray-400 hover:text-red-500 transition-all duration-200 cursor-pointer"
+                title="아이템 삭제"
               >
-                {isFullscreen ? <Minimize2 size={20} strokeWidth={2.5} /> : <Maximize2 size={20} strokeWidth={2.5} />}
+                <Trash2 size={20} strokeWidth={2.5} />
               </button>
-              <button
-                onClick={() => setIsWideView(v => !v)}
-                className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${isWideView ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
-                title={isWideView ? '기본 너비로 보기' : '넓게 보기'}
-              >
-                {isWideView ? <AlignCenter size={20} strokeWidth={2.5} /> : <AlignJustify size={20} strokeWidth={2.5} />}
-              </button>
-            </div>
+            )}
+          </div>
 
             <div className="min-w-0 flex flex-col gap-2.5">
               <nav className="flex items-center gap-2 text-[13px] font-black uppercase tracking-widest min-w-0">
