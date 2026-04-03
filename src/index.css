@@ -437,6 +437,7 @@ input:focus, textarea:focus {
 
 .cm-live-preview-shell .cm-cursor {
   border-left-color: #93c5fd;
+  border-left-width: 2px;
 }
 
 .cm-tooltip-autocomplete {

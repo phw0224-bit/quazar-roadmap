@@ -14,7 +14,7 @@
  */
 import { useState, useEffect, useMemo } from 'react';
 import {
-  ChevronsRight, Maximize2, Minimize2, ChevronRight, CheckCircle2,
+  ChevronsRight, Maximize2, Minimize2, ChevronRight, Trash2,
   Clock, Users, Building2, Tag, Link2, Plus, X,
   MessageSquare, Search, ArrowUpRight, AlignCenter, AlignJustify,
   Calendar, Flag, LayoutList
@@ -31,6 +31,7 @@ function ItemDetailPanel({
   onShowConfirm, onShowToast,
   onAddChildPage,
   onShowPrompt,
+  onDeleteItem,
 }) {
   const stopProp = (e) => e.stopPropagation();
   const [isEditingAssignees, setIsEditingAssignees] = useState(false);
@@ -120,13 +121,6 @@ function ItemDetailPanel({
   const assigneeCount = (item.assignees || []).length;
   const teamCount = (item.teams || []).length;
 
-  const handleQuickToggleDone = async () => {
-    const isDone = item.status === 'done';
-    const nextStatus = isDone ? 'none' : 'done';
-    await onUpdateItem(phase.id, item.id, { status: nextStatus });
-    onShowToast?.(isDone ? '완료 표시를 해제했습니다.' : '완료로 표시했습니다.');
-  };
-
   // 브레드크럼 경로 계산 (Phase -> Parent1 -> Parent2 -> ... -> Current Item)
   const itemPath = useMemo(() => {
     const path = [];
@@ -170,6 +164,18 @@ function ItemDetailPanel({
             >
               {isWideView ? <AlignCenter size={20} strokeWidth={2.5} /> : <AlignJustify size={20} strokeWidth={2.5} />}
             </button>
+            {!isReadOnly && (
+              <button
+                onClick={() => onShowConfirm('아이템 삭제', '정말로 이 아이템을 삭제하시겠습니까?', async () => {
+                  await onDeleteItem(phase.id, item.id);
+                  onClose();
+                }, 'danger')}
+                className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl text-gray-400 hover:text-red-500 transition-all duration-200 cursor-pointer"
+                title="아이템 삭제"
+              >
+                <Trash2 size={20} strokeWidth={2.5} />
+              </button>
+            )}
           </div>
 
           <div className="min-w-0 flex flex-col gap-2.5">
@@ -219,21 +225,6 @@ function ItemDetailPanel({
           </div>
         </div>
 
-        {!isReadOnly && (
-          <div className="flex items-center gap-3 shrink-0 pt-1">
-            <button
-              onClick={handleQuickToggleDone}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-md hover:shadow-lg active:scale-95 border ${
-                item.status === 'done'
-                  ? 'bg-emerald-500 border-emerald-600 text-white hover:bg-emerald-600'
-                  : 'bg-white dark:bg-bg-elevated border-gray-200 dark:border-border-subtle text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
-              }`}
-            >
-              <CheckCircle2 size={16} strokeWidth={3} />
-              {item.status === 'done' ? '완료 취소' : '완료 처리'}
-            </button>
-          </div>
-        )}
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar bg-white dark:bg-bg-base transition-colors duration-200">
