@@ -422,7 +422,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
       onAddChildPage={addChildPage}
       onShowPrompt={showPrompt}
       onShowReleaseNotes={onShowReleaseNotes}
-      isReadOnly={!user}
+      isReadOnly={isReadOnly}
     >
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="w-full h-full bg-white dark:bg-bg-base font-sans flex overflow-hidden transition-colors duration-200">
@@ -542,7 +542,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                 sections={sections.filter(s => (s.board_type || 'main') !== 'main')}
                 onUpdateItem={updateItem}
                 onOpenDetail={(itemId) => setUrlState({ itemId })}
-                isReadOnly={!user}
+                isReadOnly={isReadOnly}
                 showToast={showToast}
               />
             </Suspense>
@@ -643,7 +643,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                       onOpenDetail: (itemId) => setUrlState({ itemId }),
                       onShowConfirm: showConfirm, onShowToast: showToast,
                       currentUserId: user?.id || null,
-                      isReadOnly: !user,
+                      isReadOnly: isReadOnly,
                     };
 
                     return (
@@ -819,7 +819,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                   onShowToast={showToast}
                   onAddChildPage={addChildPage}
                   onShowPrompt={showPrompt}
-                  isReadOnly={!user}
+                  isReadOnly={isReadOnly}
                 />
               </Suspense>
             </div>
