@@ -15,6 +15,7 @@ export function usePresence({ user, itemId, isReadOnly }) {
   const channelRef = useRef(null);
   const itemIdRef = useRef(itemId);
   const editingFieldRef = useRef(null);
+  const displayName = user?.user_metadata?.name || user?.email?.split('@')[0] || '익명';
 
   // itemIdRef를 최신 값으로 유지 (클로저 문제 방지)
   useEffect(() => {
@@ -44,11 +45,14 @@ export function usePresence({ user, itemId, isReadOnly }) {
       .on('presence', { event: 'sync' }, () => {
         syncPresenceState(channel);
       })
+      .on('presence', { event: 'leave' }, () => {
+        syncPresenceState(channel);
+      })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           await channel.track({
             userId: user.id,
-            name: user.user_metadata?.name || user.email?.split('@')[0] || '익명',
+            name: displayName,
             itemId: itemIdRef.current ?? null,
             editingField: null,
           });
@@ -69,7 +73,7 @@ export function usePresence({ user, itemId, isReadOnly }) {
 
     channelRef.current.track({
       userId: user.id,
-      name: user.user_metadata?.name || user.email?.split('@')[0] || '익명',
+      name: displayName,
       itemId: itemId ?? null,
       editingField: null,
     });
@@ -87,7 +91,7 @@ export function usePresence({ user, itemId, isReadOnly }) {
     editingFieldRef.current = field;
     channelRef.current.track({
       userId: user.id,
-      name: user.user_metadata?.name || user.email?.split('@')[0] || '익명',
+      name: displayName,
       itemId: itemIdRef.current ?? null,
       editingField: field ?? null,
     });
