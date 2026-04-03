@@ -36,6 +36,10 @@ test('filterEditorCommands matches by id and keyword', () => {
   );
 
   assert.ok(
+    filterEditorCommands('위키').some((command) => command.id === 'link-page'),
+  );
+
+  assert.ok(
     filterEditorCommands('new-page').some((command) => command.id === 'page'),
   );
 });

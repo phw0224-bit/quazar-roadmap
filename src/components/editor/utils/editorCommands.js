@@ -27,7 +27,13 @@ export const EDITOR_COMMANDS = [
   { id: 'toggle-h1', label: '토글 제목 1', keywords: ['toggle-h1', 'toggle', 'h1'], insert: buildToggleSnippet('h1'), selectionFrom: 15, selectionTo: 17 },
   { id: 'toggle-h2', label: '토글 제목 2', keywords: ['toggle-h2', 'toggle', 'h2'], insert: buildToggleSnippet('h2'), selectionFrom: 15, selectionTo: 17 },
   { id: 'toggle-h3', label: '토글 제목 3', keywords: ['toggle-h3', 'toggle', 'h3'], insert: buildToggleSnippet('h3'), selectionFrom: 15, selectionTo: 17 },
-  { id: 'link-page', label: '페이지 링크', keywords: ['link', 'page', 'wiki'], action: 'link-page' },
+  {
+    id: 'link-page',
+    label: '위키 링크',
+    description: '기존 페이지를 [[위키 링크]]로 연결합니다.',
+    keywords: ['wiki', 'wikilink', 'link', 'page', '페이지', '위키'],
+    action: 'link-page',
+  },
   { id: 'page', label: '새 페이지', keywords: ['page', 'new-page', 'child-page', 'subpage'], action: 'create-page' },
   { id: 'image', label: '이미지/파일', keywords: ['image', 'file', 'upload'], action: 'image' },
 ];

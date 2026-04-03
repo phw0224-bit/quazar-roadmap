@@ -13,11 +13,12 @@ import {
 } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
-import { EditorSelection, StateField } from '@codemirror/state';
+import { EditorSelection, Prec, StateField } from '@codemirror/state';
 import {
   Decoration,
   EditorView,
   WidgetType,
+  keymap,
 } from '@codemirror/view';
 import { oneDark } from '@codemirror/theme-one-dark';
 import {
@@ -510,44 +511,48 @@ export default function Editor({
     EditorView.lineWrapping,
     ...createLivePreviewExtension(mode === 'live'),
     ...createTableSelectionExtension(editable),
+    Prec.highest(keymap.of([
+      {
+        key: 'ArrowDown',
+        run: () => {
+          if (!slashStateRef.current || !filteredSlashCommandsRef.current.length) return false;
+          setSelectedSlashIndex((index) => {
+            const commands = filteredSlashCommandsRef.current;
+            return commands.length ? (index + 1) % commands.length : 0;
+          });
+          return true;
+        },
+      },
+      {
+        key: 'ArrowUp',
+        run: () => {
+          if (!slashStateRef.current || !filteredSlashCommandsRef.current.length) return false;
+          setSelectedSlashIndex((index) => {
+            const commands = filteredSlashCommandsRef.current;
+            return commands.length ? (index - 1 + commands.length) % commands.length : 0;
+          });
+          return true;
+        },
+      },
+      {
+        key: 'Enter',
+        run: () => {
+          if (!slashStateRef.current || !filteredSlashCommandsRef.current.length) return false;
+          return executeSelectedSlashCommand();
+        },
+      },
+      {
+        key: 'Escape',
+        run: () => {
+          if (!slashStateRef.current) return false;
+          closeSlashMenu();
+          return true;
+        },
+      },
+    ])),
     EditorView.domEventHandlers({
       keydown: (event) => {
         const view = editorViewRef.current;
-
-        if (slashStateRef.current && filteredSlashCommandsRef.current.length) {
-          if (event.key === 'ArrowDown') {
-            event.preventDefault();
-            event.stopPropagation();
-            setSelectedSlashIndex((index) => {
-              const commands = filteredSlashCommandsRef.current;
-              return commands.length ? (index + 1) % commands.length : 0;
-            });
-            return true;
-          }
-
-          if (event.key === 'ArrowUp') {
-            event.preventDefault();
-            event.stopPropagation();
-            setSelectedSlashIndex((index) => {
-              const commands = filteredSlashCommandsRef.current;
-              return commands.length ? (index - 1 + commands.length) % commands.length : 0;
-            });
-            return true;
-          }
-
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            event.stopPropagation();
-            return executeSelectedSlashCommand();
-          }
-
-          if (event.key === 'Escape') {
-            event.preventDefault();
-            event.stopPropagation();
-            closeSlashMenu();
-            return true;
-          }
-        }
 
         if (view && (event.key === 'Tab')) {
           const selection = view.state.selection.main;
@@ -715,9 +720,9 @@ export default function Editor({
             else containerRef.current = node;
           }
         }}
-        className={`relative overflow-hidden ${mode === 'live'
-          ? 'cm-live-preview-shell bg-transparent'
-          : 'rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-border-subtle dark:bg-[#0f1115]'
+        className={`relative ${mode === 'live'
+          ? 'overflow-visible cm-live-preview-shell bg-transparent'
+          : 'overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-border-subtle dark:bg-[#0f1115]'
         }`}
       >
         <CodeMirror
