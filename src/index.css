@@ -430,8 +430,6 @@ input:focus, textarea:focus {
 .cm-live-active-line {
   background: rgba(96, 165, 250, 0.08) !important;
   border-left: 2px solid rgba(96, 165, 250, 0.78);
-  margin-left: -10px;
-  padding-left: 8px !important;
   border-radius: 0.25rem;
   box-shadow: none;
 }
@@ -462,17 +460,26 @@ input:focus, textarea:focus {
   color: #f5f2eb;
 }
 
-.cm-live-heading-1 {
+.cm-live-active-heading {
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #f5f2eb;
+}
+
+.cm-live-heading-1,
+.cm-live-active-heading-1 {
   font-size: 2.15rem;
   line-height: 1.04;
 }
 
-.cm-live-heading-2 {
+.cm-live-heading-2,
+.cm-live-active-heading-2 {
   font-size: 1.6rem;
   line-height: 1.12;
 }
 
-.cm-live-heading-3 {
+.cm-live-heading-3,
+.cm-live-active-heading-3 {
   font-size: 1.25rem;
   line-height: 1.18;
 }
@@ -553,7 +560,7 @@ input:focus, textarea:focus {
   display: inline-block;
   max-width: 100%;
   vertical-align: middle;
-  margin: 0.35rem 0;
+  margin: 0.1rem 0;
 }
 
 .cm-live-image-el {
@@ -565,6 +572,199 @@ input:focus, textarea:focus {
   cursor: default;
 }
 
+/* ── LaTeX 수식 ── */
+.cm-live-math-widget {
+  margin: 0.05rem 0;
+}
+
+.cm-live-math-block {
+  overflow-x: auto;
+  text-align: center;
+  padding: 0.75rem 1rem;
+  background: rgba(148, 163, 184, 0.06);
+  border-radius: 0.5rem;
+}
+
+.cm-live-math-inline {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.md-math-error {
+  color: #f87171;
+  font-size: 0.85em;
+}
+
+/* View 모드 수식 */
+.markdown-preview .katex-display {
+  overflow-x: auto;
+  padding: 0.5rem 0;
+}
+
+/* ── Callout 블록 (View 모드 + Live Preview 공용) ── */
+.md-callout {
+  margin: 0.75rem 0;
+  border-radius: 0.6rem;
+  border-left-width: 4px;
+  border-left-style: solid;
+  padding: 0.65rem 0.9rem 0.65rem 0.85rem;
+  background: rgba(148, 163, 184, 0.06);
+}
+
+.md-callout-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 700;
+  font-size: 0.92em;
+  margin-bottom: 0.3rem;
+}
+
+.md-callout-icon {
+  font-size: 1em;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.md-callout-body > :first-child { margin-top: 0; }
+.md-callout-body > :last-child  { margin-bottom: 0; }
+.md-callout-body { font-size: 0.93em; opacity: 0.9; }
+
+/* 색상 변형 */
+.md-callout-blue    { border-color: #60a5fa; background: rgba(96,165,250,0.08); }
+.md-callout-blue .md-callout-title  { color: #93c5fd; }
+
+.md-callout-yellow  { border-color: #fbbf24; background: rgba(251,191,36,0.08); }
+.md-callout-yellow .md-callout-title { color: #fde68a; }
+
+.md-callout-orange  { border-color: #f97316; background: rgba(249,115,22,0.08); }
+.md-callout-orange .md-callout-title { color: #fdba74; }
+
+.md-callout-red     { border-color: #f87171; background: rgba(248,113,113,0.08); }
+.md-callout-red .md-callout-title   { color: #fca5a5; }
+
+.md-callout-green   { border-color: #4ade80; background: rgba(74,222,128,0.08); }
+.md-callout-green .md-callout-title { color: #86efac; }
+
+.md-callout-gray    { border-color: #94a3b8; background: rgba(148,163,184,0.08); }
+.md-callout-gray .md-callout-title  { color: #cbd5e1; }
+
+.md-callout-purple  { border-color: #a78bfa; background: rgba(167,139,250,0.08); }
+.md-callout-purple .md-callout-title { color: #c4b5fd; }
+
+/* Live Preview callout 위젯 */
+.cm-live-callout-widget { margin: 0.05rem 0; }
+.cm-live-callout-widget .md-callout { margin: 0; }
+
+/* ── 헤딩 폴딩 토글 ───────────────────────────────────── */
+.cm-heading-fold-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 8px;
+  line-height: 1;
+  color: #c9cdd2;
+  cursor: pointer;
+  user-select: none;
+  margin-right: 3px;
+  border-radius: 3px;
+  transition: color 0.12s, background 0.12s, opacity 0.12s;
+  vertical-align: middle;
+  opacity: 0;
+}
+/* 헤딩 라인에 마우스 오버 시 토글 표시 */
+.cm-line:hover .cm-heading-fold-toggle,
+.cm-heading-fold-toggle--folded {
+  opacity: 1;
+}
+.cm-heading-fold-toggle:hover {
+  color: #4b5563;
+  background: rgba(0, 0, 0, 0.07);
+  opacity: 1;
+}
+.dark .cm-heading-fold-toggle { color: #4a5568; }
+.dark .cm-line:hover .cm-heading-fold-toggle,
+.dark .cm-heading-fold-toggle--folded { opacity: 1; }
+.dark .cm-heading-fold-toggle:hover {
+  color: #a0aec0;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* 접힌 내용 플레이스홀더 */
+.cm-heading-folded-placeholder {
+  display: inline-block;
+  color: #9ca3af;
+  font-size: 0.8em;
+  letter-spacing: 0.05em;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.04);
+  margin-left: 4px;
+  vertical-align: middle;
+  cursor: pointer;
+}
+.dark .cm-heading-folded-placeholder {
+  color: #6b7280;
+  background: rgba(255, 255, 255, 0.06);
+}
+/* ─────────────────────────────────────────────────────── */
+
+/* Mermaid 다이어그램 */
+.cm-live-preview-shell .cm-live-mermaid-wrapper {
+  margin: 0.05rem 0;
+  padding: 1rem;
+  background: var(--color-bg-elevated, rgba(30, 41, 59, 0.35));
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-border-subtle, rgba(148, 163, 184, 0.22));
+  overflow-x: auto;
+}
+
+.cm-live-preview-shell .cm-live-mermaid-diagram {
+  display: block;
+  min-height: 100px;
+  width: max-content;
+  min-width: 100%;
+}
+
+.cm-live-preview-shell .cm-live-mermaid-diagram svg {
+  display: block;
+  width: auto !important;
+  max-width: none !important;
+  height: auto;
+}
+
+.dark .cm-live-preview-shell .cm-live-mermaid-diagram svg {
+  filter: contrast(1.05) saturate(1.05);
+}
+
+.markdown-preview .markdown-preview-mermaid-wrapper {
+  margin: 1rem 0;
+  padding: 0.9rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-border-subtle, rgba(148, 163, 184, 0.22));
+  background: var(--color-bg-elevated, rgba(30, 41, 59, 0.35));
+  overflow-x: auto;
+}
+
+.markdown-preview .markdown-preview-mermaid-wrapper svg {
+  display: block;
+  width: auto !important;
+  max-width: none !important;
+  height: auto;
+}
+
+.cm-live-mermaid-error {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+}
+
+
 .cm-table-active-cell {
   border-radius: 0.35rem;
   background: rgba(96, 165, 250, 0.16);
@@ -572,7 +772,7 @@ input:focus, textarea:focus {
 }
 
 .cm-live-table-widget {
-  margin: 0.35rem 0 0.55rem;
+  margin: 0.05rem 0;
 }
 
 .cm-table-widget-shell {
@@ -606,7 +806,98 @@ input:focus, textarea:focus {
 .cm-live-blockquote-widget,
 .cm-live-codeblock-widget,
 .cm-live-hr-widget {
-  margin: 0.3rem 0 0.55rem;
+  margin: 0.05rem 0;
+}
+
+.cm-live-preview-shell .cm-live-codeblock-widget pre {
+  margin: 0;
+  padding: 0.95rem 1.1rem;
+  border-radius: 0.75rem;
+  background: #141922;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  overflow-x: auto;
+}
+
+.cm-live-preview-shell .cm-live-codeblock-widget code {
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: #e5e7eb;
+}
+
+.cm-live-preview-shell .cm-live-blockquote-widget blockquote {
+  margin: 0;
+  border-left: 3px solid rgba(59, 130, 246, 0.45);
+  padding: 0.55rem 0.85rem;
+  border-radius: 0.4rem;
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.markdown-preview pre {
+  margin: 0.9rem 0;
+  padding: 0.95rem 1.1rem;
+  border-radius: 0.75rem;
+  background: #141922;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  overflow-x: auto;
+}
+
+.markdown-preview pre code {
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: #e5e7eb;
+}
+
+.markdown-preview .markdown-preview-task-checkbox {
+  cursor: pointer;
+}
+
+/* ── 각주(Footnote) ── */
+.markdown-preview .footnotes {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  font-size: 0.85em;
+  color: var(--color-text-secondary);
+}
+
+.markdown-preview .footnotes ol {
+  padding-left: 1.25rem;
+}
+
+.markdown-preview .footnotes li {
+  margin-bottom: 0.35rem;
+  line-height: 1.6;
+}
+
+.markdown-preview sup a,
+.markdown-preview .footnote-ref {
+  color: #93c5fd;
+  text-decoration: none;
+  font-size: 0.78em;
+  font-weight: 700;
+  padding: 0 0.1rem;
+}
+
+.markdown-preview sup a:hover,
+.markdown-preview .footnote-ref:hover {
+  text-decoration: underline;
+}
+
+.markdown-preview .footnote-backref {
+  margin-left: 0.25rem;
+  color: #93c5fd;
+  text-decoration: none;
+}
+
+/* Live Preview 각주 인라인 표시 */
+.cm-live-footnote-ref {
+  color: #93c5fd;
+  font-size: 0.78em;
+  font-weight: 700;
+  vertical-align: super;
+  line-height: 1;
 }
 
 /* ── TaskList (체크리스트) ── */
@@ -736,67 +1027,4 @@ input:focus, textarea:focus {
   font-weight: 700;
 }
 
-.tiptap-content .toggle-node[data-variant="note"] > div {
-  background: rgba(59, 130, 246, 0.06);
-  border-color: rgba(59, 130, 246, 0.18);
-}
-
-.dark .tiptap-content .toggle-node[data-variant="note"] > div {
-  background: rgba(59, 130, 246, 0.12);
-  border-color: rgba(59, 130, 246, 0.3);
-}
-
-.tiptap-content .toggle-node-content > :not(:first-child) {
-  margin-left: 0.35rem;
-  padding-left: 1rem;
-  border-left: 1px solid rgba(55, 53, 47, 0.12);
-}
-
-.dark .tiptap-content .toggle-node-content > :not(:first-child) {
-  border-left-color: rgba(255, 255, 255, 0.08);
-}
-
-.tiptap-content .toggle-node[data-open="false"] .toggle-node-content > :not(:first-child) {
-  display: none;
-}
-
-/* ── Tiptap Global Drag Handle ── */
-.drag-handle {
-  position: fixed; /* 뷰포트 기준으로 위치 설정 (getBoundingClientRect 대응) */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.25rem;
-  height: 1.25rem;
-  background-image: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="%23666666" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>');
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 14px;
-  opacity: 0;
-  cursor: grab;
-  transition: opacity 0.1s ease-in, background-color 0.1s ease;
-  border-radius: 4px;
-  z-index: 99999;
-}
-.dark .drag-handle {
-  background-image: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="%23dddddd" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>');
-}
-.drag-handle:hover {
-  opacity: 1 !important;
-  background-color: rgba(0, 0, 0, 0.1);
-}
-.dark .drag-handle:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-}
-.tiptap-content .tiptap > *:hover ~ .drag-handle,
-.drag-handle:hover {
-  opacity: 0.6;
-}
-.drag-handle.active {
-  opacity: 1;
-  cursor: grabbing;
-}
-.ProseMirror-dropcursor {
-  border-top: 2px solid #3b82f6 !important;
-  transition: all 0.1s ease-in-out;
-}
+.tiptap-co

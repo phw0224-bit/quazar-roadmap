@@ -18,6 +18,7 @@ import MarkdownPreview from './editor/MarkdownPreview';
 import SearchModal from './SearchModal';
 import { summarizeContent } from '../api/summarizeAPI';
 import { getInitialDescriptionMode } from './itemDescriptionMode';
+import { toggleMarkdownTaskItem } from './editor/utils/markdownPreview';
 import {
   convertMarkdownToEditorHTML,
   isLikelyHTML,
@@ -35,6 +36,8 @@ export default function ItemDescriptionSection({
   onUpdateItem,
   onAddChildPage,
   onShowPrompt,
+  editorViewRef,
+  onEditorUpdate,
 }) {
   const [description, setDescription] = useState(normalizeDescriptionSource(item?.description || ''));
   const [descriptionMode, setDescriptionMode] = useState(() => getInitialDescriptionMode({
@@ -169,6 +172,17 @@ export default function ItemDescriptionSection({
 
     onShowToast?.(`연결된 페이지를 찾지 못했습니다: ${target}`);
   }, [allItems, onOpenDetail, onShowToast]);
+
+  const handleToggleTaskItem = useCallback((taskIndex, checked) => {
+    if (isReadOnly) return;
+    setDescription((prev) => {
+      const next = toggleMarkdownTaskItem(prev || '', taskIndex, checked);
+      if (next !== prev) {
+        onUpdateItem(phaseId, item.id, { description: next });
+      }
+      return next;
+    });
+  }, [isReadOnly, item.id, onUpdateItem, phaseId]);
 
   const linkModalPhases = useMemo(
     () => [{ title: '전체 아이템', items: allItems }],
@@ -313,6 +327,8 @@ export default function ItemDescriptionSection({
               onAddChildPage={onAddChildPage ? async (title) => onAddChildPage(phaseId, item.id, title) : null}
               onShowPrompt={onShowPrompt}
               onLinkExistingPage={handleLinkExistingPage}
+              editorViewRef={editorViewRef}
+              onUpdate={onEditorUpdate}
             />
           )}
 
@@ -321,6 +337,7 @@ export default function ItemDescriptionSection({
               content={description}
               containerRef={descriptionRef}
               onOpenLink={handleOpenLink}
+              onToggleTaskItem={handleToggleTaskItem}
             />
           )}
         </div>

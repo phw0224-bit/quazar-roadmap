@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   buildPageWikiLink,
   renderMarkdownPreviewHTML,
+  toggleMarkdownTaskItem,
 } from './markdownPreview.js';
 
 test('buildPageWikiLink emits title-first canonical wiki link', () => {
@@ -35,4 +36,18 @@ test('renderMarkdownPreviewHTML renders wiki links as clickable anchors', () => 
 test('renderMarkdownPreviewHTML keeps standard markdown headings', () => {
   const html = renderMarkdownPreviewHTML('# 큰 제목');
   assert.match(html, /<h1[^>]*>큰 제목<\/h1>/);
+});
+
+test('toggleMarkdownTaskItem toggles the target checklist item only', () => {
+  const markdown = ['- [ ] 첫번째', '- [x] 두번째', '- [ ] 세번째'].join('\n');
+  const next = toggleMarkdownTaskItem(markdown, 1, false);
+
+  assert.equal(next, ['- [ ] 첫번째', '- [ ] 두번째', '- [ ] 세번째'].join('\n'));
+});
+
+test('toggleMarkdownTaskItem ignores invalid index', () => {
+  const markdown = '- [ ] 할 일';
+  const next = toggleMarkdownTaskItem(markdown, 9, true);
+
+  assert.equal(next, markdown);
 });

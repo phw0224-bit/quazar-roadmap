@@ -68,6 +68,8 @@ Google Chat Bot (port 3002)
 | React | 19.2 | concurrent features, 최신 훅 |
 | Vite | 8 | HMR 빠름, Tailwind v4 플러그인 |
 | Tailwind CSS | v4 | utility-first, `dark:` prefix로 다크모드 |
+| CodeMirror | 6 | Markdown live preview 에디터 |
+| Mermaid | 11.14 | 다이어그램 렌더링 (플로우차트, 시퀀스 등) |
 | Tiptap | v3 | ProseMirror 기반, 확장 커스텀 용이 |
 | @dnd-kit | 6.3 | 접근성 고려한 DnD, SortableContext |
 | Supabase | 2.99 | PostgreSQL + Realtime 한 번에 |
@@ -208,8 +210,9 @@ Reducer 액션: `SET_DATA`, `ADD/UPDATE/DELETE/MOVE_PHASE`, `ADD/UPDATE/DELETE/M
 ### 파일 업로드
 
 ```
-Editor/FileUploadButton → POST /upload/:itemId (Express multer)
+EditorToolbar/FileUploadButton → POST /upload/:itemId (Express multer)
   응답: { url, filename, originalName, mimetype, size }
+  → Markdown snippet을 Editor에 삽입
   → items.files jsonb에 추가 저장
   → 이미지: 에디터에 img 삽입, 문서: 링크로 삽입
 ```
@@ -239,7 +242,8 @@ src/
 │   ├── BoardSection.jsx       섹션 그룹 (접기/펼치기, DnD 재정렬)
 │   ├── ProjectColumn.jsx      칸반 컬럼 (Phase). DnD droppable+draggable
 │   ├── KanbanCard.jsx         카드 (Item). DnD sortable
-│   ├── ItemDetailPanel.jsx    우측 슬라이드 패널 (에디터+댓글+AI요약)
+│   ├── ItemDetailPanel.jsx    우측 슬라이드 패널 (에디터+댓글+AI요약+TOC)
+│   ├── DocumentOutline.jsx    문서 아웃라인(TOC) 패널 (헤딩 트리 + 스크롤)
 │   ├── FilterBar.jsx          필터/정렬/그룹 UI
 │   ├── SearchModal.jsx        Ctrl+K 전역 검색
 │   ├── TimelineView.jsx       간트 스타일 타임라인
@@ -255,8 +259,19 @@ src/
 │   ├── UI/
 │   │   └── Feedback.jsx       Toast, ConfirmModal, InputModal
 │   └── editor/
-│       ├── Editor.jsx         Tiptap 에디터 (툴바, 파일업로드, 슬래시커맨드)
+│       ├── Editor.jsx         CodeMirror 6 Markdown 에디터 오케스트레이션
+│       ├── EditorToolbar.jsx  명령 툴바 + 테이블 컨텍스트 액션 + 파일 업로드
 │       ├── SlashCommandMenu.jsx  슬래시 커맨드 팝업 UI
+│       ├── codemirror/
+│       │   ├── livePreviewExtension.js   Live Preview/헤딩 폴딩 확장
+│       │   └── tableSelectionExtension.js 표 활성 셀 데코레이션 확장
+│       ├── utils/
+│       │   ├── livePreview.js     Live Preview 장식 계획 (Mermaid 블록 감지)
+│       │   ├── editorTextOps.js   CodeMirror 텍스트 삽입/치환 공용 유틸
+│       │   ├── headingExtractor.js  헤딩 추출 + 트리 구조 생성 (TOC용)
+│       │   ├── markdownPreview.js   Markdown → HTML 렌더링
+│       │   ├── markdownTransform.js HTML ↔ Markdown 변환
+│       │   └── tableEditing.js      테이블 편집 유틸
 │       └── extensions/
 │           ├── SlashCommand.js   `/` 커맨드 팔레트 Tiptap 확장
 │           ├── ResizableImage.jsx  리사이즈 가능 이미지
@@ -319,6 +334,28 @@ const stopProp = (e) => e.stopPropagation();
 dispatch(action);            // 1. UI 즉시 반영
 await kanbanAPI.method();    // 2. DB 저장 (실패해도 Realtime이 재동기화)
 ```
+
+**Mermaid 다이어그램 사용:**
+
+```markdown
+```mermaid
+graph TD
+    A[시작] --> B{조건}
+    B -->|예| C[완료]
+    B -->|아니오| D[재시도]
+```​```
+
+- Live Preview 모드에서 자동 렌더링
+- 커서가 블록 내부에 있을 때만 source 표시
+- 구문 오류 시 에러 메시지 표시
+- 지원 다이어그램: flowchart, sequence, gantt, class, state 등
+
+**문서 아웃라인(TOC) 사용:**
+
+- ItemDetailPanel 상단 List 아이콘 클릭으로 토글
+- `#` ~ `######` 헤딩 자동 추출하여 트리 표시
+- 헤딩 클릭 시 에디터 해당 위치로 스크롤
+- 현재 스크롤 위치에 있는 헤딩 하이라이트
 
 **다크모드 (Tailwind):**
 

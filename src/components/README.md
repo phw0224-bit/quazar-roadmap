@@ -37,7 +37,7 @@
 | `Comment.jsx` | 단일 댓글 (수정/삭제 포함) |
 | `FileUploadButton.jsx` | 파일 첨부 드래그앤드롭 UI |
 | `VirtualizedItemList.jsx` | 대량 카드 렌더링 최적화용 가상 리스트. 현재 미사용 |
-| `TiptapEditor.jsx` | 초기 에디터 프로토타입. 현재 본문 편집에는 `components/editor/Editor.jsx` 사용 |
+| `TiptapEditor.jsx` | 초기 에디터 프로토타입. 현재 본문 편집에는 `components/editor/Editor.jsx` + `components/editor/EditorToolbar.jsx` 조합 사용 |
 
 ## 패턴 & 규칙
 

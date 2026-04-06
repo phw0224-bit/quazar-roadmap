@@ -20,5 +20,5 @@
 ## 패턴 & 규칙
 
 - 새 description 기능은 이 폴더에 추가하지 않는다.
-- 현재 상세내용 편집 확장은 `src/components/editor/Editor.jsx`와 `src/components/editor/utils/editorCommands.js`에서 Markdown 스니펫으로 처리한다.
+- 현재 상세내용 편집 확장은 `src/components/editor/Editor.jsx` + `src/components/editor/EditorToolbar.jsx` 조합과 `src/components/editor/utils/editorCommands.js`에서 Markdown 스니펫으로 처리한다.
 - 이 폴더 파일을 수정해야 할 때는 “legacy import/호환 유지” 목적이 명확할 때만 수정한다.

@@ -2,13 +2,18 @@
  * @fileoverview Markdown source editor 명령 정의와 슬래시 쿼리 파싱 유틸.
  *
  * 툴바와 슬래시 메뉴가 같은 명령 메타데이터를 재사용한다.
- * 실제 삽입/콜백 실행은 Editor.jsx에서 담당하고, 이 파일은 검색/라벨/snippet 정의와 쿼리 파싱만 맡는다.
+ * 실제 삽입/콜백 실행은 Editor.jsx/EditorToolbar.jsx에서 담당하고,
+ * 이 파일은 검색/라벨/snippet 정의와 쿼리 파싱만 맡는다.
  */
 import { buildMarkdownTableSnippet } from './tableEditing.js';
 
 export function buildToggleSnippet(variant = 'toggle') {
   const marker = variant === 'toggle' ? 'toggle' : `toggle-${variant}`;
   return `> [!${marker}] 제목\n> 내용\n`;
+}
+
+export function buildCalloutSnippet(type) {
+  return `> [!${type}] 제목\n> 내용\n`;
 }
 
 export const EDITOR_COMMANDS = [
@@ -36,6 +41,18 @@ export const EDITOR_COMMANDS = [
   },
   { id: 'page', label: '새 페이지', keywords: ['page', 'new-page', 'child-page', 'subpage'], action: 'create-page' },
   { id: 'image', label: '이미지/파일', keywords: ['image', 'file', 'upload'], action: 'image' },
+  // Callout 타입
+  { id: 'callout-note',     label: '📝 Note',     keywords: ['note', 'callout'],     insert: buildCalloutSnippet('note'),    selectionFrom: 9,  selectionTo: 11 },
+  { id: 'callout-tip',      label: '💡 Tip',      keywords: ['tip', 'hint', 'callout'],      insert: buildCalloutSnippet('tip'),     selectionFrom: 8,  selectionTo: 10 },
+  { id: 'callout-warning',  label: '⚠️ Warning',  keywords: ['warning', 'caution', 'callout'],  insert: buildCalloutSnippet('warning'), selectionFrom: 12, selectionTo: 14 },
+  { id: 'callout-danger',   label: '🔴 Danger',   keywords: ['danger', 'error', 'callout'],   insert: buildCalloutSnippet('danger'),  selectionFrom: 11, selectionTo: 13 },
+  { id: 'callout-success',  label: '✅ Success',  keywords: ['success', 'check', 'done', 'callout'],  insert: buildCalloutSnippet('success'), selectionFrom: 12, selectionTo: 14 },
+  { id: 'callout-info',     label: 'ℹ️ Info',     keywords: ['info', 'callout'],     insert: buildCalloutSnippet('info'),    selectionFrom: 9,  selectionTo: 11 },
+  { id: 'callout-abstract', label: '📋 Abstract', keywords: ['abstract', 'summary', 'callout'], insert: buildCalloutSnippet('abstract'), selectionFrom: 13, selectionTo: 15 },
+  { id: 'callout-question', label: '❓ Question', keywords: ['question', 'callout'], insert: buildCalloutSnippet('question'), selectionFrom: 13, selectionTo: 15 },
+  { id: 'callout-bug',      label: '🐛 Bug',      keywords: ['bug', 'callout'],      insert: buildCalloutSnippet('bug'),     selectionFrom: 8,  selectionTo: 10 },
+  { id: 'callout-example',  label: '📌 Example',  keywords: ['example', 'callout'],  insert: buildCalloutSnippet('example'), selectionFrom: 12, selectionTo: 14 },
+  { id: 'callout-quote',    label: '💬 Quote',    keywords: ['quote', 'callout'],    insert: buildCalloutSnippet('quote'),   selectionFrom: 10, selectionTo: 12 },
 ];
 
 export function filterEditorCommands(query) {

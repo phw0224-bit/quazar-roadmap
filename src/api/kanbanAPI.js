@@ -588,3 +588,19 @@ export async function getChildPages(parentItemId) {
   if (error) throw error;
   return data;
 }
+
+
+/**
+ * @description 특정 아이템을 [[위키링크]]로 참조하는 다른 아이템들을 조회한다.
+ * wiki link 저장 포맷: [[title|itemId]] 또는 [[title]] — id 포함 패턴으로 검색.
+ * @param {string} itemId - 대상 아이템 UUID
+ * @returns {Array} backlink 아이템 목록 (id, title, content, page_type)
+ */
+export async function getBacklinks(itemId) {
+  const { data, error } = await supabase
+    .from('items')
+    .select('id, title, content, page_type, project_id')
+    .ilike('description', `%|${itemId}]]%`);
+  if (error) throw error;
+  return data || [];
+}

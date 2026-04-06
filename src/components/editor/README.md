@@ -13,10 +13,14 @@
 
 | 파일 | 역할 | 주요 의존성 |
 |------|------|------------|
-| `Editor.jsx` | **핵심.** CodeMirror live/source editor, 툴바, 슬래시 메뉴, 파일 업로드, 위키링크/새 페이지 삽입, 표 편집 보조 | `@uiw/react-codemirror`, `utils/editorCommands.js`, `utils/tableEditing.js`, `utils/livePreview.js` |
+| `Editor.jsx` | **핵심.** CodeMirror live/source editor orchestration, 슬래시 메뉴 상태, 편집 이벤트 브리지 | `EditorToolbar.jsx`, `codemirror/livePreviewExtension.js`, `codemirror/tableSelectionExtension.js` |
+| `EditorToolbar.jsx` | 상단 툴바 버튼 렌더링 + 표 컨텍스트 액션 UI + 파일 선택 input | `utils/tableEditing.js`, `utils/editorCommands.js` |
 | `MarkdownPreview.jsx` | Markdown 읽기 전용 렌더링과 위키링크 클릭 처리 | `utils/markdownPreview.js` |
 | `SlashCommandMenu.jsx` | `/query` 기반 Markdown 명령 팔레트 UI | - |
+| `codemirror/livePreviewExtension.js` | live preview decoration + 헤딩 폴딩 위젯/상태 확장 | `utils/livePreview.js`, `utils/mermaidRenderer.js` |
+| `codemirror/tableSelectionExtension.js` | 표 활성 셀 강조 decoration 확장 | `utils/tableEditing.js` |
 | `utils/editorCommands.js` | 툴바/슬래시 메뉴 공용 명령 정의와 slash query 파싱 | - |
+| `utils/editorTextOps.js` | CodeMirror selection 기반 공용 삽입/치환 유틸 | `@codemirror/state` |
 | `utils/tableEditing.js` | 표 감지, Tab 셀 이동, 행/열 추가, 셀 비우기 | - |
 | `utils/markdownPreview.js` | 토글/위키링크 포함 preview HTML 렌더링 | `marked` |
 | `utils/markdownTransform.js` | Markdown 저장 경계와 legacy HTML -> Markdown 정규화 | `marked`, `turndown` |

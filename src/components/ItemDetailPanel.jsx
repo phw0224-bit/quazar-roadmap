@@ -12,15 +12,17 @@
  * - 댓글 목록 (CommentSection)
  * - 브레드크럼 네비게이션 (parent_item_id 체인 추적)
  */
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   ChevronsRight, Maximize2, Minimize2, ChevronRight, Trash2,
   Clock, Users, Building2, Tag, Link2, Plus, X,
   MessageSquare, Search, ArrowUpRight, AlignCenter, AlignJustify,
-  Calendar, Flag, LayoutList
+  Calendar, Flag, LayoutList, List
 } from 'lucide-react';
 import CommentSection from './CommentSection';
 import ItemDescriptionSection from './ItemDescriptionSection';
+import DocumentOutline from './DocumentOutline';
+import BacklinksPanel from './BacklinksPanel';
 import { TEAMS, STATUS_MAP, PRIORITY_MAP } from '../lib/constants';
 import { usePresenceContext } from '../hooks/usePresenceContext';
 import ItemViewers from './ItemViewers';
@@ -47,6 +49,10 @@ function ItemDetailPanel({
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [titleInput, setTitleInput] = useState(item?.title || item?.content || '');
   const [isWideView, setIsWideView] = useState(false);
+  const [showOutline, setShowOutline] = useState(false);
+  const [showBacklinks, setShowBacklinks] = useState(false);
+  const [currentEditorOffset, setCurrentEditorOffset] = useState(0);
+  const editorViewRef = useRef(null);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -77,6 +83,29 @@ function ItemDetailPanel({
   useEffect(() => () => {
     updateEditing(null);
   }, [updateEditing]);
+
+  const handleHeadingClick = (offset) => {
+    // CodeMirror editorView로 스크롤
+    if (editorViewRef.current) {
+      const view = editorViewRef.current;
+      const pos = Math.min(offset, view.state.doc.length);
+      const line = view.state.doc.lineAt(pos);
+      view.dispatch({
+        selection: { anchor: line.from, head: line.from },
+        scrollIntoView: true,
+      });
+      view.focus();
+    }
+  };
+
+  const handleEditorUpdate = (view) => {
+    if (view) {
+      editorViewRef.current = view;
+      const offset = view.state.selection.main.head;
+      setCurrentEditorOffset(offset);
+    }
+  };
+
   const handleSaveAssignees = async () => {
     const updated = assigneeInput.split(',').map(s => s.trim()).filter(s => s !== '');
     await onUpdateItem(phase.id, item.id, { assignees: updated });
@@ -189,6 +218,20 @@ function ItemDetailPanel({
             >
               {isWideView ? <AlignCenter size={20} strokeWidth={2.5} /> : <AlignJustify size={20} strokeWidth={2.5} />}
             </button>
+            <button
+              onClick={() => setShowOutline(v => !v)}
+              className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${showOutline ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
+              title={showOutline ? '목차 숨기기' : '목차 표시'}
+            >
+              <List size={20} strokeWidth={2.5} />
+            </button>
+            <button
+              onClick={() => setShowBacklinks(v => !v)}
+              className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${showBacklinks ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
+              title={showBacklinks ? '백링크 숨기기' : '백링크 표시'}
+            >
+              <Link2 size={20} strokeWidth={2.5} />
+            </button>
             {!isReadOnly && (
               <button
                 onClick={() => onShowConfirm('아이템 삭제', '정말로 이 아이템을 삭제하시겠습니까?', async () => {
@@ -252,7 +295,32 @@ function ItemDetailPanel({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar bg-white dark:bg-bg-base transition-colors duration-200">
+      {/* Main Content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* TOC 패널 (좌측) */}
+        {showOutline && item.description && (
+          <div className="w-64 border-r border-gray-200 dark:border-border-subtle bg-white dark:bg-bg-base flex-shrink-0 overflow-y-auto">
+            <DocumentOutline
+              markdown={item.description || ''}
+              onHeadingClick={handleHeadingClick}
+              currentOffset={currentEditorOffset}
+            />
+          </div>
+        )}
+
+        {/* 백링크 패널 (좌측, TOC와 함께 표시 가능) */}
+        {showBacklinks && (
+          <div className="w-64 border-r border-gray-200 dark:border-border-subtle bg-white dark:bg-bg-base flex-shrink-0 overflow-y-auto">
+            <BacklinksPanel
+              itemId={item.id}
+              allItems={allItems}
+              onOpenDetail={onOpenDetail}
+            />
+          </div>
+        )}
+
+        {/* 메인 스크롤 영역 */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar bg-white dark:bg-bg-base transition-colors duration-200">
         <div className={`${isWideView ? 'px-24' : 'max-w-4xl mx-auto px-12'} py-16 flex flex-col gap-16 transition-all duration-300`}>
           
           {/* Title */}
@@ -576,6 +644,8 @@ function ItemDetailPanel({
             onUpdateItem={onUpdateItem}
             onAddChildPage={onAddChildPage}
             onShowPrompt={onShowPrompt}
+            editorViewRef={editorViewRef}
+            onEditorUpdate={handleEditorUpdate}
           />
 
           {/* Project Items List (Only for project page_type) */}
@@ -652,8 +722,8 @@ function ItemDetailPanel({
           </div>
         </div>
       </div>
-
     </div>
+  </div>
   );
 }
 

@@ -13,38 +13,11 @@ import {
 } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
-import { EditorSelection, Prec, StateField } from '@codemirror/state';
-import {
-  Decoration,
-  EditorView,
-  WidgetType,
-  keymap,
-} from '@codemirror/view';
+import { Prec } from '@codemirror/state';
+import { EditorView, keymap } from '@codemirror/view';
 import { oneDark } from '@codemirror/theme-one-dark';
-import {
-  Bold,
-  Columns3,
-  CheckSquare,
-  Code,
-  Eye,
-  Eraser,
-  FilePlus2,
-  Heading1,
-  Heading2,
-  Heading3,
-  ImagePlus,
-  Link as LinkIcon,
-  List,
-  ListOrdered,
-  MessageSquareQuote,
-  Minus,
-  Quote,
-  Rows3,
-  Table2,
-  ChevronRightSquare,
-  Trash2,
-} from 'lucide-react';
 import SlashCommandMenu from './SlashCommandMenu';
+import EditorToolbar from './EditorToolbar';
 import { buildPageWikiLink } from './utils/markdownPreview';
 import {
   EDITOR_COMMANDS,
@@ -54,262 +27,33 @@ import {
   rankWikiLinkItems,
 } from './utils/editorCommands';
 import {
-  addMarkdownTableColumn,
-  addMarkdownTableRow,
-  clearMarkdownTableCell,
-  deleteMarkdownTableColumn,
-  deleteMarkdownTableRow,
   getMarkdownTableContext,
   moveMarkdownTableSelection,
 } from './utils/tableEditing';
-import { getMarkdownLivePreviewPlan } from './utils/livePreview';
+import {
+  insertAroundSelection,
+  insertAtSelection,
+  replaceRange,
+} from './utils/editorTextOps';
+import {
+  createLivePreviewExtension,
+  toggleHeadingFold,
+} from './codemirror/livePreviewExtension';
+import { createTableSelectionExtension } from './codemirror/tableSelectionExtension';
 
-function ToolbarButton({ title, onClick, children, disabled = false }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      disabled={disabled}
-      className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border-subtle dark:bg-bg-base dark:text-text-secondary dark:hover:bg-bg-hover dark:hover:text-text-primary"
-    >
-      {children}
-    </button>
-  );
-}
+const LIVE_WIDGET_SELECTOR = [
+  '.cm-live-codeblock-widget',
+  '.cm-live-mermaid-wrapper',
+  '.cm-live-table-widget',
+  '.cm-live-blockquote-widget',
+  '.cm-live-callout-widget',
+  '.cm-live-math-widget',
+  '.cm-live-hr-widget',
+  '.cm-live-image-wrapper',
+  '.cm-heading-folded-placeholder',
+].join(', ');
 
-function insertAroundSelection(view, prefix, suffix = '') {
-  if (!view) return;
-  const { from, to } = view.state.selection.main;
-  const selected = view.state.sliceDoc(from, to);
-  const text = `${prefix}${selected}${suffix}`;
-  view.dispatch({
-    changes: { from, to, insert: text },
-    selection: EditorSelection.range(from + prefix.length, from + prefix.length + selected.length),
-  });
-  view.focus();
-}
-
-function replaceRange(view, from, to, text, { selectFrom = null, selectTo = null } = {}) {
-  if (!view) return;
-  const anchor = selectFrom == null ? from + text.length : from + selectFrom;
-  const head = selectTo == null ? anchor : from + selectTo;
-
-  view.dispatch({
-    changes: { from, to, insert: text },
-    selection: EditorSelection.range(anchor, head),
-  });
-  view.focus();
-}
-
-function insertAtSelection(view, text, options = {}) {
-  if (!view) return;
-  const { from, to } = view.state.selection.main;
-  replaceRange(view, from, to, text, {
-    selectFrom: options.selectFrom ?? options.selectionFrom ?? null,
-    selectTo: options.selectTo ?? options.selectionTo ?? null,
-  });
-}
-
-const TOOLBAR_COMMAND_IDS = [
-  'h1',
-  'h2',
-  'h3',
-  'bullet',
-  'numbered',
-  'todo',
-  'quote',
-  'code',
-  'table',
-  'divider',
-  'toggle',
-  'toggle-note',
-  'link-page',
-  'page',
-  'image',
-];
-
-const TOOLBAR_ICONS = {
-  h1: Heading1,
-  h2: Heading2,
-  h3: Heading3,
-  bullet: List,
-  numbered: ListOrdered,
-  todo: CheckSquare,
-  quote: Quote,
-  code: Code,
-  table: Table2,
-  divider: Minus,
-  toggle: ChevronRightSquare,
-  'toggle-note': MessageSquareQuote,
-  'link-page': LinkIcon,
-  page: FilePlus2,
-  image: ImagePlus,
-};
-
-class InlinePreviewWidget extends WidgetType {
-  constructor(label, className) {
-    super();
-    this.label = label;
-    this.className = className;
-  }
-
-  eq(other) {
-    return other.label === this.label && other.className === this.className;
-  }
-
-  toDOM() {
-    const element = document.createElement('span');
-    element.className = this.className;
-    element.textContent = this.label;
-    return element;
-  }
-}
-
-class HTMLPreviewWidget extends WidgetType {
-  constructor(html, className) {
-    super();
-    this.html = html;
-    this.className = className;
-  }
-
-  eq(other) {
-    return other.html === this.html && other.className === this.className;
-  }
-
-  toDOM() {
-    const element = document.createElement('div');
-    element.className = this.className;
-    element.innerHTML = this.html;
-    return element;
-  }
-
-  ignoreEvent() {
-    return false;
-  }
-}
-
-class InlineImageWidget extends WidgetType {
-  constructor(url, alt) {
-    super();
-    this.url = url;
-    this.alt = alt;
-  }
-
-  eq(other) {
-    return other.url === this.url && other.alt === this.alt;
-  }
-
-  toDOM() {
-    const wrapper = document.createElement('span');
-    wrapper.className = 'cm-live-image-wrapper';
-    const img = document.createElement('img');
-    img.src = this.url;
-    img.alt = this.alt;
-    img.className = 'cm-live-image-el';
-    img.loading = 'lazy';
-    wrapper.appendChild(img);
-    return wrapper;
-  }
-
-  ignoreEvent() {
-    return false;
-  }
-}
-
-function createLivePreviewExtension(enabled) {
-  if (!enabled) return [];
-
-  const field = StateField.define({
-    create(state) {
-      return buildLivePreviewDecorationsFromState(state);
-    },
-    update(_value, transaction) {
-      if (transaction.docChanged || transaction.selection) {
-        return buildLivePreviewDecorationsFromState(transaction.state);
-      }
-      return buildLivePreviewDecorationsFromState(transaction.state);
-    },
-    provide: (fieldRef) => EditorView.decorations.from(fieldRef),
-  });
-
-  return [field];
-}
-
-function createTableSelectionExtension(enabled) {
-  if (!enabled) return [];
-
-  const field = StateField.define({
-    create(state) {
-      return buildTableSelectionDecoration(state);
-    },
-    update(_value, transaction) {
-      return buildTableSelectionDecoration(transaction.state);
-    },
-    provide: (fieldRef) => EditorView.decorations.from(fieldRef),
-  });
-
-  return [field];
-}
-
-function buildLivePreviewDecorationsFromState(state) {
-  const selection = state.selection.main;
-  const activeLineIndex = state.doc.lineAt(selection.head).number - 1;
-  const plan = getMarkdownLivePreviewPlan(state.doc.toString(), activeLineIndex, selection.head);
-  const decorations = [];
-
-  plan.replacements.forEach((item) => {
-    decorations.push(
-      Decoration.replace({
-        widget: new InlinePreviewWidget(item.label, item.className),
-        inclusive: false,
-      }).range(item.from, item.to),
-    );
-  });
-
-  plan.lineClasses.forEach((item) => {
-    decorations.push(Decoration.line({ class: item.className }).range(item.lineStart));
-  });
-
-  plan.marks.forEach((item) => {
-    decorations.push(Decoration.mark({ class: item.className }).range(item.from, item.to));
-  });
-
-  plan.blockWidgets.forEach((item) => {
-    decorations.push(
-      Decoration.replace({
-        widget: new HTMLPreviewWidget(item.html, item.className),
-        block: true,
-      }).range(item.from, item.to),
-    );
-  });
-
-  // 이미지 인라인 위젯: ![alt](url) → 실제 <img> 렌더링
-  plan.inlineWidgets.forEach((item) => {
-    decorations.push(
-      Decoration.replace({
-        widget: new InlineImageWidget(item.url, item.alt),
-        inclusive: false,
-      }).range(item.from, item.to),
-    );
-  });
-
-  return Decoration.set(decorations, true);
-}
-
-function buildTableSelectionDecoration(state) {
-  const context = getMarkdownTableContext(state.doc.toString(), state.selection.main.head);
-  if (!context?.activeCell) return Decoration.none;
-
-  return Decoration.set([
-    Decoration.mark({ class: 'cm-table-active-cell' }).range(
-      context.activeCell.from,
-      Math.max(context.activeCell.from + 1, context.activeCell.to),
-    ),
-  ]);
-}
-
-export default function Editor({
+function Editor({
   content,
   onChange,
   editable,
@@ -324,8 +68,11 @@ export default function Editor({
   onAddChildPage,
   onShowPrompt,
   onLinkExistingPage,
+  editorViewRef: externalEditorViewRef,
+  onUpdate: externalOnUpdate,
 }) {
-  const editorViewRef = useRef(null);
+  const internalEditorViewRef = useRef(null);
+  const editorViewRef = externalEditorViewRef || internalEditorViewRef;
   const wrapperRef = useRef(null);
   const fileInputRef = useRef(null);
   const isApplyingExternalValue = useRef(false);
@@ -465,7 +212,7 @@ export default function Editor({
       if (!item) return;
       insertAtSelection(editorViewRef.current, buildPageWikiLink(item));
     });
-  }, [onLinkExistingPage]);
+  }, [editorViewRef, onLinkExistingPage]);
 
   const handleInsertChildPage = useCallback(() => {
     if (!onAddChildPage || !onShowPrompt || !editorViewRef.current) return;
@@ -481,7 +228,7 @@ export default function Editor({
         onShowToast?.(`하위 페이지 생성 실패: ${error.message}`);
       }
     });
-  }, [onAddChildPage, onShowPrompt, onShowToast]);
+  }, [editorViewRef, onAddChildPage, onShowPrompt, onShowToast]);
 
   const runCommand = useCallback((command, range = null) => {
     const view = editorViewRef.current;
@@ -511,7 +258,7 @@ export default function Editor({
     }
 
     closeSlashMenu();
-  }, [closeSlashMenu, handleInsertChildPage, handleInsertPageLink]);
+  }, [closeSlashMenu, editorViewRef, handleInsertChildPage, handleInsertPageLink]);
 
   const runCommandById = useCallback((commandId) => {
     const command = commandMap[commandId];
@@ -540,7 +287,7 @@ export default function Editor({
 
     runCommand(selected, { from: activeSlash.from, to: activeSlash.to });
     return true;
-  }, [closeSlashMenu, runCommand, selectedSlashIndex]);
+  }, [closeSlashMenu, editorViewRef, runCommand, selectedSlashIndex]);
 
   const extensions = useMemo(() => [
     markdown({
@@ -589,10 +336,45 @@ export default function Editor({
       },
     ])),
     EditorView.domEventHandlers({
+      mousedown: (event) => {
+        const view = editorViewRef.current;
+        if (!view || mode !== 'live' || event.button !== 0) return false;
+
+        const foldToggle = event.target?.closest?.('[data-fold-line]');
+        if (foldToggle) {
+          const lineFrom = parseInt(foldToggle.getAttribute('data-fold-line'), 10);
+          if (!Number.isNaN(lineFrom)) {
+            event.preventDefault();
+            view.dispatch({ effects: toggleHeadingFold.of(lineFrom) });
+            return true;
+          }
+        }
+
+        const widgetRoot = event.target?.closest?.(LIVE_WIDGET_SELECTOR);
+        if (widgetRoot) {
+          try {
+            const widgetPos = view.posAtDOM(widgetRoot, 0);
+            if (widgetPos != null) {
+              const widgetLine = view.state.doc.lineAt(widgetPos);
+              event.preventDefault();
+              view.dispatch({
+                selection: { anchor: widgetLine.from, head: widgetLine.from },
+                scrollIntoView: true,
+              });
+              view.focus();
+              return true;
+            }
+          } catch {
+            // Fall through to default CodeMirror behavior when DOM->position mapping is unavailable.
+          }
+        }
+
+        return false;
+      },
       keydown: (event) => {
         const view = editorViewRef.current;
 
-        if (view && (event.key === 'Tab')) {
+        if (view && event.key === 'Tab') {
           const selection = view.state.selection.main;
           if (selection.empty) {
             const move = moveMarkdownTableSelection(
@@ -616,7 +398,7 @@ export default function Editor({
         return false;
       },
     }),
-  ], [closeSlashMenu, executeSelectedSlashCommand, mode, syncTableContext]);
+  ], [closeSlashMenu, editable, editorViewRef, executeSelectedSlashCommand, mode, syncTableContext]);
 
   useEffect(() => {
     const view = editorViewRef.current;
@@ -632,7 +414,7 @@ export default function Editor({
     isApplyingExternalValue.current = false;
     syncSlashMenu(view);
     syncTableContext(view);
-  }, [content, syncSlashMenu, syncTableContext]);
+  }, [content, editorViewRef, syncSlashMenu, syncTableContext]);
 
   const applyTableChange = useCallback((operation) => {
     const view = editorViewRef.current;
@@ -645,7 +427,7 @@ export default function Editor({
       selectTo: result.cursor,
     });
     syncTableContext(view);
-  }, [syncTableContext]);
+  }, [editorViewRef, syncTableContext]);
 
   const handleFileChange = async (event) => {
     const file = event.target.files?.[0];
@@ -683,72 +465,21 @@ export default function Editor({
       onMouseEnter={() => setIsSurfaceHovered(true)}
       onMouseLeave={() => setIsSurfaceHovered(false)}
     >
-      {editable && (
-        <div className="relative rounded-2xl border border-gray-200 bg-gray-50 px-2 py-2 dark:border-border-subtle dark:bg-bg-elevated">
-          <div className="flex flex-wrap items-center gap-1">
-          {TOOLBAR_COMMAND_IDS.map((commandId) => {
-            const command = commandMap[commandId];
-            const Icon = TOOLBAR_ICONS[commandId];
-            const isDisabled = (commandId === 'link-page' && !onLinkExistingPage)
-              || (commandId === 'page' && !onAddChildPage)
-              || (commandId === 'image' && !itemId);
-
-            return (
-              <ToolbarButton
-                key={commandId}
-                title={command.label}
-                onClick={() => runCommandById(commandId)}
-                disabled={isDisabled}
-              >
-                <Icon size={15} />
-              </ToolbarButton>
-            );
-          })}
-          <ToolbarButton title="굵게" onClick={() => insertAroundSelection(editorViewRef.current, '**', '**')}>
-            <Bold size={15} />
-          </ToolbarButton>
-          </div>
-          {tableContext && (
-            <div
-              className={`pointer-events-none absolute left-2 right-2 top-full z-20 mt-2 flex flex-wrap items-center gap-1 rounded-xl border border-gray-200 bg-white px-2 py-2 shadow-lg transition-all duration-150 dark:border-border-subtle dark:bg-bg-base dark:shadow-black/20 ${
-                isSurfaceHovered || isEditorFocused ? 'pointer-events-auto opacity-100 translate-y-0' : '-translate-y-1 opacity-0'
-              }`}
-            >
-              <span className="px-1.5 text-[10px] font-black uppercase tracking-[0.22em] text-gray-400 dark:text-text-tertiary">
-                Table R{tableContext.activeEditableRowIndex + 1} C{tableContext.activeColumnIndex + 1}
-              </span>
-              <ToolbarButton title="행 추가" onClick={() => applyTableChange(addMarkdownTableRow)}>
-                <Rows3 size={15} />
-              </ToolbarButton>
-              <ToolbarButton title="열 추가" onClick={() => applyTableChange(addMarkdownTableColumn)}>
-                <Columns3 size={15} />
-              </ToolbarButton>
-              <ToolbarButton title="셀 비우기" onClick={() => applyTableChange(clearMarkdownTableCell)}>
-                <Eraser size={15} />
-              </ToolbarButton>
-              <ToolbarButton title="행 삭제" onClick={() => applyTableChange(deleteMarkdownTableRow)}>
-                <span className="inline-flex items-center gap-1">
-                  <Rows3 size={15} />
-                  <Trash2 size={11} />
-                </span>
-              </ToolbarButton>
-              <ToolbarButton title="열 삭제" onClick={() => applyTableChange(deleteMarkdownTableColumn)}>
-                <span className="inline-flex items-center gap-1">
-                  <Columns3 size={15} />
-                  <Trash2 size={11} />
-                </span>
-              </ToolbarButton>
-            </div>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
-            onChange={handleFileChange}
-          />
-        </div>
-      )}
+      <EditorToolbar
+        editable={editable}
+        commandMap={commandMap}
+        runCommandById={runCommandById}
+        insertBold={() => insertAroundSelection(editorViewRef.current, '**', '**')}
+        tableContext={tableContext}
+        applyTableChange={applyTableChange}
+        isSurfaceHovered={isSurfaceHovered}
+        isEditorFocused={isEditorFocused}
+        onLinkExistingPage={onLinkExistingPage}
+        onAddChildPage={onAddChildPage}
+        itemId={itemId}
+        fileInputRef={fileInputRef}
+        onFileChange={handleFileChange}
+      />
 
       <div
         ref={(node) => {
@@ -783,12 +514,14 @@ export default function Editor({
           onUpdate={(viewUpdate) => {
             syncSlashMenu(viewUpdate.view);
             syncTableContext(viewUpdate.view);
+            externalOnUpdate?.(viewUpdate.view);
           }}
           onChange={(value, viewUpdate) => {
             if (isApplyingExternalValue.current) return;
             onChange?.(value);
             syncSlashMenu(viewUpdate.view);
             syncTableContext(viewUpdate.view);
+            externalOnUpdate?.(viewUpdate.view);
           }}
           onBlur={(event) => {
             if (event.relatedTarget?.closest?.('[data-slash-menu-root]')) return;
@@ -824,3 +557,5 @@ export default function Editor({
     </div>
   );
 }
+
+export default Editor;
