@@ -189,6 +189,34 @@ class HTMLPreviewWidget extends WidgetType {
   }
 }
 
+class InlineImageWidget extends WidgetType {
+  constructor(url, alt) {
+    super();
+    this.url = url;
+    this.alt = alt;
+  }
+
+  eq(other) {
+    return other.url === this.url && other.alt === this.alt;
+  }
+
+  toDOM() {
+    const wrapper = document.createElement('span');
+    wrapper.className = 'cm-live-image-wrapper';
+    const img = document.createElement('img');
+    img.src = this.url;
+    img.alt = this.alt;
+    img.className = 'cm-live-image-el';
+    img.loading = 'lazy';
+    wrapper.appendChild(img);
+    return wrapper;
+  }
+
+  ignoreEvent() {
+    return false;
+  }
+}
+
 function createLivePreviewExtension(enabled) {
   if (!enabled) return [];
 
@@ -227,7 +255,7 @@ function createTableSelectionExtension(enabled) {
 function buildLivePreviewDecorationsFromState(state) {
   const selection = state.selection.main;
   const activeLineIndex = state.doc.lineAt(selection.head).number - 1;
-  const plan = getMarkdownLivePreviewPlan(state.doc.toString(), activeLineIndex);
+  const plan = getMarkdownLivePreviewPlan(state.doc.toString(), activeLineIndex, selection.head);
   const decorations = [];
 
   plan.replacements.forEach((item) => {
@@ -252,6 +280,16 @@ function buildLivePreviewDecorationsFromState(state) {
       Decoration.replace({
         widget: new HTMLPreviewWidget(item.html, item.className),
         block: true,
+      }).range(item.from, item.to),
+    );
+  });
+
+  // 이미지 인라인 위젯: ![alt](url) → 실제 <img> 렌더링
+  plan.inlineWidgets.forEach((item) => {
+    decorations.push(
+      Decoration.replace({
+        widget: new InlineImageWidget(item.url, item.alt),
+        inclusive: false,
       }).range(item.from, item.to),
     );
   });

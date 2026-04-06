@@ -531,6 +531,40 @@ input:focus, textarea:focus {
   font-size: 0.92em;
 }
 
+.cm-live-strikethrough {
+  text-decoration: line-through;
+  color: var(--color-text-tertiary);
+  opacity: 0.75;
+}
+
+.cm-live-highlight {
+  background: rgba(250, 204, 21, 0.22);
+  color: #fde68a;
+  border-radius: 0.25rem;
+  padding: 0.05rem 0.15rem;
+}
+
+.dark .cm-live-highlight {
+  background: rgba(250, 204, 21, 0.18);
+}
+
+/* 이미지 인라인 위젯 */
+.cm-live-image-wrapper {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: middle;
+  margin: 0.35rem 0;
+}
+
+.cm-live-image-el {
+  display: block;
+  max-width: 100%;
+  max-height: 420px;
+  border-radius: 0.6rem;
+  object-fit: contain;
+  cursor: default;
+}
+
 .cm-table-active-cell {
   border-radius: 0.35rem;
   background: rgba(96, 165, 250, 0.16);

@@ -10,13 +10,33 @@ test('live preview hides heading markers on inactive lines', () => {
   assert.ok(plan.lineClasses.some((item) => item.className.includes('cm-live-heading-1')));
 });
 
-test('live preview keeps active line in source form', () => {
+test('live preview keeps active line prefix in source form but renders inline marks', () => {
+  // 줄 수준 prefix(# 등)는 source 그대로, 인라인 마크는 렌더링
   const plan = getMarkdownLivePreviewPlan('# 제목\n본문', 0);
 
-  assert.equal(plan.replacements.length, 0);
-  assert.equal(plan.marks.length, 0);
-  assert.equal(plan.blockWidgets.length, 0);
+  // heading prefix(# )는 숨기지 않음 (줄 수준 장식 생략)
+  assert.ok(!plan.lineClasses.some((item) => item.className?.includes('cm-live-heading')));
   assert.ok(plan.lineClasses.some((item) => item.className === 'cm-live-active-line'));
+  assert.equal(plan.blockWidgets.length, 0);
+});
+
+test('live preview renders inline bold on active line when cursor is outside the token', () => {
+  // '**굵게** 텍스트' — cursorPos=10 (텍스트 부분), 커서가 bold 토큰 밖
+  const text = '**굵게** 텍스트';
+  // bold 토큰: '**굵게**' = 0~9 bytes (UTF-16 기준 대략적으로 확인)
+  const cursorPos = text.length; // 맨 끝
+  const plan = getMarkdownLivePreviewPlan(text, 0, cursorPos);
+
+  assert.ok(plan.marks.some((item) => item.className === 'cm-live-strong'));
+});
+
+test('live preview skips bold rendering on active line when cursor is inside the token', () => {
+  // '**굵게** 텍스트' — cursorPos=2 (bold 토큰 내부)
+  const text = '**bold** text';
+  const cursorPos = 3; // bold 토큰 안쪽
+  const plan = getMarkdownLivePreviewPlan(text, 0, cursorPos);
+
+  assert.ok(!plan.marks.some((item) => item.className === 'cm-live-strong'));
 });
 
 test('live preview replaces wiki links and task markers', () => {
@@ -72,6 +92,34 @@ test('live preview decorates inline bold and code tokens on inactive lines', () 
 
   assert.ok(plan.marks.some((item) => item.className === 'cm-live-strong'));
   assert.ok(plan.marks.some((item) => item.className === 'cm-live-inline-code'));
+});
+
+test('live preview decorates strikethrough tokens on inactive lines', () => {
+  const plan = getMarkdownLivePreviewPlan('~~취소선~~ 텍스트', -1);
+
+  assert.ok(plan.marks.some((item) => item.className === 'cm-live-strikethrough'));
+});
+
+test('live preview decorates highlight tokens on inactive lines', () => {
+  const plan = getMarkdownLivePreviewPlan('==형광펜== 텍스트', -1);
+
+  assert.ok(plan.marks.some((item) => item.className === 'cm-live-highlight'));
+});
+
+test('live preview creates image inline widget for inactive lines', () => {
+  const plan = getMarkdownLivePreviewPlan('텍스트 ![고양이](https://example.com/cat.jpg) 끝', -1);
+
+  assert.equal(plan.inlineWidgets.length, 1);
+  assert.equal(plan.inlineWidgets[0].url, 'https://example.com/cat.jpg');
+  assert.equal(plan.inlineWidgets[0].alt, '고양이');
+});
+
+test('live preview skips image widget when cursor is inside image token', () => {
+  const text = '![cat](https://example.com/cat.jpg)';
+  const cursorPos = 5; // 이미지 토큰 내부
+  const plan = getMarkdownLivePreviewPlan(text, 0, cursorPos);
+
+  assert.equal(plan.inlineWidgets.length, 0);
 });
 
 test('live preview replaces ordered list prefixes on inactive lines', () => {

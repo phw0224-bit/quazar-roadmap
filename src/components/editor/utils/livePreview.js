@@ -1,12 +1,14 @@
 /**
  * @fileoverview Markdown live preview 장식 계획 유틸.
  *
- * 현재 줄은 source 그대로 두고, 나머지 줄은 헤더/토글/체크리스트/위키링크 문법을
- * 렌더처럼 보이게 만들 수 있도록 Decoration 계획을 계산한다.
+ * - 비활성 줄: 헤더/토글/체크리스트/위키링크 + 인라인 마크 전부 렌더링
+ * - 활성 줄(커서 위치 줄): 줄 수준 prefix(##, -, > 등)는 source 그대로 두고,
+ *   인라인 마크(**bold**, ~~취소선~~, ==형광펜== 등)는 토큰 단위로 렌더링.
+ *   커서가 해당 토큰 내부에 있으면 source 표시, 그 외는 렌더링.
  */
 import { renderMarkdownPreviewHTML } from './markdownPreview.js';
 
-export function getMarkdownLivePreviewPlan(text, activeLineIndex = -1) {
+export function getMarkdownLivePreviewPlan(text, activeLineIndex = -1, cursorPos = -1) {
   const source = text || '';
   const lines = source.split('\n');
   const lineStarts = getLineStarts(lines);
@@ -14,6 +16,7 @@ export function getMarkdownLivePreviewPlan(text, activeLineIndex = -1) {
   const lineClasses = [];
   const blockWidgets = [];
   const marks = [];
+  const inlineWidgets = [];
 
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
     const codeFenceRange = getFencedCodeBlock(lines, lineStarts, lineIndex, activeLineIndex);
@@ -54,6 +57,10 @@ export function getMarkdownLivePreviewPlan(text, activeLineIndex = -1) {
         lineStart: lineStarts[lineIndex],
         className: 'cm-live-active-line',
       });
+      // 줄 수준 prefix는 source 그대로 두고, 인라인 마크만 토큰 단위로 렌더링
+      const lineStart = lineStarts[lineIndex];
+      collectInlineMarks(lines[lineIndex], lineStart, marks, replacements, cursorPos);
+      collectImageWidgets(lines[lineIndex], lineStart, inlineWidgets, cursorPos);
       continue;
     }
 
@@ -146,10 +153,11 @@ export function getMarkdownLivePreviewPlan(text, activeLineIndex = -1) {
       });
     }
 
-    collectInlineMarks(line, lineStart, marks, replacements);
+    collectInlineMarks(line, lineStart, marks, replacements, -1);
+    collectImageWidgets(line, lineStart, inlineWidgets, -1);
   }
 
-  return { replacements, lineClasses, blockWidgets, marks };
+  return { replacements, lineClasses, blockWidgets, marks, inlineWidgets };
 }
 
 function getLineStarts(lines) {
@@ -268,17 +276,42 @@ function isHorizontalRule(line = '') {
     || /^(_\s*){3,}$/.test(trimmed);
 }
 
-function collectInlineMarks(line, lineStart, marks, replacements) {
-  collectWrappedToken(line, lineStart, /\*\*([^*]+)\*\*/g, 2, 'cm-live-strong', replacements, marks);
-  collectWrappedToken(line, lineStart, /`([^`]+)`/g, 1, 'cm-live-inline-code', replacements, marks);
-  collectWrappedToken(line, lineStart, /\*([^*\s][^*]*?)\*/g, 1, 'cm-live-emphasis', replacements, marks);
+function collectInlineMarks(line, lineStart, marks, replacements, cursorPos) {
+  collectWrappedToken(line, lineStart, /\*\*([^*]+)\*\*/g, 2, 'cm-live-strong', replacements, marks, cursorPos);
+  collectWrappedToken(line, lineStart, /`([^`]+)`/g, 1, 'cm-live-inline-code', replacements, marks, cursorPos);
+  collectWrappedToken(line, lineStart, /\*([^*\s][^*]*?)\*/g, 1, 'cm-live-emphasis', replacements, marks, cursorPos);
+  collectWrappedToken(line, lineStart, /~~([^~\n]+)~~/g, 2, 'cm-live-strikethrough', replacements, marks, cursorPos);
+  collectWrappedToken(line, lineStart, /==([^=\n]+)==/g, 2, 'cm-live-highlight', replacements, marks, cursorPos);
 }
 
-function collectWrappedToken(line, lineStart, regex, wrapperLength, className, replacements, marks) {
+/**
+ * @description 이미지 마크다운 `![alt](url)` 을 인라인 위젯으로 변환.
+ * 커서가 해당 토큰 내부에 있으면 source 그대로 표시하여 편집 가능.
+ */
+function collectImageWidgets(line, lineStart, inlineWidgets, cursorPos) {
+  const imageRegex = /!\[([^\]]*)\]\(([^)\n]+)\)/g;
+  let match;
+  while ((match = imageRegex.exec(line)) !== null) {
+    const from = lineStart + match.index;
+    const to = from + match[0].length;
+    // 커서가 이미지 마크다운 내부에 있으면 source 그대로 표시
+    if (cursorPos >= 0 && cursorPos >= from && cursorPos <= to) continue;
+    inlineWidgets.push({
+      from,
+      to,
+      url: match[2],
+      alt: match[1] || '',
+    });
+  }
+}
+
+function collectWrappedToken(line, lineStart, regex, wrapperLength, className, replacements, marks, cursorPos) {
   let match;
   while ((match = regex.exec(line)) !== null) {
     const from = lineStart + match.index;
     const to = from + match[0].length;
+    // 커서가 이 토큰 안에 있으면 렌더링 건너뜀 → source 그대로 표시
+    if (cursorPos >= 0 && cursorPos >= from && cursorPos <= to) continue;
     replacements.push({
       from,
       to: from + wrapperLength,
