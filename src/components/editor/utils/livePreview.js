@@ -13,6 +13,7 @@ export function getMarkdownLivePreviewPlan(text, activeLineIndex = -1, cursorPos
   const source = text || '';
   const lines = source.split('\n');
   const lineStarts = getLineStarts(lines);
+  const activeToggleRange = getActiveToggleRange(lines, activeLineIndex);
   const replacements = [];
   const lineClasses = [];
   const blockWidgets = [];
@@ -20,6 +21,16 @@ export function getMarkdownLivePreviewPlan(text, activeLineIndex = -1, cursorPos
   const inlineWidgets = [];
 
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+    if (activeToggleRange && lineIndex >= activeToggleRange.startLine && lineIndex <= activeToggleRange.endLine) {
+      if (lineIndex === activeLineIndex) {
+        lineClasses.push({
+          lineStart: lineStarts[lineIndex],
+          className: 'cm-live-active-line',
+        });
+      }
+      continue;
+    }
+
     // 블록 수식 $$ ... $$ 처리 (코드 블록보다 먼저)
     const mathBlockRange = getMathBlock(lines, lineStarts, lineIndex, activeLineIndex);
     if (mathBlockRange) {
@@ -47,6 +58,13 @@ export function getMarkdownLivePreviewPlan(text, activeLineIndex = -1, cursorPos
     if (tableRange) {
       blockWidgets.push(tableRange);
       lineIndex = tableRange.endLine;
+      continue;
+    }
+
+    const toggleRange = getToggleBlock(lines, lineStarts, lineIndex, activeLineIndex);
+    if (toggleRange) {
+      blockWidgets.push(toggleRange);
+      lineIndex = toggleRange.endLine;
       continue;
     }
 
@@ -227,6 +245,51 @@ function getMarkdownTableBlock(lines, lineStarts, lineIndex, activeLineIndex) {
     className: 'cm-live-table-widget',
     endLine,
   };
+}
+
+function getToggleBlock(lines, lineStarts, lineIndex, activeLineIndex) {
+  const firstLine = lines[lineIndex];
+  if (!/^\s*>\s*\[!toggle(?:-[a-z0-9]+)?\]/i.test(firstLine)) return null;
+
+  let endLine = lineIndex;
+  while (endLine + 1 < lines.length && /^\s*>\s?/.test(lines[endLine + 1])) {
+    endLine += 1;
+  }
+
+  if (activeLineIndex >= lineIndex && activeLineIndex <= endLine) return null;
+
+  const from = lineStarts[lineIndex];
+  const to = getBlockRangeEnd(lines, lineStarts, endLine);
+  const markdown = lines.slice(lineIndex, endLine + 1).join('\n');
+
+  return {
+    from,
+    to,
+    html: renderMarkdownPreviewHTML(markdown),
+    className: 'cm-live-toggle-widget',
+    endLine,
+  };
+}
+
+function getActiveToggleRange(lines, activeLineIndex) {
+  if (activeLineIndex < 0 || activeLineIndex >= lines.length) return null;
+
+  for (let startLine = 0; startLine < lines.length; startLine += 1) {
+    if (!/^\s*>\s*\[!toggle(?:-[a-z0-9]+)?\]/i.test(lines[startLine])) continue;
+
+    let endLine = startLine;
+    while (endLine + 1 < lines.length && /^\s*>\s?/.test(lines[endLine + 1])) {
+      endLine += 1;
+    }
+
+    if (activeLineIndex >= startLine && activeLineIndex <= endLine) {
+      return { startLine, endLine };
+    }
+
+    startLine = endLine;
+  }
+
+  return null;
 }
 
 function isTableHeaderLine(line = '') {

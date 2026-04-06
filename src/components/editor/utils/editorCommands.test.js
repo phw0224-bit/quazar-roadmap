@@ -42,6 +42,14 @@ test('filterEditorCommands matches by id and keyword', () => {
   assert.ok(
     filterEditorCommands('new-page').some((command) => command.id === 'page'),
   );
+
+  assert.ok(
+    filterEditorCommands('mermaid').some((command) => command.id === 'mermaid'),
+  );
+
+  assert.ok(
+    filterEditorCommands('footnote').some((command) => command.id === 'footnote-ref'),
+  );
 });
 
 test('getSlashCommandContext resolves slash query at line end', () => {

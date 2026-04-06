@@ -338,6 +338,7 @@ export default function ItemDescriptionSection({
               containerRef={descriptionRef}
               onOpenLink={handleOpenLink}
               onToggleTaskItem={handleToggleTaskItem}
+              allItems={allItems}
             />
           )}
         </div>

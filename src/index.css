@@ -378,6 +378,62 @@ input:focus, textarea:focus {
   font-size: 1rem;
 }
 
+/* Live Preview 토글 블록 */
+.cm-live-toggle-widget {
+  margin: 0.05rem 0;
+}
+
+.cm-live-toggle-widget details[data-toggle-preview] {
+  margin: 0;
+  border: 1px solid rgba(229, 231, 235, 1);
+  border-radius: 0.9rem;
+  background: rgba(249, 250, 251, 0.78);
+  overflow: hidden;
+}
+
+.dark .cm-live-toggle-widget details[data-toggle-preview] {
+  border-color: rgba(55, 65, 81, 1);
+  background: rgba(33, 33, 33, 0.75);
+}
+
+.cm-live-toggle-widget details[data-toggle-preview] > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 0.75rem 0.95rem;
+  font-weight: 700;
+}
+
+.cm-live-toggle-widget details[data-toggle-preview] > summary::-webkit-details-marker {
+  display: none;
+}
+
+.cm-live-toggle-widget details[data-toggle-preview] > :not(summary) {
+  padding: 0 0.95rem 0.95rem 1.8rem;
+}
+
+.cm-live-toggle-widget details[data-toggle-preview][data-variant="note"] {
+  border-color: rgba(59, 130, 246, 0.25);
+  background: rgba(59, 130, 246, 0.07);
+}
+
+.dark .cm-live-toggle-widget details[data-toggle-preview][data-variant="note"] {
+  border-color: rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.14);
+}
+
+.cm-live-toggle-widget details[data-toggle-preview][data-variant="h1"] > summary {
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+}
+
+.cm-live-toggle-widget details[data-toggle-preview][data-variant="h2"] > summary {
+  font-size: 1.08rem;
+}
+
+.cm-live-toggle-widget details[data-toggle-preview][data-variant="h3"] > summary {
+  font-size: 1rem;
+}
+
 .markdown-preview .wiki-link {
   color: #2563eb;
   text-decoration: none;
@@ -672,7 +728,7 @@ input:focus, textarea:focus {
   border-radius: 3px;
   transition: color 0.12s, background 0.12s, opacity 0.12s;
   vertical-align: middle;
-  opacity: 0;
+  opacity: 0.3;
 }
 /* 헤딩 라인에 마우스 오버 시 토글 표시 */
 .cm-line:hover .cm-heading-fold-toggle,

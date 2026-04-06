@@ -66,11 +66,47 @@ test('live preview decorates wiki link without alias by hiding only brackets', (
   assert.ok(plan.marks.some((item) => item.className === 'cm-live-wiki-link'));
 });
 
-test('live preview replaces toggle marker and adds toggle line class', () => {
+test('live preview renders inactive toggle blocks as block widgets', () => {
   const plan = getMarkdownLivePreviewPlan('> [!toggle] 제품 요구사항', -1);
 
-  assert.ok(plan.replacements.some((item) => item.className === 'cm-live-toggle-prefix'));
-  assert.ok(plan.lineClasses.some((item) => item.className === 'cm-live-toggle-line'));
+  assert.equal(plan.blockWidgets.length, 1);
+  assert.equal(plan.blockWidgets[0].className, 'cm-live-toggle-widget');
+  assert.match(plan.blockWidgets[0].html, /data-toggle-preview/);
+});
+
+test('live preview keeps active toggle line in source form', () => {
+  const plan = getMarkdownLivePreviewPlan('> [!toggle] 제품 요구사항', 0);
+
+  assert.equal(plan.blockWidgets.length, 0);
+  assert.ok(plan.lineClasses.some((item) => item.className === 'cm-live-active-line'));
+});
+
+test('live preview keeps whole toggle block in source form when cursor is in toggle body', () => {
+  const markdown = [
+    '> [!toggle] 제품 요구사항',
+    '> 본문 첫 줄',
+    '> 본문 둘째 줄',
+  ].join('\n');
+  const plan = getMarkdownLivePreviewPlan(markdown, 1);
+
+  assert.equal(plan.blockWidgets.length, 0);
+  assert.ok(!plan.replacements.some((item) => item.className === 'cm-live-toggle-prefix'));
+  assert.ok(plan.lineClasses.some((item) => item.className === 'cm-live-active-line'));
+});
+
+test('live preview keeps whole toggle block in source form when cursor is on toggle last line', () => {
+  const markdown = [
+    '> [!toggle] 제품 요구사항',
+    '> 본문 첫 줄',
+    '> 본문 마지막 줄',
+    '일반 문단',
+  ].join('\n');
+  const plan = getMarkdownLivePreviewPlan(markdown, 2);
+
+  assert.equal(plan.blockWidgets.length, 0);
+  assert.ok(!plan.replacements.some((item) => item.className === 'cm-live-toggle-prefix'));
+  assert.ok(plan.lineClasses.some((item) => item.className === 'cm-live-active-line'));
+  assert.ok(!plan.lineClasses.some((item) => item.className === 'cm-live-toggle-line'));
 });
 
 test('live preview renders inactive markdown tables as block widgets', () => {
@@ -186,5 +222,17 @@ test('live preview distinguishes mermaid from regular code blocks', () => {
   assert.equal(plan.blockWidgets.length, 2);
   assert.equal(plan.blockWidgets[0].className, 'cm-live-codeblock-widget'); // javascript
   assert.equal(plan.blockWidgets[1].type, 'mermaid'); // mermaid
+});
+
+test('live preview decorates footnote references on inactive lines', () => {
+  const plan = getMarkdownLivePreviewPlan('참조 문장[^1]', -1);
+
+  assert.ok(plan.replacements.some((item) => item.className === 'cm-live-footnote-ref'));
+});
+
+test('live preview decorates wiki embeds as inline badges', () => {
+  const plan = getMarkdownLivePreviewPlan('![[기획 문서|item-1]]', -1);
+
+  assert.ok(plan.replacements.some((item) => item.className === 'cm-live-embed-link'));
 });
 

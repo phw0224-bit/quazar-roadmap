@@ -38,6 +38,16 @@ test('renderMarkdownPreviewHTML keeps standard markdown headings', () => {
   assert.match(html, /<h1[^>]*>큰 제목<\/h1>/);
 });
 
+test('renderMarkdownPreviewHTML renders extended callout types', () => {
+  const html = renderMarkdownPreviewHTML([
+    '> [!abstract] 요약',
+    '> 핵심 내용',
+  ].join('\n'));
+
+  assert.match(html, /data-callout-type="abstract"/);
+  assert.match(html, /md-callout-gray/);
+});
+
 test('toggleMarkdownTaskItem toggles the target checklist item only', () => {
   const markdown = ['- [ ] 첫번째', '- [x] 두번째', '- [ ] 세번째'].join('\n');
   const next = toggleMarkdownTaskItem(markdown, 1, false);

@@ -15,7 +15,25 @@
 import { marked } from 'marked';
 import TurndownService from 'turndown';
 
-const CALLOUT_TYPES = new Set(['tip', 'warning', 'danger', 'info', 'note']);
+const CALLOUT_TYPES = new Set([
+  'note',
+  'info',
+  'tip',
+  'hint',
+  'warning',
+  'caution',
+  'danger',
+  'error',
+  'success',
+  'check',
+  'done',
+  'abstract',
+  'summary',
+  'question',
+  'bug',
+  'example',
+  'quote',
+]);
 const TOGGLE_VARIANTS = new Set(['toggle', 'toggle-h1', 'toggle-h2', 'toggle-h3', 'toggle-note']);
 
 const turndown = new TurndownService({

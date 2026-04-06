@@ -597,10 +597,34 @@ export async function getChildPages(parentItemId) {
  * @returns {Array} backlink 아이템 목록 (id, title, content, page_type)
  */
 export async function getBacklinks(itemId) {
-  const { data, error } = await supabase
+  const { data: directMatches, error: directError } = await supabase
     .from('items')
     .select('id, title, content, page_type, project_id')
     .ilike('description', `%|${itemId}]]%`);
-  if (error) throw error;
-  return data || [];
+  if (directError) throw directError;
+
+  const backlinkMap = new Map((directMatches || []).map((item) => [item.id, item]));
+
+  const { data: targetItem, error: targetError } = await supabase
+    .from('items')
+    .select('title, content')
+    .eq('id', itemId)
+    .maybeSingle();
+  if (targetError) throw targetError;
+
+  const titleCandidates = [targetItem?.title, targetItem?.content]
+    .map((value) => `${value || ''}`.trim())
+    .filter(Boolean);
+
+  for (const title of titleCandidates) {
+    const { data: titleMatches, error: titleError } = await supabase
+      .from('items')
+      .select('id, title, content, page_type, project_id')
+      .ilike('description', `%[[${title}]]%`);
+    if (titleError) throw titleError;
+    (titleMatches || []).forEach((item) => backlinkMap.set(item.id, item));
+  }
+
+  backlinkMap.delete(itemId);
+  return Array.from(backlinkMap.values());
 }
