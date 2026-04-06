@@ -228,6 +228,19 @@ ItemDetailPanel "요약 생성" → POST /api/summarize (HTML)
   → summary 내 [N] 클릭 → data-id 속성으로 에디터 블록 스크롤
 ```
 
+### 라이브 프리뷰 클릭 매핑
+
+```javascript
+// Editor.jsx (live mode)
+// 1) 일반 텍스트 클릭: CodeMirror 기본 클릭 매핑 사용
+// 2) 특수 클릭: 헤딩 폴드 토글 / block widget 클릭만 커스텀 처리
+// 3) widget 클릭 시 posAtDOM으로 해당 source 라인 시작점으로 이동
+```
+
+- 기존의 `posAtCoords` 기반 전역 강제 selection은 제거됨
+- 렌더 블록(코드/표/머메이드/콜아웃 등) 누적 구간에서 클릭 오프셋 체감을 줄이기 위해
+  live widget 세로 margin을 최소화해 사용
+
 ---
 
 ## 7. Component Map
@@ -356,6 +369,18 @@ graph TD
 - `#` ~ `######` 헤딩 자동 추출하여 트리 표시
 - 헤딩 클릭 시 에디터 해당 위치로 스크롤
 - 현재 스크롤 위치에 있는 헤딩 하이라이트
+
+**CodeMirror Live 클릭 처리:**
+
+```javascript
+// live 모드 클릭 정책
+// - 일반 클릭: return false (기본 동작 위임)
+// - [data-fold-line] 클릭: toggleHeadingFold effect dispatch
+// - .cm-live-* widget 클릭: posAtDOM으로 source line.from으로 이동
+```
+
+- 대형 block widget은 시각적 높이와 source 라인 수가 다를 수 있어
+  세부 y 위치보다 "해당 블록 source 진입"을 우선하는 정책을 사용
 
 **다크모드 (Tailwind):**
 

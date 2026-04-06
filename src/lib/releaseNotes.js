@@ -9,6 +9,37 @@ export const RELEASE_NOTES_STORAGE_KEY = 'kanban-release-notes-last-seen';
 
 export const RELEASE_NOTES = [
   {
+    id: '2026-04-06-live-click-alignment',
+    version: '2026-04-06.1',
+    title: '업데이트 내역',
+    description: '상세 설명 라이브 프리뷰에서 클릭 위치가 아래로 밀리던 문제를 줄이기 위한 클릭 매핑/스타일 보정을 반영했습니다.',
+    sections: [
+      {
+        title: '변경',
+        items: [
+          '라이브 모드 클릭 처리에서 일반 텍스트 클릭은 CodeMirror 기본 동작으로 위임하도록 조정',
+          '헤딩 폴드 토글 및 렌더 위젯 클릭만 최소 개입하도록 Editor 클릭 분기 정리',
+          '렌더 위젯 클릭 시 `posAtDOM` 기준으로 해당 source 라인으로 이동하도록 보정',
+          '라이브 위젯(math/callout/mermaid/table/blockquote/code/hr/image) 세로 margin을 축소해 누적 클릭 오차를 완화',
+        ],
+      },
+      {
+        title: '문서 업데이트',
+        items: [
+          'CLAUDE.md에 라이브 프리뷰 클릭 매핑 정책과 현재 상호작용 규칙 추가',
+          'components/editor 동작 규칙을 현재 클릭 정책 기준으로 정리',
+        ],
+      },
+      {
+        title: '알려진 사항',
+        items: [
+          '코드블록/머메이드처럼 여러 source 라인을 하나의 렌더 블록으로 축약하는 구간은 특성상 세부 y 위치와 1:1 매핑에 한계가 있습니다.',
+          '현재는 편집 안정성을 위해 해당 구간 클릭 시 블록 source 진입 일관성을 우선합니다.',
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-04-02-ui-docs',
     version: '2026-04-02.1',
     title: '업데이트 내역',
