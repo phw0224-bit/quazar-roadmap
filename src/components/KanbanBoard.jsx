@@ -42,6 +42,7 @@ import KanbanCard from './KanbanCard';
 import BoardSection from './BoardSection';
 import GeneralDocumentSection from './GeneralDocumentSection';
 import { TEAMS, GLOBAL_TAGS } from '../lib/constants';
+import { buildEntityContext, ENTITY_TYPES } from '../lib/entityModel';
 import FilterBar from './FilterBar';
 import AppLayout from './AppLayout';
 import { useFilterState, applyFilterSort } from '../hooks/useFilterState';
@@ -411,6 +412,19 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   const activePhase = phases.find(p => p.id === activeId);
   const activeSection = sections.find(s => s.id === activeId);
 
+  const getProjectDetailItem = (projectPhase) => ({
+    id: projectPhase.id,
+    title: projectPhase.title,
+    description: projectPhase.description || '',
+    status: 'none',
+    page_type: 'project',
+    assignees: projectPhase.assignees || [],
+    teams: [],
+    tags: [],
+    related_items: [],
+    creator_profile: null,
+  });
+
   let detailItem = detailItemId ? phaseItems.find(i => i.id === detailItemId) : null;
   let detailPhase = detailItem ? phases.find(p => p.items.some(i => i.id === detailItemId)) : null;
 
@@ -441,21 +455,14 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   if (!detailItem && detailItemId) {
     const projectPhase = phases.find(p => p.id === detailItemId);
     if (projectPhase) {
-      detailItem = {
-        id: projectPhase.id,
-        title: projectPhase.title,
-        description: projectPhase.description || '',
-        status: 'none',
-        page_type: 'project',
-        assignees: projectPhase.assignees || [],
-        teams: [],
-        tags: [],
-        related_items: [],
-        creator_profile: null,
-      };
+      detailItem = getProjectDetailItem(projectPhase);
       detailPhase = projectPhase;
     }
   }
+
+  const detailEntityContext = detailItem
+    ? buildEntityContext({ item: detailItem, phase: detailPhase })
+    : null;
 
   const handleOpenDetail = (entityOrId) => {
     const itemId = typeof entityOrId === 'object' && entityOrId !== null ? entityOrId.id : entityOrId;
@@ -464,32 +471,28 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   };
 
   const handleUpdateItem = async (phaseId, itemId, updates) => {
-    if (detailItem?.page_type === 'project') {
-      try {
-        await updatePhase(itemId, updates);
-      } catch {
-        showToast('프로젝트 속성 업데이트 실패 (DB 마이그레이션 필요)', 'error');
-      }
+    if (detailEntityContext?.type === ENTITY_TYPES.PROJECT) {
+      await updatePhase(itemId, updates);
       return;
     }
-    if (detailPhase?.id === 'general-docs') {
-      await updateGeneralDocument(itemId, updates);
-      return;
-    }
-    if (detailPhase?.id === 'personal-memo') {
+    if (detailEntityContext?.type === ENTITY_TYPES.MEMO) {
       await updatePersonalMemo(itemId, updates);
+      return;
+    }
+    if (detailEntityContext?.collection === 'general') {
+      await updateGeneralDocument(itemId, updates);
       return;
     }
     await updateItem(phaseId, itemId, updates);
   };
 
   const handleDeleteItem = async (phaseId, itemId) => {
-    if (detailPhase?.id === 'general-docs') {
-      await deleteGeneralDocument(itemId);
+    if (detailEntityContext?.type === ENTITY_TYPES.MEMO) {
+      await deletePersonalMemo(itemId);
       return;
     }
-    if (detailPhase?.id === 'personal-memo') {
-      await deletePersonalMemo(itemId);
+    if (detailEntityContext?.collection === 'general') {
+      await deleteGeneralDocument(itemId);
       return;
     }
     await deleteItem(phaseId, itemId);
@@ -1143,6 +1146,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                 <ItemDetailPanel
                   item={detailItem}
                   phase={detailPhase}
+                  entityContext={detailEntityContext}
                   allItems={[...phaseItems, ...generalDocs]}
                   onClose={closeDetailPanel}
                   isFullscreen={isDetailFullscreen}

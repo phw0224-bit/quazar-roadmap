@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, X, FileText } from 'lucide-react';
 import { STATUS_MAP } from '../lib/constants';
+import { buildEntityContext, getEntityLabel } from '../lib/entityModel';
 
 export default function SearchModal({ phases = [], additionalItems = [], onOpenDetail, onClose }) {
   const [query, setQuery] = useState('');
@@ -31,9 +32,17 @@ export default function SearchModal({ phases = [], additionalItems = [], onOpenD
     
     const lowerQ = q.toLowerCase();
     const phaseItems = phases.flatMap(p =>
-      (p.items || []).map(item => ({ ...item, projects: { title: p.title } }))
+      (p.items || []).map(item => ({
+        ...item,
+        projects: { title: p.title },
+        _entityContext: buildEntityContext({ item, phase: p }),
+      }))
     );
-    const allItems = [...phaseItems, ...additionalItems].filter(item => {
+    const indexedAdditionalItems = additionalItems.map(item => ({
+      ...item,
+      _entityContext: buildEntityContext({ item }),
+    }));
+    const allItems = [...phaseItems, ...indexedAdditionalItems].filter(item => {
       const matchTitle = item.title?.toLowerCase().includes(lowerQ);
       const matchContent = item.content?.toLowerCase().includes(lowerQ);
       const matchAssignee = item.assignees?.some(a => a.toLowerCase().includes(lowerQ));
@@ -118,9 +127,7 @@ export default function SearchModal({ phases = [], additionalItems = [], onOpenD
             {!loading && results.map((item, idx) => {
               const status = STATUS_MAP[item.status];
               const projectTitle = item.projects?.title
-                || (item.is_private ? '개인 메모' : null)
-                || (!item.project_id && item.page_type === 'folder' ? '일반 폴더' : null)
-                || (!item.project_id && item.page_type === 'page' ? '일반 문서' : null);
+                || getEntityLabel(item._entityContext);
               return (
                 <button
                   key={item.id}

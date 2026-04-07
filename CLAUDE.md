@@ -154,6 +154,14 @@ lib/
 
 ## 8. Conventions
 
+- **Import/Export 단일 기준:** 공용 모듈(`src/lib/*`, `src/api/*`)은 named export를 기본으로 사용하고, default export는 React 컴포넌트 파일에서만 사용
+- **배럴 파일 금지:** `index.js` 재-export(배럴)로 우회 import하지 않고, 실제 파일 경로를 직접 import
+- **import 경로 고정:** 같은 파일을 서로 다른 경로(alias/relative 혼용)로 import하지 않기 (항상 한 방식만 사용)
+- **export 이름 안정성:** export 이름 변경 시 참조 파일을 전역 검색(`rg`)으로 일괄 수정 후 커밋
+- **상수 접근 규칙:** 단일 현재값(`CURRENT_*`)을 별도 export로 중복 제공하지 않고, 원본 배열/객체(`RELEASE_NOTES[0]`)에서 파생해 사용
+- **모듈 계약 변경 절차:** `import ... from` 오류 방지를 위해 (1) export 변경 → (2) 참조부 동시 수정 → (3) build 확인을 한 세트로 처리
+- **default vs named 혼동 방지:** `export default` 파일는 중괄호 없이 import, named export는 반드시 중괄호로 import
+
 - **stopProp 패턴:** DnD 충돌 방지 → `onPointerDown={stopProp}`
 - **Portal 메뉴:** 드래그 컨텍스트 위 → body fixed 포털
 - **isReadOnly:** disabled 대신 렌더링 제거 (`{!isReadOnly && ...}`)

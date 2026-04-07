@@ -12,7 +12,7 @@ import LoginForm from './components/Auth/LoginForm';
 import SetupProfileForm from './components/Auth/SetupProfileForm';
 import ReleaseNotesModal from './components/ReleaseNotesModal';
 import {
-  CURRENT_RELEASE_NOTE,
+  RELEASE_NOTES,
   RELEASE_NOTES_STORAGE_KEY,
 } from './lib/releaseNotes';
 
@@ -20,21 +20,27 @@ function App() {
   const { user, loading, needsPasswordSetup, login, updateProfileAndStep } = useAuth();
   const [showLogin, setShowLogin] = useState(false);
   const [showReleaseNotes, setShowReleaseNotes] = useState(false);
+  const currentReleaseNote = RELEASE_NOTES?.[0] || null;
 
   useEffect(() => {
+    if (!currentReleaseNote) return;
     try {
       const lastSeenReleaseId = localStorage.getItem(RELEASE_NOTES_STORAGE_KEY);
-      if (lastSeenReleaseId !== CURRENT_RELEASE_NOTE.id) {
+      if (lastSeenReleaseId !== currentReleaseNote.id) {
         setShowReleaseNotes(true);
       }
     } catch (e) {
       // Ignore
     }
-  }, []);
+  }, [currentReleaseNote]);
 
   const handleCloseReleaseNotes = () => {
+    if (!currentReleaseNote) {
+      setShowReleaseNotes(false);
+      return;
+    }
     try {
-      localStorage.setItem(RELEASE_NOTES_STORAGE_KEY, CURRENT_RELEASE_NOTE.id);
+      localStorage.setItem(RELEASE_NOTES_STORAGE_KEY, currentReleaseNote.id);
     } catch (e) {
       // Ignore
     }
@@ -59,7 +65,7 @@ function App() {
         <SetupProfileForm onComplete={updateProfileAndStep} />
         {showReleaseNotes && (
           <ReleaseNotesModal
-            release={CURRENT_RELEASE_NOTE}
+            release={currentReleaseNote}
             onClose={handleCloseReleaseNotes}
           />
         )}
@@ -83,7 +89,7 @@ function App() {
         }} />
         {showReleaseNotes && (
           <ReleaseNotesModal
-            release={CURRENT_RELEASE_NOTE}
+            release={currentReleaseNote}
             onClose={handleCloseReleaseNotes}
           />
         )}
@@ -100,7 +106,7 @@ function App() {
       />
       {showReleaseNotes && (
         <ReleaseNotesModal
-          release={CURRENT_RELEASE_NOTE}
+          release={currentReleaseNote}
           onClose={handleCloseReleaseNotes}
         />
       )}

@@ -26,9 +26,10 @@ import BacklinksPanel from './BacklinksPanel';
 import { TEAMS, STATUS_MAP, PRIORITY_MAP } from '../lib/constants';
 import { usePresenceContext } from '../hooks/usePresenceContext';
 import ItemViewers from './ItemViewers';
+import { ENTITY_TYPES, getEntityLabel } from '../lib/entityModel';
 
 function ItemDetailPanel({
-  item, phase, allItems = [], onClose, onUpdateItem, onUpdatePhase, isReadOnly,
+  item, phase, entityContext = null, allItems = [], onClose, onUpdateItem, onUpdatePhase, isReadOnly,
   isFullscreen = false, onToggleFullscreen,
   onBreadcrumbNavigate,
   onAddComment, onUpdateComment, onDeleteComment, onOpenDetail,
@@ -170,6 +171,13 @@ function ItemDetailPanel({
 
   const boardType = (phase?.board_type || 'main').toLowerCase();
   const boardLabel = boardType === 'main' ? '전체 보드' : `${phase?.board_type || '팀'} 보드`;
+  const contextLabel = getEntityLabel(entityContext || {});
+  const isProjectLike = entityContext?.type === ENTITY_TYPES.PROJECT || item.page_type === 'project';
+  const sectionLabel = entityContext?.collection === 'general'
+    ? `📚 ${contextLabel}`
+    : entityContext?.type === ENTITY_TYPES.MEMO
+      ? '📝 개인 메모장'
+      : `🧭 ${phase?.title}`;
   const statusInfo = STATUS_MAP[item.status || 'none'];
   const assigneeCount = (item.assignees || []).length;
   const teamCount = (item.teams || []).length;
@@ -270,9 +278,10 @@ function ItemDetailPanel({
                 <ChevronRight size={12} strokeWidth={3} className="text-gray-300 dark:text-text-tertiary" />
                 <button
                   onClick={() => onBreadcrumbNavigate?.('project', { projectId: phase?.id, boardType })}
+                  disabled={!isProjectLike && entityContext?.collection !== 'project'}
                   className="bg-gray-100 dark:bg-bg-hover px-2.5 py-1 rounded-lg text-gray-500 dark:text-text-secondary shrink-0 hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-all border border-transparent hover:border-gray-200 dark:hover:border-border-strong"
                 >
-                  🧭 {phase?.title}
+                  {sectionLabel}
                 </button>
                 
                 {/* 계층형 부모 아이템 경로 표시 */}

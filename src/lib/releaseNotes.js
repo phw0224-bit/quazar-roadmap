@@ -9,6 +9,25 @@ export const RELEASE_NOTES_STORAGE_KEY = 'kanban-release-notes-last-seen';
 
 export const RELEASE_NOTES = [
   {
+    id: '2026-04-07-entity-context-unification',
+    version: '2026-04-07.3',
+    title: '업데이트 내역',
+    description: '아이템 타입 판별 규칙을 공통 모듈로 통합해 상세 패널/검색의 엔티티 처리 일관성을 높이고, 릴리즈 노트 현재값 참조 방식을 안정화했습니다.',
+    sections: [
+      {
+        title: '변경',
+        items: [
+          'entityModel 공통 모듈을 추가해 task/document/folder/memo/project 타입 및 문맥(collection, boardType) 판별 로직 중앙화',
+          'KanbanBoard 상세 패널 업데이트/삭제 분기를 엔티티 문맥 기반으로 정리하고 프로젝트 상세 아이템 생성 로직을 헬퍼로 통합',
+          'ItemDetailPanel에 엔티티 라벨(프로젝트 문서/일반 문서/개인 메모 등) 기반 경로 표기를 반영',
+          'SearchModal이 공통 엔티티 문맥을 사용해 결과 라벨을 일관되게 표시하도록 개선',
+          'App에서 현재 릴리즈를 고정 상수 대신 RELEASE_NOTES[0] 파생값으로 사용하도록 변경',
+          'CLAUDE.md에 import/export 계약 및 모듈 변경 절차 규칙을 보강',
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-04-07-general-doc-search-detail-fixes',
     version: '2026-04-07.2',
     title: '업데이트 내역',
