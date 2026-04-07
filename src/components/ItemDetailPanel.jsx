@@ -36,6 +36,7 @@ function ItemDetailPanel({
   onAddChildPage,
   onShowPrompt,
   onDeleteItem,
+  onDeletePhase,
 }) {
   const stopProp = (e) => e.stopPropagation();
   const { updateEditing } = usePresenceContext();
@@ -234,12 +235,24 @@ function ItemDetailPanel({
             </button>
             {!isReadOnly && (
               <button
-                onClick={() => onShowConfirm('아이템 삭제', '정말로 이 아이템을 삭제하시겠습니까?', async () => {
-                  await onDeleteItem(phase.id, item.id);
-                  onClose();
-                }, 'danger')}
+                onClick={() => {
+                  const isProject = item.page_type === 'project';
+                  const confirmMsg = isProject
+                    ? '정말로 이 프로젝트를 삭제하시겠습니까?'
+                    : '정말로 이 아이템을 삭제하시겠습니까?';
+                  const confirmTitle = isProject ? '프로젝트 삭제' : '아이템 삭제';
+
+                  onShowConfirm(confirmTitle, confirmMsg, async () => {
+                    if (isProject) {
+                      await onDeletePhase?.(phase.id);
+                    } else {
+                      await onDeleteItem(phase.id, item.id);
+                    }
+                    onClose();
+                  }, 'danger');
+                }}
                 className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl text-gray-400 hover:text-red-500 transition-all duration-200 cursor-pointer"
-                title="아이템 삭제"
+                title="삭제"
               >
                 <Trash2 size={20} strokeWidth={2.5} />
               </button>

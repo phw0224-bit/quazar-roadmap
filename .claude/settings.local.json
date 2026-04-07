@@ -19,7 +19,10 @@
       "Bash(node '/c/Program Files/nodejs/node_modules/yarn/bin/yarn.js' --version)",
       "Read(//c/Users/uguls/AppData/Roaming/**)",
       "Bash('/c/Program Files/nodejs/npm.cmd' list -g yarn)",
-      "Bash(node -e \"const {execSync}=require\\(''child_process''\\);console.log\\(execSync\\(''npm root -g''\\).toString\\(\\).trim\\(\\)\\)\")"
+      "Bash(node -e \"const {execSync}=require\\(''child_process''\\);console.log\\(execSync\\(''npm root -g''\\).toString\\(\\).trim\\(\\)\\)\")",
+      "Bash(yarn dev:all)",
+      "Bash(xargs kill:*)",
+      "Bash(yarn build:*)"
     ]
   }
 }

@@ -15,9 +15,10 @@ const normalizeNameKey = (value) => (value || '').trim().toLowerCase();
 
 const supabaseAPI = {
   /**
-   * @description 전체 보드 데이터를 단일 조회로 로드. projects + items(with comments) + sections.
+   * @description 전체 보드 데이터를 단일 조회로 로드. projects + items(with comments) + sections + generalDocs.
    * page_type='page' 아이템은 포함됨 (useKanbanData reducer에서 필터링).
-   * @returns {Promise<{ phases: Array, sections: Array }>}
+   * generalDocs: project_id=null && page_type='page'인 문서들 (팀별 분리).
+   * @returns {Promise<{ phases: Array, sections: Array, generalDocs: Array }>}
    * phases: 각 project에 items 배열 내장, items에 comments(with profiles) 배열 내장
    */
   getBoardData: async () => {
@@ -42,6 +43,24 @@ const supabaseAPI = {
       .order('order_index', { ascending: true });
 
     if (iError) throw iError;
+
+    // 2.5 일반 문서 + 폴더 가져오기 (project_id=null, page_type='page'|'folder')
+    // 최상위 + 자식 문서/폴더 모두 포함 (GeneralDocumentSection에서 트리 구조 생성)
+    const { data: generalDocItems, error: docError } = await supabase
+      .from('items')
+      .select(`
+        *,
+        comments (
+          *,
+          profiles (name, department)
+        )
+      `)
+      .is('project_id', null)
+      .in('page_type', ['page', 'folder'])
+      .order('board_type', { ascending: true })
+      .order('order_index', { ascending: true });
+
+    if (docError) throw docError;
 
     const { data: profiles, error: profileError } = await supabase
       .from('profiles')
@@ -73,7 +92,19 @@ const supabaseAPI = {
         }))
     }));
 
-    return { phases: formattedProjects, sections: sections || [] };
+    // 4.5 일반 문서 포맷팅
+    const formattedGeneralDocs = (generalDocItems || []).map(item => ({
+      ...item,
+      related_items: Array.isArray(item.related_items) ? item.related_items : [],
+      creator_profile: item.created_by ? profilesById.get(item.created_by) || null : null,
+      comments: (item.comments || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+    }));
+
+    return {
+      phases: formattedProjects,
+      sections: sections || [],
+      generalDocs: formattedGeneralDocs
+    };
   },
 
   getPeopleData: async () => {
@@ -527,8 +558,6 @@ const supabaseAPI = {
   },
 };
 
-export default supabaseAPI;
-
 /**
  * @description page_type='page' 아이템 생성 + 부모 아이템의 related_items에 양방향 연결.
  * 칸반 카드가 아닌 문서 페이지 생성. 사이드바 트리에만 표시됨.
@@ -628,3 +657,213 @@ export async function getBacklinks(itemId) {
   backlinkMap.delete(itemId);
   return Array.from(backlinkMap.values());
 }
+
+/**
+ * @description 개인 메모장만 조회 (비공개 + 사용자 소유)
+ * @param {string} userId - auth.users.id
+ * @returns {Promise<Array>} 개인 메모 아이템 배열
+ */
+export async function getPersonalMemos(userId) {
+  const { data, error } = await supabase
+    .from('items')
+    .select(`
+      *,
+      comments (
+        *,
+        profiles (name, department)
+      )
+    `)
+    .eq('is_private', true)
+    .eq('owner_id', userId)
+    .order('order_index', { ascending: true });
+
+  if (error) throw error;
+  return (data || []).map(item => ({
+    ...item,
+    related_items: Array.isArray(item.related_items) ? item.related_items : [],
+    comments: (item.comments || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+  }));
+}
+
+/**
+ * @description 개인 메모 생성
+ * @param {string} title - 메모 제목
+ * @param {string} content - 메모 부제목
+ * @param {string} createdBy - 작성자 UUID (auth.users.id)
+ * @returns {Promise<Object>} 생성된 메모 아이템
+ */
+export async function createPersonalMemo(title, content = '', createdBy) {
+  const { data: existingItems, error: orderError } = await supabase
+    .from('items')
+    .select('order_index')
+    .eq('is_private', true)
+    .eq('owner_id', createdBy)
+    .order('order_index', { ascending: false })
+    .limit(1);
+
+  if (orderError) throw orderError;
+  const nextOrder = existingItems?.[0] ? existingItems[0].order_index + 1 : 0;
+
+  const { data, error } = await supabase
+    .from('items')
+    .insert([{
+      project_id: null,
+      title,
+      content,
+      description: '',
+      is_private: true,
+      owner_id: createdBy,
+      created_by: createdBy,
+      order_index: nextOrder,
+      status: 'none',
+      priority: 0,
+      page_type: null,
+      assignees: [],
+      teams: [],
+      tags: [],
+      related_items: []
+    }])
+    .select();
+
+  if (error) throw error;
+  return data?.[0];
+}
+
+/**
+ * @description 개인 메모 업데이트
+ * @param {string} memoId - 메모 아이템 ID
+ * @param {Object} updates - 변경할 필드 (title, content, description 등)
+ * @param {string} userId - 소유자 UUID (권한 확인용)
+ * @returns {Promise<Object>} 업데이트된 메모
+ */
+export async function updatePersonalMemo(memoId, updates, userId) {
+  // 권한 확인: 소유자만 수정 가능
+  const { data: memo, error: checkError } = await supabase
+    .from('items')
+    .select('owner_id')
+    .eq('id', memoId)
+    .eq('is_private', true)
+    .single();
+
+  if (checkError || !memo || memo.owner_id !== userId) {
+    throw new Error('권한이 없습니다');
+  }
+
+  const { data, error } = await supabase
+    .from('items')
+    .update(updates)
+    .eq('id', memoId)
+    .select();
+
+  if (error) throw error;
+  return data?.[0];
+}
+
+/**
+ * @description 개인 메모 삭제
+ * @param {string} memoId - 메모 아이템 ID
+ * @param {string} userId - 소유자 UUID (권한 확인용)
+ * @returns {Promise<void>}
+ */
+export async function deletePersonalMemo(memoId, userId) {
+  // 권한 확인: 소유자만 삭제 가능
+  const { data: memo, error: checkError } = await supabase
+    .from('items')
+    .select('owner_id')
+    .eq('id', memoId)
+    .eq('is_private', true)
+    .single();
+
+  if (checkError || !memo || memo.owner_id !== userId) {
+    throw new Error('권한이 없습니다');
+  }
+
+  const { error } = await supabase
+    .from('items')
+    .delete()
+    .eq('id', memoId);
+
+  if (error) throw error;
+}
+
+/**
+ * @description 일반 문서 또는 폴더를 생성합니다 (프로젝트 없이).
+ * project_id=null로 저장되어 칸반 보드에 표시되지 않습니다.
+ * @param {string} boardType - 'main' | '개발팀' | ...
+ * @param {string} title - 제목
+ * @param {string} type - 'document' (기본값) 또는 'folder'
+ * @param {string} parentFolderId - 부모 폴더 ID (선택사항)
+ * @returns {Promise<Object>} 생성된 일반 문서/폴더 아이템
+ */
+export async function createGeneralDocument(boardType, title, type = 'document', parentFolderId = null) {
+  const pageType = type === 'folder' ? 'folder' : 'page';
+
+  const { data, error } = await supabase
+    .from('items')
+    .insert([
+      {
+        board_type: boardType,
+        project_id: null,  // ← 일반 문서/폴더는 프로젝트 미배정
+        title: title.trim(),
+        page_type: pageType,  // ← 'page' 또는 'folder'
+        status: 'none',
+        order_index: 0,
+        parent_item_id: parentFolderId,  // ← 부모 폴더 지정 (선택사항)
+      },
+    ])
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * @description 일반 문서 또는 폴더를 삭제합니다.
+ * 안전장치: project_id=null && (page_type='page' || page_type='folder') 조건을 확인합니다.
+ * @param {string} itemId - 아이템 ID
+ * @returns {Promise<void>}
+ */
+export async function deleteGeneralDocument(itemId) {
+  // 안전장치: 일반 문서/폴더만 삭제
+  const { error } = await supabase
+    .from('items')
+    .delete()
+    .eq('id', itemId)
+    .is('project_id', null)
+    .in('page_type', ['page', 'folder']);
+
+  if (error) throw error;
+}
+
+/**
+ * @description 일반 문서/폴더를 다시 정렬합니다 (같은 팀 보드 내에서).
+ * @param {string} itemId - 이동할 아이템 ID
+ * @param {number} newIndex - 새로운 order_index
+ * @returns {Promise<void>}
+ */
+export async function moveGeneralDocument(itemId, newIndex) {
+  const { error } = await supabase
+    .from('items')
+    .update({ order_index: newIndex })
+    .eq('id', itemId)
+    .is('project_id', null)
+    .in('page_type', ['page', 'folder']);
+
+  if (error) throw error;
+}
+
+// Export all functions as default for backward compatibility
+export default {
+  ...supabaseAPI,
+  createChildPage,
+  getChildPages,
+  getBacklinks,
+  getPersonalMemos,
+  createPersonalMemo,
+  updatePersonalMemo,
+  deletePersonalMemo,
+  createGeneralDocument,
+  deleteGeneralDocument,
+  moveGeneralDocument,
+};

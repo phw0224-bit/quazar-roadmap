@@ -40,6 +40,7 @@ import API from '../api/kanbanAPI';
 import ProjectColumn from './ProjectColumn';
 import KanbanCard from './KanbanCard';
 import BoardSection from './BoardSection';
+import GeneralDocumentSection from './GeneralDocumentSection';
 import { TEAMS, GLOBAL_TAGS } from '../lib/constants';
 import FilterBar from './FilterBar';
 import AppLayout from './AppLayout';
@@ -52,6 +53,7 @@ const ItemDetailPanel = lazy(() => import('./ItemDetailPanel'));
 const PeopleBoard = lazy(() => import('./PeopleBoard'));
 const TimelineView = lazy(() => import('./TimelineView'));
 const SearchModal = lazy(() => import('./SearchModal'));
+const PersonalMemoBoard = lazy(() => import('./PersonalMemoBoard'));
 
 function ViewLoadingFallback({ label, fullHeight = true }) {
   return (
@@ -71,6 +73,8 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
     moveItem, updatePhase, deletePhase, completePhase, movePhase, addComment, updateComment, deleteComment,
     addSection, updateSection, deleteSection, moveSection,
     addChildPage,
+    // 신규: 일반 문서
+    generalDocs, currentBoardType, addGeneralDocument, updateGeneralDocument, deleteGeneralDocument, moveGeneralDocument, setBoardType,
   } = useKanbanData();
 
   const { user, logout } = useAuth();
@@ -83,6 +87,8 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   const [peopleTeams, setPeopleTeams] = useState([]);
   const [peopleLoading, setPeopleLoading] = useState(true);
   const [peopleError, setPeopleError] = useState(null);
+  const [personalMemos, setPersonalMemos] = useState([]);
+  const [personalMemosLoading, setPersonalMemosLoading] = useState(false);
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -113,6 +119,31 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
     replaceUrlState({ scrollTo: null });
     return () => clearTimeout(timer);
   }, [loading, urlState.scrollTo, replaceUrlState]);
+
+  // 개인 메모 로드
+  useEffect(() => {
+    if (!user?.id) {
+      setPersonalMemos([]);
+      return;
+    }
+
+    let isMounted = true;
+    const fetchPersonalMemos = async () => {
+      setPersonalMemosLoading(true);
+      try {
+        const memos = await API.getPersonalMemos?.(user.id) || [];
+        if (isMounted) setPersonalMemos(memos);
+      } catch (err) {
+        console.warn('개인 메모 로드 실패:', err.message);
+        if (isMounted) setPersonalMemos([]);
+      } finally {
+        if (isMounted) setPersonalMemosLoading(false);
+      }
+    };
+
+    fetchPersonalMemos();
+    return () => { isMounted = false; };
+  }, [user?.id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -159,6 +190,16 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   });
   const [expandedCompletedPhases, setExpandedCompletedPhases] = useState(new Set());
 
+  // 일반 문서 섹션 열림/닫힘 (board별)
+  const [expandedGeneralDocBoards, setExpandedGeneralDocBoards] = useState(() => {
+    try {
+      const saved = localStorage.getItem('kanban-general-docs-expanded');
+      return saved ? new Set(JSON.parse(saved)) : new Set(DISPLAY_BOARDS);
+    } catch {
+      return new Set(DISPLAY_BOARDS);
+    }
+  });
+
   const [panelWidth, setPanelWidth] = useState(50); // percentage width
   const [isResizing, setIsResizing] = useState(false);
   const [isMainBoardCollapsed, setIsMainBoardCollapsed] = useState(() => {
@@ -183,6 +224,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   const [toast, setToast] = useState(null); // { message, type }
   const [confirm, setConfirm] = useState(null); // { title, message, onConfirm, type }
   const [prompt, setPrompt] = useState(null); // { title, placeholder, onConfirm }
+  const [selectFolder, setSelectFolder] = useState(null); // { itemId, itemTitle, folders, onSelect }
 
   const showToast = (message, type = 'success') => setToast({ message, type });
   const showConfirm = (title, message, onConfirm, type = 'danger') => setConfirm({ title, message, onConfirm, type });
@@ -321,6 +363,10 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   }, [isMainBoardCollapsed]);
 
   useEffect(() => {
+    localStorage.setItem('kanban-general-docs-expanded', JSON.stringify([...expandedGeneralDocBoards]));
+  }, [expandedGeneralDocBoards]);
+
+  useEffect(() => {
     const resize = (e) => {
       const newWidth = ((window.innerWidth - e.clientX) / window.innerWidth) * 100;
       if (newWidth > 20 && newWidth < 80) setPanelWidth(newWidth);
@@ -354,6 +400,18 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
 
   let detailItem = detailItemId ? phases.flatMap(p => p.items).find(i => i.id === detailItemId) : null;
   let detailPhase = detailItem ? phases.find(p => p.items.some(i => i.id === detailItemId)) : null;
+
+  // 개인 메모에서도 아이템 찾기
+  if (!detailItem && detailItemId && activeView === 'personal') {
+    detailItem = personalMemos.find(m => m.id === detailItemId);
+    if (detailItem) {
+      detailPhase = {
+        id: 'personal-memo',
+        title: '개인 메모장',
+        board_type: 'personal',
+      };
+    }
+  }
 
   if (!detailItem && detailItemId) {
     const projectPhase = phases.find(p => p.id === detailItemId);
@@ -397,6 +455,51 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   const closeDetailPanel = () => {
     setUrlState({ itemId: null, fullscreen: false });
   };
+
+  // 개인 메모 CRUD 함수들
+  const addPersonalMemo = async (title, content = '') => {
+    if (!user?.id) {
+      showToast('로그인이 필요합니다.', 'error');
+      return;
+    }
+    try {
+      const newMemo = await API.createPersonalMemo(title, content, user.id);
+      setPersonalMemos(prev => [...prev, newMemo]);
+      showToast(`'${title}' 메모가 생성되었습니다.`, 'success');
+    } catch (err) {
+      showToast('메모 생성 실패: ' + err.message, 'error');
+    }
+  };
+
+  const updatePersonalMemo = async (memoId, updates) => {
+    if (!user?.id) {
+      showToast('로그인이 필요합니다.', 'error');
+      return;
+    }
+    try {
+      await API.updatePersonalMemo(memoId, updates, user.id);
+      setPersonalMemos(prev =>
+        prev.map(m => m.id === memoId ? { ...m, ...updates } : m)
+      );
+    } catch (err) {
+      showToast('메모 업데이트 실패: ' + err.message, 'error');
+    }
+  };
+
+  const deletePersonalMemo = async (memoId) => {
+    if (!user?.id) {
+      showToast('로그인이 필요합니다.', 'error');
+      return;
+    }
+    try {
+      await API.deletePersonalMemo(memoId, user.id);
+      setPersonalMemos(prev => prev.filter(m => m.id !== memoId));
+      showToast('메모가 삭제되었습니다.', 'success');
+    } catch (err) {
+      showToast('메모 삭제 실패: ' + err.message, 'error');
+    }
+  };
+
   const handleBreadcrumbNavigate = (type, payload = {}) => {
     setUrlState({ view: 'board', itemId: null, fullscreen: false });
 
@@ -422,12 +525,14 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
       onAddChildPage={addChildPage}
       onShowPrompt={showPrompt}
       onShowReleaseNotes={onShowReleaseNotes}
+      onShowConfirm={showConfirm}
       isReadOnly={isReadOnly}
       user={user}
       theme={theme}
       mounted={mounted}
       onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
       onLogout={logout}
+      onSetBoardType={setBoardType}
     >
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="w-full h-full bg-white dark:bg-bg-base font-sans flex overflow-hidden transition-colors duration-200">
@@ -450,7 +555,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                 </button>
                 <div className="text-3xl filter drop-shadow-sm">📂</div>
                 <h1 className="text-2xl font-black text-gray-900 dark:text-text-primary tracking-tight leading-none">
-                  {activeView === 'board' ? '프로젝트 보드' : activeView === 'timeline' ? '타임라인' : '인원 관리'}
+                  {activeView === 'board' ? '프로젝트 보드' : activeView === 'timeline' ? '타임라인' : activeView === 'personal' ? '개인 메모장' : '인원 관리'}
                 </h1>
               </div>
               
@@ -475,6 +580,19 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                 >
                   타임라인
                 </button>
+                {user && (
+                  <button
+                    onClick={() => setUrlState({ view: 'personal' })}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${
+                      activeView === 'personal'
+                        ? 'bg-white dark:bg-bg-hover text-gray-900 dark:text-text-primary shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.05]'
+                        : 'text-gray-400 dark:text-text-tertiary hover:text-gray-600 dark:hover:text-text-secondary'
+                    }`}
+                    title="개인 메모장 (로그인 필수)"
+                  >
+                    📝 메모
+                  </button>
+                )}
                 <button
                   onClick={() => setUrlState({ view: 'people' })}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${
@@ -621,6 +739,25 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                           <span className="text-xl group-hover/add:text-blue-500 transition-colors">+</span>
                           새 프로젝트 추가
                         </button>
+                        <button
+                          onClick={() => {
+                            showPrompt(
+                              '새 문서 추가',
+                              '문서 제목을 입력하세요',
+                              (title) => {
+                                if (title) {
+                                  addGeneralDocument(boardName.toLowerCase(), title.trim());
+                                  showToast(`'${title}' 문서가 생성되었습니다.`);
+                                  setPrompt(null);
+                                }
+                              }
+                            );
+                          }}
+                          className="px-5 py-2.5 bg-gray-50 dark:bg-bg-elevated text-gray-400 dark:text-text-tertiary rounded-xl text-sm font-bold hover:bg-gray-100 dark:hover:bg-bg-hover border border-dashed border-gray-200 dark:border-border-strong transition-all flex items-center gap-2 cursor-pointer hover:text-gray-600 dark:hover:text-text-secondary"
+                        >
+                          <span className="text-xl">📄</span>
+                          새 문서 추가
+                        </button>
                       </div>
                     )}
                   </div>
@@ -630,7 +767,8 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                     const boardSections = sections
                       .filter(s => s.board_type === boardName.toLowerCase())
                       .sort((a, b) => a.order_index - b.order_index);
-                    const isEmpty = boardPhases.length === 0 && boardSections.length === 0;
+                    const boardGeneralDocs = generalDocs.filter(doc => (doc.board_type || 'main') === boardName.toLowerCase());
+                    const isEmpty = boardPhases.length === 0 && boardSections.length === 0 && boardGeneralDocs.length === 0;
                     const projectColumnProps = {
                       onAddItem: addItem, onUpdateItem: updateItem, onDeleteItem: deleteItem,
                       onUpdatePhase: updatePhase, onDeletePhase: deletePhase,
@@ -681,6 +819,147 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                                   />
                                 ))}
                               </SortableContext>
+                            )}
+
+                            {/* 일반 문서 섹션 - 접고 펼칠 수 있음 */}
+                            {boardGeneralDocs.length > 0 && (
+                              <div className="mt-8">
+                                <div className="flex items-center justify-between gap-2">
+                                  <button
+                                    className="flex items-center gap-2 px-2 py-2 text-sm font-bold text-gray-500 dark:text-text-secondary hover:text-gray-900 dark:hover:text-text-primary transition-colors cursor-pointer"
+                                    onClick={() => setExpandedGeneralDocBoards(prev => {
+                                      const next = new Set(prev);
+                                      next.has(boardName) ? next.delete(boardName) : next.add(boardName);
+                                      return next;
+                                    })}
+                                  >
+                                    <ChevronRight
+                                      size={14}
+                                      className={`transition-transform duration-200 ${expandedGeneralDocBoards.has(boardName) ? 'rotate-90' : ''}`}
+                                    />
+                                    <span>📄 일반 문서</span>
+                                    <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-xs font-bold tabular-nums">
+                                      {boardGeneralDocs.length}
+                                    </span>
+                                  </button>
+
+                                  {/* 생성 버튼 그룹 */}
+                                  {!isReadOnly && (
+                                    <div className="flex gap-2">
+                                      <button
+                                        className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 dark:text-text-primary hover:bg-blue-50 dark:hover:bg-blue-900/10 rounded transition-colors"
+                                        onClick={() => {
+                                          showPrompt(
+                                            '새 문서 추가',
+                                            '문서 제목을 입력하세요',
+                                            (title) => {
+                                              if (title) {
+                                                addGeneralDocument(boardName.toLowerCase(), title.trim(), 'document');
+                                                showToast(`'${title}' 문서가 생성되었습니다.`);
+                                                setPrompt(null);
+                                              }
+                                            }
+                                          );
+                                        }}
+                                        title="새 문서 추가"
+                                      >
+                                        <span>➕</span>
+                                        <span>문서</span>
+                                      </button>
+                                      <button
+                                        className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 dark:text-text-primary hover:bg-amber-50 dark:hover:bg-amber-900/10 rounded transition-colors"
+                                        onClick={() => {
+                                          showPrompt(
+                                            '새 폴더 추가',
+                                            '폴더 이름을 입력하세요',
+                                            (title) => {
+                                              if (title) {
+                                                addGeneralDocument(boardName.toLowerCase(), title.trim(), 'folder');
+                                                showToast(`'${title}' 폴더가 생성되었습니다.`);
+                                                setPrompt(null);
+                                              }
+                                            }
+                                          );
+                                        }}
+                                        title="새 폴더 추가"
+                                      >
+                                        <span>➕</span>
+                                        <span>폴더</span>
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {expandedGeneralDocBoards.has(boardName) && (
+                                  <div className="mt-3">
+                                    <GeneralDocumentSection
+                                      documents={boardGeneralDocs}
+                                      onOpenDetail={(doc) => setUrlState({ itemId: doc.id })}
+                                      onDeleteDocument={(itemId) => {
+                                        console.log('[onDeleteDocument] itemId:', itemId, 'boardGeneralDocs:', boardGeneralDocs);
+                                        const doc = boardGeneralDocs.find(d => d.id === itemId);
+                                        console.log('[onDeleteDocument] found doc:', doc);
+                                        if (doc) {
+                                          showConfirm(
+                                            '삭제',
+                                            `"${doc.title}"을(를) 삭제하시겠습니까?`,
+                                            async (confirmed) => {
+                                              console.log('[onDeleteDocument] confirmed:', confirmed);
+                                              if (confirmed) {
+                                                await deleteGeneralDocument(itemId);
+                                                showToast('삭제되었습니다.', 'success');
+                                              }
+                                            },
+                                            'delete'
+                                          );
+                                        }
+                                      }}
+                                      onMoveToFolder={(itemId) => {
+                                        const doc = boardGeneralDocs.find(d => d.id === itemId);
+                                        const folders = boardGeneralDocs.filter(d => d.page_type === 'folder');
+
+                                        if (!doc) return;
+
+                                        if (folders.length === 0) {
+                                          showToast('이동할 폴더가 없습니다. 먼저 폴더를 만들어주세요.', 'warning');
+                                          return;
+                                        }
+
+                                        setSelectFolder({
+                                          itemId,
+                                          itemTitle: doc.title,
+                                          folders,
+                                          onSelect: async (targetFolderId) => {
+                                            const targetFolder = folders.find(f => f.id === targetFolderId);
+                                            if (!targetFolder) return;
+
+                                            try {
+                                              await updateGeneralDocument(itemId, { parent_item_id: targetFolder.id });
+                                              showToast(`"${doc.title}"이(가) "${targetFolder.title}"으로 이동되었습니다.`, 'success');
+                                            } catch (err) {
+                                              showToast(`이동 실패: ${err.message}`, 'error');
+                                            }
+                                          }
+                                        });
+                                      }}
+                                      onAddDocumentToFolder={(folderId) => {
+                                        showPrompt(
+                                          '새 문서 추가',
+                                          '문서 제목을 입력하세요',
+                                          (title) => {
+                                            if (title) {
+                                              addGeneralDocument(boardName.toLowerCase(), title.trim(), 'document', folderId);
+                                              showToast(`'${title}' 문서가 생성되었습니다.`);
+                                              setPrompt(null);
+                                            }
+                                          }
+                                        );
+                                      }}
+                                      isReadOnly={isReadOnly}
+                                    />
+                                  </div>
+                                )}
+                              </div>
                             )}
 
                             {standalonePhases.length > 0 && (
@@ -747,6 +1026,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                                 )}
                               </div>
                             )}
+
                           </>
                         )}
                       </div>
@@ -757,6 +1037,21 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
             })}
             
             </div>
+          ) : activeView === 'personal' ? (
+            <Suspense fallback={<ViewLoadingFallback label="개인 메모장 준비 중..." />}>
+              <PersonalMemoBoard
+                memos={personalMemos}
+                onAddMemo={addPersonalMemo}
+                onUpdateMemo={updatePersonalMemo}
+                onDeleteMemo={deletePersonalMemo}
+                onOpenDetail={(itemId) => setUrlState({ itemId })}
+                onShowConfirm={showConfirm}
+                onShowToast={showToast}
+                onShowPrompt={showPrompt}
+                isReadOnly={isReadOnly}
+                loading={personalMemosLoading}
+              />
+            </Suspense>
           ) : (
             <Suspense fallback={<ViewLoadingFallback label="인원관리 화면 준비 중..." />}>
               <PeopleBoard
@@ -851,21 +1146,60 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
         {/* Global Feedback Components */}
         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         {confirm && (
-          <ConfirmModal 
-            title={confirm.title} 
-            message={confirm.message} 
+          <ConfirmModal
+            title={confirm.title}
+            message={confirm.message}
             type={confirm.type}
-            onConfirm={() => { confirm.onConfirm(); setConfirm(null); }} 
-            onCancel={() => setConfirm(null)} 
+            onConfirm={() => { confirm.onConfirm(true); setConfirm(null); }}
+            onCancel={() => setConfirm(null)}
           />
         )}
         {prompt && (
-          <InputModal 
-            title={prompt.title} 
-            placeholder={prompt.placeholder} 
-            onConfirm={(val) => { prompt.onConfirm(val); setPrompt(null); }} 
-            onCancel={() => setPrompt(null)} 
+          <InputModal
+            title={prompt.title}
+            placeholder={prompt.placeholder}
+            onConfirm={(val) => { prompt.onConfirm(val); setPrompt(null); }}
+            onCancel={() => setPrompt(null)}
           />
+        )}
+
+        {/* 폴더 선택 모달 */}
+        {selectFolder && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setSelectFolder(null)}>
+            <div className="bg-white dark:bg-bg-elevated rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-text-primary mb-4">
+                폴더 선택
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-text-secondary mb-4">
+                "{selectFolder.itemTitle}"을(를) 이동할 폴더를 선택하세요:
+              </p>
+
+              <div className="space-y-2 max-h-96 overflow-y-auto mb-6">
+                {selectFolder.folders.map((folder) => (
+                  <button
+                    key={folder.id}
+                    onClick={() => {
+                      selectFolder.onSelect(folder.id);
+                      setSelectFolder(null);
+                    }}
+                    className="w-full text-left px-4 py-3 rounded-lg bg-gray-50 dark:bg-bg-hover hover:bg-gray-100 dark:hover:bg-bg-elevated border border-gray-200 dark:border-border-subtle hover:border-blue-300 dark:hover:border-blue-700 transition-all flex items-center gap-2"
+                  >
+                    <span className="text-lg">📁</span>
+                    <span className="font-medium text-gray-700 dark:text-text-primary">{folder.title}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setSelectFolder(null)}
+                  className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-bg-hover text-gray-700 dark:text-text-primary font-medium hover:bg-gray-300 dark:hover:bg-border-subtle transition-colors"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </DndContext>

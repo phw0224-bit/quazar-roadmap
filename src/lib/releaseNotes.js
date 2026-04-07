@@ -9,6 +9,47 @@ export const RELEASE_NOTES_STORAGE_KEY = 'kanban-release-notes-last-seen';
 
 export const RELEASE_NOTES = [
   {
+    id: '2026-04-07-personal-memo-general-docs',
+    version: '2026-04-07.1',
+    title: '업데이트 내역',
+    description: '개인 메모 기능과 일반 문서 관리 기능이 추가되었으며, 프로젝트 문서 구조를 대폭 개선했습니다.',
+    sections: [
+      {
+        title: '추가',
+        items: [
+          '개인 메모 보드: 사용자별 개인 메모를 관리할 수 있는 새로운 뷰 추가',
+          '일반 문서 섹션: 보드별로 프로젝트에 속하지 않는 일반 문서를 관리할 수 있는 기능 추가',
+          '개인 메모/일반 문서 CRUD: 생성, 수정, 삭제, 이동 기능 완전 구현',
+          'docs/ 폴더: 구조화된 프로젝트 문서 (BUSINESS_RULES, DATA_MODEL, FLOWS, ROADMAP, DOCUMENTATION_GUIDE) 추가',
+          'SQL 마이그레이션: 개인 메모 필드 추가 및 project_id nullable 변경 스크립트 문서화',
+        ],
+      },
+      {
+        title: '변경',
+        items: [
+          'CLAUDE.md 대폭 간소화: 11개 핵심 섹션으로 압축하여 AI 컨텍스트 파악 효율성 향상',
+          'README.md 간소화: 핵심 정보만 남기고 상세 내용은 docs/ 폴더로 분리',
+          'kanbanAPI 확장: getPersonalMemos, createPersonalMemo, updatePersonalMemo 등 API 함수 추가',
+          'useKanbanData 훅 확장: 개인 메모 및 일반 문서 상태 관리 로직 추가',
+        ],
+      },
+      {
+        title: '삭제/정리',
+        items: [
+          'AGENTS.md 삭제: CLAUDE.md로 통합하여 문서 중복 제거',
+          '레거시 문서 정리: 중복되거나 구식 설명 제거 및 최신 구조 반영',
+        ],
+      },
+      {
+        title: '기술 부채',
+        items: [
+          '개인 메모 Realtime 구독: 현재 초기 로드만 구현, 실시간 업데이트는 추후 추가 예정',
+          '일반 문서 UI 개선: 드래그앤드롭 및 폴더 선택 UI 최적화 예정',
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-04-06-live-click-alignment',
     version: '2026-04-06.1',
     title: '업데이트 내역',

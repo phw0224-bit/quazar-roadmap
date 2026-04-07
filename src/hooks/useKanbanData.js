@@ -16,8 +16,10 @@ import { supabase } from '../lib/supabase';
 const INITIAL_STATE = {
   phases: [],
   sections: [],
+  generalDocs: [],  // project_id=null, page_type='page' 문서들 (팀별 분리)
   loading: true,
   error: null,
+  currentBoardType: 'main',  // 현재 선택된 팀별 보드
 };
 
 /**
@@ -38,7 +40,13 @@ const INITIAL_STATE = {
 const kanbanReducer = (state, action) => {
   switch (action.type) {
     case 'SET_DATA':
-      return { ...state, phases: action.payload.phases, sections: action.payload.sections, loading: false };
+      return {
+        ...state,
+        phases: action.payload.phases,
+        sections: action.payload.sections,
+        generalDocs: action.payload.generalDocs || [],  // 신규: 일반 문서 추가
+        loading: false
+      };
     case 'ADD_SECTION':
       return { ...state, sections: [...state.sections, action.payload] };
     case 'UPDATE_SECTION':
@@ -87,6 +95,36 @@ const kanbanReducer = (state, action) => {
       newPhases.splice(action.payload.targetIndex, 0, movingPhase);
       return { ...state, phases: newPhases };
     }
+    // 신규: 일반 문서 액션들
+    case 'ADD_GENERAL_DOC':
+      return {
+        ...state,
+        generalDocs: [...state.generalDocs, { ...action.payload, comments: [] }].sort((a, b) => a.order_index - b.order_index)
+      };
+    case 'UPDATE_GENERAL_DOC':
+      return {
+        ...state,
+        generalDocs: state.generalDocs.map(doc =>
+          doc.id === action.payload.itemId
+            ? { ...doc, ...action.payload.updates }
+            : doc
+        )
+      };
+    case 'DELETE_GENERAL_DOC':
+      return {
+        ...state,
+        generalDocs: state.generalDocs.filter(doc => doc.id !== action.payload)
+      };
+    case 'MOVE_GENERAL_DOC': {
+      const { itemId, newIndex } = action.payload;
+      const newDocs = [...state.generalDocs];
+      const movingIdx = newDocs.findIndex(d => d.id === itemId);
+      const [movingDoc] = newDocs.splice(movingIdx, 1);
+      newDocs.splice(newIndex, 0, movingDoc);
+      return { ...state, generalDocs: newDocs };
+    }
+    case 'SET_BOARD_TYPE':
+      return { ...state, currentBoardType: action.payload };
     case 'ADD_ITEM':
       return {
         ...state,
@@ -208,7 +246,14 @@ export const useKanbanData = () => {
   const fetchData = useCallback(async () => {
     try {
       const data = await API.getBoardData();
-      dispatch({ type: 'SET_DATA', payload: { phases: data.phases, sections: data.sections } });
+      dispatch({
+        type: 'SET_DATA',
+        payload: {
+          phases: data.phases,
+          sections: data.sections,
+          generalDocs: data.generalDocs,  // 신규: 일반 문서 포함
+        }
+      });
     } catch (err) {
       dispatch({ type: 'SET_ERROR', payload: err.message });
     }
@@ -402,6 +447,39 @@ export const useKanbanData = () => {
     dispatch({ type: 'ADD_SECTION', payload: newSection });
   };
 
+  // 신규: 일반 문서 관련 함수들
+  const addGeneralDocument = async (boardType, title, type = 'document', parentFolderId = null) => {
+    const newDoc = await API.createGeneralDocument(boardType, title, type, parentFolderId);
+    dispatch({ type: 'ADD_GENERAL_DOC', payload: newDoc });
+  };
+
+  const updateGeneralDocument = async (itemId, updates) => {
+    const updated = await API.updateItem(null, itemId, updates);  // project_id=null
+    dispatch({ type: 'UPDATE_GENERAL_DOC', payload: { itemId, updates: updated } });
+  };
+
+  const deleteGeneralDocument = async (itemId) => {
+    console.log('[deleteGeneralDocument] itemId:', itemId);
+    try {
+      await API.deleteGeneralDocument(itemId);
+      console.log('[deleteGeneralDocument] deleted from API');
+      dispatch({ type: 'DELETE_GENERAL_DOC', payload: itemId });
+      console.log('[deleteGeneralDocument] dispatched');
+    } catch (err) {
+      console.error('[deleteGeneralDocument] error:', err);
+      throw err;
+    }
+  };
+
+  const moveGeneralDocument = async (itemId, newIndex) => {
+    dispatch({ type: 'MOVE_GENERAL_DOC', payload: { itemId, newIndex } });
+    await API.moveGeneralDocument(itemId, newIndex);
+  };
+
+  const setBoardType = (boardType) => {
+    dispatch({ type: 'SET_BOARD_TYPE', payload: boardType });
+  };
+
   const updateSection = async (sectionId, updates) => {
     const updated = await API.updateSection(sectionId, updates);
     dispatch({ type: 'UPDATE_SECTION', payload: { id: sectionId, updates: updated } });
@@ -420,6 +498,8 @@ export const useKanbanData = () => {
   return {
     phases: state.phases,
     sections: state.sections,
+    generalDocs: state.generalDocs,  // 신규: 일반 문서 (팀별 분리)
+    currentBoardType: state.currentBoardType,  // 신규: 현재 보드 타입
     loading: state.loading,
     error: state.error,
     addPhase,
@@ -439,5 +519,11 @@ export const useKanbanData = () => {
     updateSection,
     deleteSection,
     moveSection,
+    // 신규: 일반 문서 함수들
+    addGeneralDocument,
+    updateGeneralDocument,
+    deleteGeneralDocument,
+    moveGeneralDocument,
+    setBoardType,
   };
 };

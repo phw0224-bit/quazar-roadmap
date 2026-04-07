@@ -24,13 +24,17 @@ export function usePresence({ user, itemId, isReadOnly }) {
 
   const syncPresenceState = useCallback((channel) => {
     const state = channel.presenceState();
-    const users = Object.values(state).flat().map(p => ({
-      userId: p.userId,
-      name: p.name,
-      itemId: p.itemId ?? null,
-      editingField: p.editingField ?? null,
-    }));
-    setOnlineUsers(users);
+    // userId 기준으로 중복 제거 (Map 사용해서 최신 상태만 유지)
+    const userMap = new Map();
+    Object.values(state).flat().forEach(p => {
+      userMap.set(p.userId, {
+        userId: p.userId,
+        name: p.name,
+        itemId: p.itemId ?? null,
+        editingField: p.editingField ?? null,
+      });
+    });
+    setOnlineUsers(Array.from(userMap.values()));
   }, []);
 
   // 채널 구독 (마운트 시 1회)

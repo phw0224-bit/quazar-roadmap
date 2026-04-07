@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { ChevronRight, LayoutGrid, Clock, Users, PanelLeft, MousePointer2, Ellipsis, BellDot, Moon, Sun, LogOut } from 'lucide-react';
-import { 
-  DndContext, 
-  PointerSensor, 
-  useSensor, 
-  useSensors, 
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
   closestCenter,
   DragOverlay
 } from '@dnd-kit/core';
@@ -30,6 +30,7 @@ export default function Sidebar({
   onAddChildPage,
   onShowPrompt,
   onShowReleaseNotes,
+  onShowConfirm,  // 신규: 삭제 확인용
   isReadOnly,
   user,
   theme,
@@ -39,6 +40,7 @@ export default function Sidebar({
   hoverMode,
   onHoverModeToggle,
   onRefresh, // 데이터 갱신을 위한 콜백
+  onSetBoardType,  // 보드 선택 시 호출
 }) {
   const [expandedIds, setExpandedIds] = useState(() => {
     try {
@@ -87,6 +89,16 @@ export default function Sidebar({
       if (!title?.trim()) return;
       await onAddChildPage?.(phaseId, parentItemId, title.trim());
     });
+  };
+
+  // 보드 토글 시 board type 업데이트
+  const handleBoardToggle = (id) => {
+    handleToggle(id);
+    // board id format: 'board-main', 'board-개발팀' 등
+    if (id?.startsWith('board-')) {
+      const boardType = id.replace('board-', '');
+      onSetBoardType?.(boardType);
+    }
   };
 
   const handleDragEnd = async (event) => {
@@ -290,7 +302,7 @@ export default function Sidebar({
               <button
                 className="group w-full flex items-center gap-1 px-2 py-[3px] rounded-md cursor-pointer
                   text-[color:var(--color-text-secondary)] hover:bg-[color:var(--color-bg-hover)] transition-colors duration-100 select-none"
-                onClick={() => handleToggle(board.id)}
+                onClick={() => handleBoardToggle(board.id)}
                 onPointerDown={stopProp}
               >
                 <ChevronRight
