@@ -6,10 +6,9 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, X, FileText } from 'lucide-react';
-import { supabase } from '../lib/supabase';
 import { STATUS_MAP } from '../lib/constants';
 
-export default function SearchModal({ phases = [], onOpenDetail, onClose }) {
+export default function SearchModal({ phases = [], additionalItems = [], onOpenDetail, onClose }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -31,9 +30,10 @@ export default function SearchModal({ phases = [], onOpenDetail, onClose }) {
     setLoading(true);
     
     const lowerQ = q.toLowerCase();
-    const allItems = phases.flatMap(p => 
+    const phaseItems = phases.flatMap(p =>
       (p.items || []).map(item => ({ ...item, projects: { title: p.title } }))
-    ).filter(item => {
+    );
+    const allItems = [...phaseItems, ...additionalItems].filter(item => {
       const matchTitle = item.title?.toLowerCase().includes(lowerQ);
       const matchContent = item.content?.toLowerCase().includes(lowerQ);
       const matchAssignee = item.assignees?.some(a => a.toLowerCase().includes(lowerQ));
@@ -44,7 +44,7 @@ export default function SearchModal({ phases = [], onOpenDetail, onClose }) {
 
     setResults(uniqueItems.slice(0, 15));
     setLoading(false);
-  }, [phases]);
+  }, [phases, additionalItems]);
 
   useEffect(() => {
     clearTimeout(debounceRef.current);
@@ -117,7 +117,10 @@ export default function SearchModal({ phases = [], onOpenDetail, onClose }) {
             )}
             {!loading && results.map((item, idx) => {
               const status = STATUS_MAP[item.status];
-              const projectTitle = item.projects?.title;
+              const projectTitle = item.projects?.title
+                || (item.is_private ? '개인 메모' : null)
+                || (!item.project_id && item.page_type === 'folder' ? '일반 폴더' : null)
+                || (!item.project_id && item.page_type === 'page' ? '일반 문서' : null);
               return (
                 <button
                   key={item.id}

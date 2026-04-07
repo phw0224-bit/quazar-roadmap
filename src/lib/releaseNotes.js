@@ -9,6 +9,24 @@ export const RELEASE_NOTES_STORAGE_KEY = 'kanban-release-notes-last-seen';
 
 export const RELEASE_NOTES = [
   {
+    id: '2026-04-07-general-doc-search-detail-fixes',
+    version: '2026-04-07.2',
+    title: '업데이트 내역',
+    description: '일반 문서/개인 메모 상세 진입과 검색 결과 노출 경로를 정리하고, 상세 패널 수정·삭제 동작을 데이터 타입별로 안정화했습니다.',
+    sections: [
+      {
+        title: '수정',
+        items: [
+          '일반 문서 목록 클릭 시 상세 패널이 안정적으로 열리도록 상세 열기 인자 처리 통일',
+          '상세 패널에서 일반 문서/개인 메모 수정·삭제 시 각 전용 API로 분기하도록 처리',
+          '검색 모달에 일반 문서·개인 메모를 포함해 보드 아이템 외 항목도 검색 가능하도록 확장',
+          '검색 결과의 출처 라벨(개인 메모/일반 문서/일반 폴더) 표시를 추가해 구분성 개선',
+          '상세 패널 연관 아이템 목록에 일반 문서를 포함하도록 보강',
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-04-07-personal-memo-general-docs',
     version: '2026-04-07.1',
     title: '업데이트 내역',

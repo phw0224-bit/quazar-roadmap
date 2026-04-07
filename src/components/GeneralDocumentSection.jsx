@@ -78,7 +78,7 @@ function GeneralDocumentSection({
               className="document-link flex-1 flex items-center gap-2 px-2 py-2 text-sm text-gray-700 dark:text-text-primary hover:bg-gray-50 dark:hover:bg-bg-hover rounded transition-colors no-underline"
               onClick={(e) => {
                 e.preventDefault();
-                onOpenDetail?.(doc);
+                onOpenDetail?.(doc.id);
               }}
               title={doc.title}
             >

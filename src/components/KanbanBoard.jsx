@@ -74,7 +74,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
     addSection, updateSection, deleteSection, moveSection,
     addChildPage,
     // 신규: 일반 문서
-    generalDocs, currentBoardType, addGeneralDocument, updateGeneralDocument, deleteGeneralDocument, moveGeneralDocument, setBoardType,
+    generalDocs, addGeneralDocument, updateGeneralDocument, deleteGeneralDocument, setBoardType,
   } = useKanbanData();
 
   const { user, logout } = useAuth();
@@ -246,6 +246,19 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
     }));
   }, [phases, filters, sort]);
 
+  const phaseItems = useMemo(
+    () => phases.flatMap(phase => phase.items || []),
+    [phases],
+  );
+
+  const searchableAdditionalItems = useMemo(() => {
+    const items = [...generalDocs];
+    if (user) {
+      items.push(...personalMemos);
+    }
+    return items;
+  }, [generalDocs, personalMemos, user]);
+
   const findContainer = (id) => {
     if (phases.find((p) => p.id === id)) return id;
     const phase = phases.find((p) => p.items.some((i) => i.id === id));
@@ -394,17 +407,29 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
     );
   }
   
-  const activeItem = phases.flatMap(p => p.items).find(i => i.id === activeId);
+  const activeItem = phaseItems.find(i => i.id === activeId);
   const activePhase = phases.find(p => p.id === activeId);
   const activeSection = sections.find(s => s.id === activeId);
 
-  let detailItem = detailItemId ? phases.flatMap(p => p.items).find(i => i.id === detailItemId) : null;
+  let detailItem = detailItemId ? phaseItems.find(i => i.id === detailItemId) : null;
   let detailPhase = detailItem ? phases.find(p => p.items.some(i => i.id === detailItemId)) : null;
 
-  // 개인 메모에서도 아이템 찾기
-  if (!detailItem && detailItemId && activeView === 'personal') {
-    detailItem = personalMemos.find(m => m.id === detailItemId);
-    if (detailItem) {
+  if (!detailItem && detailItemId) {
+    const generalDoc = generalDocs.find(doc => doc.id === detailItemId);
+    if (generalDoc) {
+      detailItem = generalDoc;
+      detailPhase = {
+        id: 'general-docs',
+        title: '일반 문서',
+        board_type: generalDoc.board_type || 'main',
+      };
+    }
+  }
+
+  if (!detailItem && detailItemId) {
+    const personalMemo = personalMemos.find(memo => memo.id === detailItemId);
+    if (personalMemo) {
+      detailItem = personalMemo;
       detailPhase = {
         id: 'personal-memo',
         title: '개인 메모장',
@@ -432,6 +457,12 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
     }
   }
 
+  const handleOpenDetail = (entityOrId) => {
+    const itemId = typeof entityOrId === 'object' && entityOrId !== null ? entityOrId.id : entityOrId;
+    if (!itemId) return;
+    setUrlState({ itemId });
+  };
+
   const handleUpdateItem = async (phaseId, itemId, updates) => {
     if (detailItem?.page_type === 'project') {
       try {
@@ -441,7 +472,27 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
       }
       return;
     }
+    if (detailPhase?.id === 'general-docs') {
+      await updateGeneralDocument(itemId, updates);
+      return;
+    }
+    if (detailPhase?.id === 'personal-memo') {
+      await updatePersonalMemo(itemId, updates);
+      return;
+    }
     await updateItem(phaseId, itemId, updates);
+  };
+
+  const handleDeleteItem = async (phaseId, itemId) => {
+    if (detailPhase?.id === 'general-docs') {
+      await deleteGeneralDocument(itemId);
+      return;
+    }
+    if (detailPhase?.id === 'personal-memo') {
+      await deletePersonalMemo(itemId);
+      return;
+    }
+    await deleteItem(phaseId, itemId);
   };
 
   const handleUpdatePhase = async (phaseId, updates) => {
@@ -654,7 +705,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                 phases={filteredPhases.filter(p => (p.board_type || 'main') !== 'main')}
                 sections={sections.filter(s => (s.board_type || 'main') !== 'main')}
                 onUpdateItem={updateItem}
-                onOpenDetail={(itemId) => setUrlState({ itemId })}
+                onOpenDetail={handleOpenDetail}
                 isReadOnly={isReadOnly}
                 showToast={showToast}
               />
@@ -773,7 +824,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                       onAddItem: addItem, onUpdateItem: updateItem, onDeleteItem: deleteItem,
                       onUpdatePhase: updatePhase, onDeletePhase: deletePhase,
                       onCompletePhase: completePhase,
-                      onOpenDetail: (itemId) => setUrlState({ itemId }),
+                      onOpenDetail: handleOpenDetail,
                       onShowConfirm: showConfirm, onShowToast: showToast,
                       currentUserId: user?.id || null,
                       isReadOnly: isReadOnly,
@@ -894,7 +945,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                                   <div className="mt-3">
                                     <GeneralDocumentSection
                                       documents={boardGeneralDocs}
-                                      onOpenDetail={(doc) => setUrlState({ itemId: doc.id })}
+                                      onOpenDetail={handleOpenDetail}
                                       onDeleteDocument={(itemId) => {
                                         console.log('[onDeleteDocument] itemId:', itemId, 'boardGeneralDocs:', boardGeneralDocs);
                                         const doc = boardGeneralDocs.find(d => d.id === itemId);
@@ -1044,7 +1095,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                 onAddMemo={addPersonalMemo}
                 onUpdateMemo={updatePersonalMemo}
                 onDeleteMemo={deletePersonalMemo}
-                onOpenDetail={(itemId) => setUrlState({ itemId })}
+                onOpenDetail={handleOpenDetail}
                 onShowConfirm={showConfirm}
                 onShowToast={showToast}
                 onShowPrompt={showPrompt}
@@ -1058,7 +1109,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                 teams={peopleTeams}
                 loading={peopleLoading}
                 error={peopleError}
-                onOpenItem={(itemId) => setUrlState({ itemId })}
+                onOpenItem={handleOpenDetail}
                 projectAssignees={phases.reduce((acc, p) => { acc[p.title] = p.assignees || []; return acc; }, {})}
               />
             </Suspense>
@@ -1092,19 +1143,19 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                 <ItemDetailPanel
                   item={detailItem}
                   phase={detailPhase}
-                  allItems={phases.flatMap(p => p.items || [])}
+                  allItems={[...phaseItems, ...generalDocs]}
                   onClose={closeDetailPanel}
                   isFullscreen={isDetailFullscreen}
                   onToggleFullscreen={() => setUrlState({ fullscreen: !isDetailFullscreen })}
                   onBreadcrumbNavigate={handleBreadcrumbNavigate}
                   onUpdateItem={handleUpdateItem}
                   onUpdatePhase={handleUpdatePhase}
-                  onDeleteItem={deleteItem}
+                  onDeleteItem={handleDeleteItem}
                   onDeletePhase={deletePhase}
                   onAddComment={addComment}
                   onUpdateComment={updateComment}
                   onDeleteComment={deleteComment}
-                  onOpenDetail={(itemId) => setUrlState({ itemId })}
+                  onOpenDetail={handleOpenDetail}
                   onShowConfirm={showConfirm}
                   onShowToast={showToast}
                   onAddChildPage={addChildPage}
@@ -1137,7 +1188,8 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
           <Suspense fallback={<ViewLoadingFallback label="검색 창 준비 중..." />}>
             <SearchModal
               phases={phases}
-              onOpenDetail={(itemId) => setUrlState({ itemId })}
+              additionalItems={searchableAdditionalItems}
+              onOpenDetail={handleOpenDetail}
               onClose={() => setShowSearch(false)}
             />
           </Suspense>
