@@ -173,6 +173,7 @@ function ItemDetailPanel({
   const boardLabel = boardType === 'main' ? '전체 보드' : `${phase?.board_type || '팀'} 보드`;
   const contextLabel = getEntityLabel(entityContext || {});
   const isProjectLike = entityContext?.type === ENTITY_TYPES.PROJECT || item.page_type === 'project';
+  const isMemo = entityContext?.type === ENTITY_TYPES.MEMO;
   const sectionLabel = entityContext?.collection === 'general'
     ? `📚 ${contextLabel}`
     : entityContext?.type === ENTITY_TYPES.MEMO
@@ -301,17 +302,19 @@ function ItemDetailPanel({
                 <span className="text-gray-900 dark:text-text-primary truncate font-black">{item.title || item.content}</span>
               </nav>
 
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className={`px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest shadow-sm border border-white/20 dark:border-black/10 transition-colors ${statusInfo.color}`}>
-                  상태: {statusInfo.label}
-                </span>
-                <span className="px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest bg-gray-50 dark:bg-bg-hover text-gray-500 dark:text-text-secondary border border-gray-200 dark:border-border-subtle shadow-sm tabular-nums">
-                  담당자 {assigneeCount}
-                </span>
-                <span className="px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest bg-gray-50 dark:bg-bg-hover text-gray-500 dark:text-text-secondary border border-gray-200 dark:border-border-subtle shadow-sm tabular-nums">
-                  팀 {teamCount}
-                </span>
-              </div>
+              {!isMemo && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest shadow-sm border border-white/20 dark:border-black/10 transition-colors ${statusInfo.color}`}>
+                    상태: {statusInfo.label}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest bg-gray-50 dark:bg-bg-hover text-gray-500 dark:text-text-secondary border border-gray-200 dark:border-border-subtle shadow-sm tabular-nums">
+                    담당자 {assigneeCount}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest bg-gray-50 dark:bg-bg-hover text-gray-500 dark:text-text-secondary border border-gray-200 dark:border-border-subtle shadow-sm tabular-nums">
+                    팀 {teamCount}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -347,7 +350,9 @@ function ItemDetailPanel({
           
           {/* Title */}
           <div className="flex flex-col gap-4">
-            <span className="text-[11px] font-black text-blue-500 uppercase tracking-[0.3em] ml-1">Work Item Title</span>
+            <span className="text-[11px] font-black text-blue-500 uppercase tracking-[0.3em] ml-1">
+              {isMemo ? '노트' : 'Work Item Title'}
+            </span>
             {!isEditingTitle ? (
               <h1 
                 onClick={() => !isReadOnly && setIsEditingTitle(true)}
@@ -382,10 +387,11 @@ function ItemDetailPanel({
             )}
           </div>
 
-          {/* Notion Properties Style */}
-          <div className="bg-gray-50/50 dark:bg-bg-elevated/30 rounded-3xl p-8 border border-gray-100 dark:border-border-subtle flex flex-col gap-4">
-            {/* Status */}
-            <div className="flex items-center min-h-[48px] group">
+          {/* Notion Properties Style - 메모일 때는 숨김 */}
+          {!isMemo && (
+            <div className="bg-gray-50/50 dark:bg-bg-elevated/30 rounded-3xl p-8 border border-gray-100 dark:border-border-subtle flex flex-col gap-4">
+              {/* Status */}
+              <div className="flex items-center min-h-[48px] group">
               <div className="w-48 flex items-center gap-3 text-gray-400 dark:text-text-tertiary shrink-0">
                 <Clock size={18} strokeWidth={2.5} />
                 <span className="text-[13px] font-black uppercase tracking-widest">현재 상태</span>
@@ -653,6 +659,7 @@ function ItemDetailPanel({
               </div>
             </div>
           </div>
+          )}
 
           {/* Description Section */}
           <ItemDescriptionSection
@@ -660,6 +667,7 @@ function ItemDetailPanel({
             phaseId={phase.id}
             allItems={allItems}
             isReadOnly={isReadOnly}
+            entityContext={entityContext}
             onEditingChange={setIsEditingDescription}
             onOpenDetail={onOpenDetail}
             onShowToast={onShowToast}
@@ -725,23 +733,25 @@ function ItemDetailPanel({
           )}
 
 
-          {/* Comments Section */}
-          <div className="flex flex-col gap-10 pb-40">
-            <div className="flex items-center gap-3 border-b border-gray-100 dark:border-border-subtle pb-4">
-              <MessageSquare size={18} className="text-gray-400" />
-              <h3 className="text-[13px] font-black text-gray-400 dark:text-text-tertiary uppercase tracking-[0.2em]">팀 코멘트</h3>
-              {(item.comments || []).length > 0 && (
-                <span className="bg-gray-100 dark:bg-bg-hover px-2 py-0.5 rounded-md text-[11px] font-black text-gray-500 tabular-nums border border-gray-200 dark:border-border-subtle">
-                  {(item.comments || []).length}
-                </span>
-              )}
+          {/* Comments Section - 메모일 때는 숨김 */}
+          {!isMemo && (
+            <div className="flex flex-col gap-10 pb-40">
+              <div className="flex items-center gap-3 border-b border-gray-100 dark:border-border-subtle pb-4">
+                <MessageSquare size={18} className="text-gray-400" />
+                <h3 className="text-[13px] font-black text-gray-400 dark:text-text-tertiary uppercase tracking-[0.2em]">팀 코멘트</h3>
+                {(item.comments || []).length > 0 && (
+                  <span className="bg-gray-100 dark:bg-bg-hover px-2 py-0.5 rounded-md text-[11px] font-black text-gray-500 tabular-nums border border-gray-200 dark:border-border-subtle">
+                    {(item.comments || []).length}
+                  </span>
+                )}
+              </div>
+              <CommentSection 
+                phaseId={phase.id} itemId={item.id} comments={item.comments || []} 
+                onAddComment={onAddComment} onUpdateComment={onUpdateComment} onDeleteComment={onDeleteComment}
+                onShowConfirm={onShowConfirm} onShowToast={onShowToast}
+              />
             </div>
-            <CommentSection 
-              phaseId={phase.id} itemId={item.id} comments={item.comments || []} 
-              onAddComment={onAddComment} onUpdateComment={onUpdateComment} onDeleteComment={onDeleteComment}
-              onShowConfirm={onShowConfirm} onShowToast={onShowToast}
-            />
-          </div>
+          )}
         </div>
       </div>
     </div>

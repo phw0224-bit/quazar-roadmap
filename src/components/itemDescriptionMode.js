@@ -13,5 +13,6 @@
 export function getInitialDescriptionMode({ isReadOnly, description }) {
   if (isReadOnly) return 'preview';
 
-  return String(description || '').trim() ? 'preview' : 'live';
+  // 기본값을 항상 live로 설정
+  return 'live';
 }

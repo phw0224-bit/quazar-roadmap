@@ -25,11 +25,14 @@ import {
   normalizeDescriptionSource,
 } from './editor/utils/markdownTransform';
 
+import { ENTITY_TYPES } from '../lib/entityModel';
+
 export default function ItemDescriptionSection({
   item,
   phaseId,
   allItems = [],
   isReadOnly,
+  entityContext = null,
   onEditingChange,
   onOpenDetail,
   onShowToast,
@@ -51,6 +54,8 @@ export default function ItemDescriptionSection({
   const [isEditorFocused, setIsEditorFocused] = useState(false);
   const linkCallbackRef = useRef(null);
   const descriptionRef = useRef(null);
+
+  const isMemo = entityContext?.type === ENTITY_TYPES.MEMO;
 
   useEffect(() => {
     setDescription(normalizeDescriptionSource(item?.description || ''));
@@ -196,7 +201,7 @@ export default function ItemDescriptionSection({
           <div className="flex items-center gap-3">
             <FileText size={18} className="text-gray-400" />
             <h3 className="text-[13px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-text-tertiary">
-              상세 설명 (Wiki)
+              {isMemo ? '메모 내용' : '상세 설명 (Wiki)'}
             </h3>
           </div>
 
@@ -239,7 +244,7 @@ export default function ItemDescriptionSection({
               </div>
             )}
 
-            {description && !isReadOnly && (
+            {description && !isReadOnly && !isMemo && (
               <button
                 type="button"
                 onClick={handleSummarize}

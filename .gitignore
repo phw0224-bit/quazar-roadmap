@@ -31,3 +31,6 @@ yarn.lock/
 .pdca-status.json
 .worktrees/
 .superpowers/
+.*/
+docs/superpowers/*
+public/uploads/*
