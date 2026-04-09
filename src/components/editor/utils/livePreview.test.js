@@ -66,12 +66,24 @@ test('live preview decorates wiki link without alias by hiding only brackets', (
   assert.ok(plan.marks.some((item) => item.className === 'cm-live-wiki-link'));
 });
 
-test('live preview renders inactive toggle blocks as block widgets', () => {
+test('live preview renders inactive single-line toggle header as inline decoration (no block widget)', () => {
+  // 콘텐츠 없는 토글: 헤더만 inline decoration
   const plan = getMarkdownLivePreviewPlan('> [!toggle] 제품 요구사항', -1);
 
+  assert.equal(plan.blockWidgets.length, 0);
+  assert.ok(plan.replacements.some((item) => item.className === 'cm-live-toggle-prefix'));
+  assert.ok(plan.lineClasses.some((item) => item.className === 'cm-live-toggle-line'));
+});
+
+test('live preview collapses inactive multi-line toggle content with header accessible', () => {
+  // 콘텐츠 있는 토글: 헤더는 inline decoration, 콘텐츠만 block widget
+  const markdown = ['> [!toggle] 제품 요구사항', '> 콘텐츠 첫 줄', '> 콘텐츠 둘째 줄'].join('\n');
+  const plan = getMarkdownLivePreviewPlan(markdown, -1);
+
   assert.equal(plan.blockWidgets.length, 1);
-  assert.equal(plan.blockWidgets[0].className, 'cm-live-toggle-widget');
-  assert.match(plan.blockWidgets[0].html, /data-toggle-preview/);
+  assert.equal(plan.blockWidgets[0].className, 'cm-live-toggle-collapsed-widget');
+  assert.ok(plan.replacements.some((item) => item.className === 'cm-live-toggle-prefix'));
+  assert.ok(plan.lineClasses.some((item) => item.className === 'cm-live-toggle-line'));
 });
 
 test('live preview keeps active toggle line in source form', () => {
@@ -234,5 +246,54 @@ test('live preview decorates wiki embeds as inline badges', () => {
   const plan = getMarkdownLivePreviewPlan('![[기획 문서|item-1]]', -1);
 
   assert.ok(plan.replacements.some((item) => item.className === 'cm-live-embed-link'));
+});
+
+// Bug 1: * bullet support + cm-live-bullet-line class
+test('live preview replaces asterisk bullet prefix on inactive lines', () => {
+  const plan = getMarkdownLivePreviewPlan('* 항목', -1);
+
+  assert.ok(plan.replacements.some((item) => item.className === 'cm-live-bullet-prefix' && item.label === '• '));
+  assert.ok(plan.lineClasses.some((item) => item.className === 'cm-live-bullet-line'));
+});
+
+test('live preview adds bullet-line class for dash bullet on inactive lines', () => {
+  const plan = getMarkdownLivePreviewPlan('- 항목', -1);
+
+  assert.ok(plan.replacements.some((item) => item.className === 'cm-live-bullet-prefix'));
+  assert.ok(plan.lineClasses.some((item) => item.className === 'cm-live-bullet-line'));
+});
+
+// Bug 2: 커서가 토글 밖에 있을 때 헤더 줄에 lineClass가 있어야 함 (화살표 진입 가능)
+test('live preview toggle header is accessible (has lineClass) when cursor is outside', () => {
+  const markdown = ['> [!toggle] 제품 요구사항', '> 콘텐츠'].join('\n');
+  const plan = getMarkdownLivePreviewPlan(markdown, -1);
+
+  // 헤더 줄에 cm-live-toggle-line lineClass가 있어야 커서 화살표 접근 가능
+  assert.ok(plan.lineClasses.some((item) => item.className === 'cm-live-toggle-line'));
+  // 콘텐츠는 collapsed widget으로 대체
+  assert.equal(plan.blockWidgets.length, 1);
+  // 콘텐츠 widget의 from이 헤더 다음 줄에서 시작함 (헤더 줄 자체는 replace 범위에 없음)
+  const headerLineEnd = '> [!toggle] 제품 요구사항'.length;
+  assert.ok(plan.blockWidgets[0].from > headerLineEnd);
+});
+
+// Bug 3: 커서가 첫 코드블록 안에 있을 때 두 번째 코드블록은 정상 widget으로 렌더링
+test('live preview renders second code block as widget when cursor is in first code block', () => {
+  const markdown = [
+    '```js',
+    'const a = 1;',
+    '```',
+    '',
+    '```python',
+    'print("hello")',
+    '```',
+  ].join('\n');
+  // activeLineIndex=1: 첫 번째 코드블록 내부
+  const plan = getMarkdownLivePreviewPlan(markdown, 1);
+
+  // 두 번째 코드블록은 widget으로 렌더링되어야 함
+  assert.equal(plan.blockWidgets.length, 1);
+  assert.equal(plan.blockWidgets[0].className, 'cm-live-codeblock-widget');
+  assert.match(plan.blockWidgets[0].html, /print/);
 });
 

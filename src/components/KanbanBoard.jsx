@@ -467,7 +467,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   const handleOpenDetail = (entityOrId) => {
     const itemId = typeof entityOrId === 'object' && entityOrId !== null ? entityOrId.id : entityOrId;
     if (!itemId) return;
-    setUrlState({ itemId });
+    setUrlState({ itemId, fullscreen: true });
   };
 
   const handleUpdateItem = async (phaseId, itemId, updates) => {

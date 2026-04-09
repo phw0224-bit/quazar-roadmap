@@ -216,8 +216,8 @@ function ItemDetailPanel({
             <button
               onClick={onToggleFullscreen}
               className="p-2 hover:bg-gray-100 dark:hover:bg-bg-hover rounded-xl text-gray-400 hover:text-gray-900 dark:hover:text-text-primary transition-all duration-200 cursor-pointer"
-              aria-label={isFullscreen ? '창 모드로 전환' : '전체 화면으로 전환'}
-              title={isFullscreen ? '창 모드로 전환' : '전체 화면으로 전환'}
+              aria-label={isFullscreen ? '사이드바로 전환' : '전체화면으로 전환'}
+              title={isFullscreen ? '사이드바로 전환' : '전체화면으로 전환'}
             >
               {isFullscreen ? <Minimize2 size={20} strokeWidth={2.5} /> : <Maximize2 size={20} strokeWidth={2.5} />}
             </button>
