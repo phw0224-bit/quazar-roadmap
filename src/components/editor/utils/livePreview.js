@@ -34,7 +34,7 @@ export function getMarkdownLivePreviewPlan(text, activeLineIndex = -1, cursorPos
     // 블록 수식 $$ ... $$ 처리 (코드 블록보다 먼저)
     const mathBlockRange = getMathBlock(lines, lineStarts, lineIndex, activeLineIndex);
     if (mathBlockRange) {
-      blockWidgets.push(mathBlockRange);
+      if (!mathBlockRange.skip) blockWidgets.push(mathBlockRange);
       lineIndex = mathBlockRange.endLine;
       continue;
     }
@@ -42,14 +42,14 @@ export function getMarkdownLivePreviewPlan(text, activeLineIndex = -1, cursorPos
     // Mermaid 블록 우선 처리 (일반 코드 블록보다 먼저)
     const mermaidRange = getMermaidCodeBlock(lines, lineStarts, lineIndex, activeLineIndex);
     if (mermaidRange) {
-      blockWidgets.push(mermaidRange);
+      if (!mermaidRange.skip) blockWidgets.push(mermaidRange);
       lineIndex = mermaidRange.endLine;
       continue;
     }
 
     const codeFenceRange = getFencedCodeBlock(lines, lineStarts, lineIndex, activeLineIndex);
     if (codeFenceRange) {
-      blockWidgets.push(codeFenceRange);
+      if (!codeFenceRange.skip) blockWidgets.push(codeFenceRange);
       lineIndex = codeFenceRange.endLine;
       continue;
     }
@@ -63,7 +63,20 @@ export function getMarkdownLivePreviewPlan(text, activeLineIndex = -1, cursorPos
 
     const toggleRange = getToggleBlock(lines, lineStarts, lineIndex, activeLineIndex);
     if (toggleRange) {
-      blockWidgets.push(toggleRange);
+      // 헤더 inline decoration (continue 전에 반드시 실행)
+      const toggleHeaderMatch = lines[lineIndex].match(/^\s*>\s*\[!(toggle(?:-[a-z0-9]+)?)\]\s*/i);
+      if (toggleHeaderMatch) {
+        replacements.push({
+          from: lineStarts[lineIndex],
+          to: lineStarts[lineIndex] + toggleHeaderMatch[0].length,
+          label: '▸ ',
+          className: 'cm-live-toggle-prefix',
+        });
+        lineClasses.push({ lineStart: lineStarts[lineIndex], className: 'cm-live-toggle-line' });
+      }
+      if (!toggleRange.headerOnly) {
+        blockWidgets.push(toggleRange);
+      }
       lineIndex = toggleRange.endLine;
       continue;
     }
@@ -158,7 +171,7 @@ export function getMarkdownLivePreviewPlan(text, activeLineIndex = -1, cursorPos
       }
     }
 
-    const taskMatch = line.match(/^-\s+\[( |x|X)\]\s+/);
+    const taskMatch = line.match(/^[-*]\s+\[( |x|X)\]\s+/);
     if (taskMatch) {
       replacements.push({
         from: lineStart,
@@ -172,7 +185,7 @@ export function getMarkdownLivePreviewPlan(text, activeLineIndex = -1, cursorPos
       });
     }
 
-    const bulletMatch = line.match(/^-\s+/);
+    const bulletMatch = line.match(/^[-*]\s+/);
     if (bulletMatch && !taskMatch) {
       replacements.push({
         from: lineStart,
@@ -180,6 +193,7 @@ export function getMarkdownLivePreviewPlan(text, activeLineIndex = -1, cursorPos
         label: '• ',
         className: 'cm-live-bullet-prefix',
       });
+      lineClasses.push({ lineStart, className: 'cm-live-bullet-line' });
     }
 
     const orderedMatch = line.match(/^(\d+)\.\s+/);
@@ -258,16 +272,22 @@ function getToggleBlock(lines, lineStarts, lineIndex, activeLineIndex) {
 
   if (activeLineIndex >= lineIndex && activeLineIndex <= endLine) return null;
 
-  const from = lineStarts[lineIndex];
-  const to = getBlockRangeEnd(lines, lineStarts, endLine);
-  const markdown = lines.slice(lineIndex, endLine + 1).join('\n');
+  // 콘텐츠 없는 토글 (헤더만): 메인 루프에서 헤더 inline decoration만 적용
+  if (endLine === lineIndex) {
+    return { from: null, to: null, endLine, headerOnly: true };
+  }
+
+  // 콘텐츠 라인만 replace — 헤더 라인은 메인 루프 inline decoration 경로에서 처리
+  const contentFrom = lineStarts[lineIndex + 1];
+  const contentTo = getBlockRangeEnd(lines, lineStarts, endLine);
 
   return {
-    from,
-    to,
-    html: renderMarkdownPreviewHTML(markdown),
-    className: 'cm-live-toggle-widget',
+    from: contentFrom,
+    to: contentTo,
+    html: '<div class="cm-live-toggle-collapsed-content">···</div>',
+    className: 'cm-live-toggle-collapsed-widget',
     endLine,
+    headerOnly: false,
   };
 }
 
@@ -374,7 +394,9 @@ function getMathBlock(lines, lineStarts, lineIndex, activeLineIndex) {
     endLine += 1;
   }
   if (endLine >= lines.length) return null;
-  if (activeLineIndex >= lineIndex && activeLineIndex <= endLine) return null;
+  if (activeLineIndex >= lineIndex && activeLineIndex <= endLine) {
+    return { skip: true, endLine };
+  }
 
   const formula = lines.slice(lineIndex + 1, endLine).join('\n').trim();
   const from = lineStarts[lineIndex];
@@ -406,7 +428,9 @@ function getMermaidCodeBlock(lines, lineStarts, lineIndex, activeLineIndex) {
   }
   if (endLine >= lines.length) return null;
 
-  if (activeLineIndex >= lineIndex && activeLineIndex <= endLine) return null;
+  if (activeLineIndex >= lineIndex && activeLineIndex <= endLine) {
+    return { skip: true, endLine };
+  }
 
   const from = lineStarts[lineIndex];
   const to = getBlockRangeEnd(lines, lineStarts, endLine);
@@ -431,7 +455,9 @@ function getFencedCodeBlock(lines, lineStarts, lineIndex, activeLineIndex) {
   }
   if (endLine >= lines.length) return null;
 
-  if (activeLineIndex >= lineIndex && activeLineIndex <= endLine) return null;
+  if (activeLineIndex >= lineIndex && activeLineIndex <= endLine) {
+    return { skip: true, endLine };
+  }
 
   const from = lineStarts[lineIndex];
   const to = getBlockRangeEnd(lines, lineStarts, endLine);

@@ -34,3 +34,4 @@ yarn.lock/
 .*/
 docs/superpowers/*
 public/uploads/*
+.omx/

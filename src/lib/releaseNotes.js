@@ -9,6 +9,24 @@ export const RELEASE_NOTES_STORAGE_KEY = 'kanban-release-notes-last-seen';
 
 export const RELEASE_NOTES = [
   {
+    id: '2026-04-09-live-preview-detail-panel-fixes',
+    version: '2026-04-09.1',
+    title: '업데이트 내역',
+    description: '라이브 마크다운 미리보기와 상세 패널 진입 동작을 손보고, 로컬 작업 상태를 저장소에서 분리하도록 정리했습니다.',
+    sections: [
+      {
+        title: '수정',
+        items: [
+          'Markdown 라이브 프리뷰에서 토글 헤더, 불릿, 체크리스트, 코드 블록 처리 규칙을 보정해 inactive 상태의 렌더 정확도 개선',
+          '토글 블록은 헤더와 콘텐츠를 분리해 헤더 접근성을 유지하면서 콘텐츠만 접히도록 정리',
+          '아이템 상세 진입 시 기본 상태를 전체화면으로 열리게 바꿔 보드에서의 확인 흐름을 단순화',
+          '상세 패널 전체화면 토글 문구를 현재 동작에 맞게 정리',
+          '로컬 OMX 상태 디렉터리 `.omx/`를 gitignore에 추가해 개발자별 상태 파일이 커밋되지 않도록 조정',
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-04-07-entity-context-unification',
     version: '2026-04-07.3',
     title: '업데이트 내역',
