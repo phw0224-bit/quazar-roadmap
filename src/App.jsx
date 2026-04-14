@@ -96,7 +96,8 @@ function App() {
       />
       {showReleaseNotes && (
         <ReleaseNotesModal
-          release={currentReleaseNote}
+          releases={RELEASE_NOTES}
+          initialId={currentReleaseNote?.id}
           onClose={handleCloseReleaseNotes}
         />
       )}
