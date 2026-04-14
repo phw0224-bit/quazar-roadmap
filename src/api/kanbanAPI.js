@@ -1093,12 +1093,13 @@ export async function createGeneralDocument(boardType, title, type = 'document',
  * @description 일반 문서 또는 폴더를 삭제합니다.
  * 안전장치: project_id=null && (page_type='page' || page_type='folder') 조건을 확인합니다.
  * @param {string} itemId - 아이템 ID
+ * @param {string} [boardType='main'] - 보드 타입 ('main' → roadmap_items, 그 외 → items)
  * @returns {Promise<void>}
  */
-export async function deleteGeneralDocument(itemId) {
+export async function deleteGeneralDocument(itemId, boardType = 'main') {
   // 안전장치: 일반 문서/폴더만 삭제
   const { error } = await supabase
-    .from('items')
+    .from(itemsTable(boardType))
     .delete()
     .eq('id', itemId)
     .is('project_id', null)
@@ -1111,11 +1112,12 @@ export async function deleteGeneralDocument(itemId) {
  * @description 일반 문서/폴더를 다시 정렬합니다 (같은 팀 보드 내에서).
  * @param {string} itemId - 이동할 아이템 ID
  * @param {number} newIndex - 새로운 order_index
+ * @param {string} [boardType='main'] - 보드 타입 ('main' → roadmap_items, 그 외 → items)
  * @returns {Promise<void>}
  */
-export async function moveGeneralDocument(itemId, newIndex) {
+export async function moveGeneralDocument(itemId, newIndex, boardType = 'main') {
   const { error } = await supabase
-    .from('items')
+    .from(itemsTable(boardType))
     .update({ order_index: newIndex })
     .eq('id', itemId)
     .is('project_id', null)
