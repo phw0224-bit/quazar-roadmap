@@ -37,6 +37,8 @@ import { PresenceContext } from '../hooks/usePresenceContext';
 import PresenceAvatars from './PresenceAvatars';
 import { useLayoutState } from '../hooks/useLayoutState';
 import API from '../api/kanbanAPI';
+import ProfileAvatar from './ProfileAvatar';
+import ProfileSettingsModal from './ProfileSettingsModal';
 import ProjectColumn from './ProjectColumn';
 import KanbanCard from './KanbanCard';
 import BoardSection from './BoardSection';
@@ -46,10 +48,12 @@ import { buildEntityContext, ENTITY_TYPES } from '../lib/entityModel';
 import FilterBar from './FilterBar';
 import AppLayout from './AppLayout';
 import { useFilterState, applyFilterSort } from '../hooks/useFilterState';
+import { DEFAULT_PROFILE_CUSTOMIZATION, normalizeProfileCustomization } from '../lib/profileAppearance';
 
 import { Toast, ConfirmModal, InputModal } from './UI/Feedback';
 
-const DISPLAY_BOARDS = ['main', '개발팀', 'AI팀', '지원팀'];
+const TEAM_BOARDS = ['개발팀', 'AI팀', '지원팀'];
+const DISPLAY_BOARDS = ['main', ...TEAM_BOARDS];
 const ItemDetailPanel = lazy(() => import('./ItemDetailPanel'));
 const PeopleBoard = lazy(() => import('./PeopleBoard'));
 const TimelineView = lazy(() => import('./TimelineView'));
@@ -85,7 +89,16 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   const activeView = urlState.view;
   const detailItemId = urlState.itemId;
   const isReadOnly = !user;
-  const { onlineUsers, updateEditing } = usePresence({ user, itemId: detailItemId, isReadOnly });
+  const [profileCustomization, setProfileCustomization] = useState(DEFAULT_PROFILE_CUSTOMIZATION);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileModalSeed, setProfileModalSeed] = useState(0);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const { onlineUsers, updateEditing } = usePresence({
+    user,
+    itemId: detailItemId,
+    isReadOnly,
+    customization: profileCustomization,
+  });
   const isDetailFullscreen = urlState.fullscreen;
   const [peopleTeams, setPeopleTeams] = useState([]);
   const [peopleLoading, setPeopleLoading] = useState(true);
@@ -100,6 +113,28 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
 
   // Ctrl+K / Cmd+K 전체 검색 단축키
   useEffect(() => {
+    if (!user?.id) {
+      setProfileCustomization(DEFAULT_PROFILE_CUSTOMIZATION);
+      return;
+    }
+    let mounted = true;
+    const fetchProfileCustomization = async () => {
+      try {
+        const profileBundle = await API.getCurrentProfileBundle();
+        if (!mounted) return;
+        setProfileCustomization(normalizeProfileCustomization(profileBundle?.customization));
+      } catch (error) {
+        console.warn('프로필 꾸미기 데이터 로드 실패:', error.message);
+        if (mounted) setProfileCustomization(DEFAULT_PROFILE_CUSTOMIZATION);
+      }
+    };
+    fetchProfileCustomization();
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
     const handler = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
@@ -109,6 +144,26 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
+
+  const handleSaveProfileCustomization = async (nextCustomization) => {
+    try {
+      setIsSavingProfile(true);
+      const saved = await API.updateCurrentProfileCustomization(nextCustomization);
+      const normalized = normalizeProfileCustomization(saved);
+      setProfileCustomization(normalized);
+      setIsProfileModalOpen(false);
+      showToast('프로필이 업데이트되었습니다.');
+    } catch (error) {
+      showToast(`프로필 저장 실패: ${error.message}`, 'error');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleOpenProfileModal = () => {
+    setProfileModalSeed((prev) => prev + 1);
+    setIsProfileModalOpen(true);
+  };
 
   useEffect(() => {
     if (loading || !urlState.scrollTo) return;
@@ -205,14 +260,6 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
 
   const [panelWidth, setPanelWidth] = useState(50); // percentage width
   const [isResizing, setIsResizing] = useState(false);
-  const [isMainBoardCollapsed, setIsMainBoardCollapsed] = useState(() => {
-    try {
-      const saved = localStorage.getItem('kanban-main-board-collapsed');
-      return saved !== null ? JSON.parse(saved) : true;
-    } catch {
-      return true;
-    }
-  });
   const {
     filters, sort, hasActiveFilters,
     addFilter, removeFilter, reset: resetFilters, setSort,
@@ -371,10 +418,6 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   useEffect(() => {
     localStorage.setItem('kanban-completed-expanded', JSON.stringify([...expandedCompletedBoards]));
   }, [expandedCompletedBoards]);
-
-  useEffect(() => {
-    localStorage.setItem('kanban-main-board-collapsed', JSON.stringify(isMainBoardCollapsed));
-  }, [isMainBoardCollapsed]);
 
   useEffect(() => {
     localStorage.setItem('kanban-general-docs-expanded', JSON.stringify([...expandedGeneralDocBoards]));
@@ -613,7 +656,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                 </button>
                 <div className="text-3xl filter drop-shadow-sm">📂</div>
                 <h1 className="text-2xl font-black text-gray-900 dark:text-text-primary tracking-tight leading-none">
-                  {activeView === 'board' ? '프로젝트 보드' : activeView === 'timeline' ? '타임라인' : activeView === 'personal' ? '개인 메모장' : '인원 관리'}
+                  {activeView === 'roadmap' ? '전사 로드맵' : activeView === 'board' ? '팀 보드' : activeView === 'timeline' ? '타임라인' : activeView === 'personal' ? '개인 메모장' : '인원 관리'}
                 </h1>
               </div>
               
@@ -678,14 +721,28 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                 <kbd className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-bg-hover text-gray-400 dark:text-text-tertiary font-mono">⌘K</kbd>
               </button>
               {user ? (
-                <div className="flex items-center gap-3 bg-gray-50 dark:bg-bg-elevated px-4 py-2 rounded-xl border border-gray-100 dark:border-border-subtle shadow-sm transition-colors duration-200">
+                <button
+                  type="button"
+                  onClick={handleOpenProfileModal}
+                  className="flex items-center gap-3 bg-gray-50 dark:bg-bg-elevated px-4 py-2 rounded-xl border border-gray-100 dark:border-border-subtle shadow-sm transition-colors duration-200 cursor-pointer hover:border-gray-300 dark:hover:border-border-strong"
+                  title="프로필 꾸미기"
+                >
                   <div className="flex flex-col items-end">
-                    <span className="text-sm font-bold text-gray-800 dark:text-text-primary leading-tight">{user?.user_metadata?.name || user?.email?.split('@')[0]}</span>
+                    <span className="text-sm font-bold text-gray-800 dark:text-text-primary leading-tight">
+                      {user?.user_metadata?.name || user?.email?.split('@')[0]}
+                    </span>
+                    {profileCustomization.statusMessage && (
+                      <span className="text-[11px] text-gray-400 dark:text-text-tertiary max-w-[160px] truncate">
+                        {profileCustomization.statusMessage}
+                      </span>
+                    )}
                   </div>
-                  <div className="w-10 h-10 rounded-full bg-gray-900 dark:bg-brand-accent flex items-center justify-center text-white text-sm font-black shadow-inner uppercase border-2 border-white dark:border-border-strong">
-                    {(user?.user_metadata?.name || user?.email || 'U').charAt(0)}
-                  </div>
-                </div>
+                  <ProfileAvatar
+                    name={user?.user_metadata?.name || user?.email || 'U'}
+                    customization={profileCustomization}
+                    size="md"
+                  />
+                </button>
               ) : (
                 <button onClick={onShowLogin} className="px-6 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-sm font-black uppercase tracking-widest hover:bg-black dark:hover:bg-gray-100 transition-all shadow-md hover:shadow-lg active:scale-95">Login to Edit</button>
               )}
@@ -693,7 +750,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
           </header>
 
           {/* Filter Bar */}
-          {activeView === 'board' && (
+          {(activeView === 'board' || activeView === 'roadmap') && (
             <FilterBar
               filters={filters}
               sort={sort}
@@ -717,7 +774,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                 showToast={showToast}
               />
             </Suspense>
-          ) : activeView === 'board' ? (
+          ) : activeView === 'board' || activeView === 'roadmap' ? (
             <div
               className={`flex-1 overflow-x-auto overflow-y-auto pt-10 pb-10 pl-10 custom-scrollbar bg-white dark:bg-bg-base transition-all duration-300 ease-notion flex flex-col gap-20 ${detailItemId && !isDetailFullscreen ? 'pr-4' : 'pr-10'}`}
               onClick={(e) => {
@@ -728,33 +785,16 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
             >
 
             {/* Separate Board Sections */}
-            {[...DISPLAY_BOARDS].sort((a, b) => {
-              if (a === 'main') return -1;
-              if (b === 'main') return 1;
-              const userDept = user?.user_metadata?.department;
-              if (userDept === a) return -1;
-              if (userDept === b) return 1;
-              return 0;
-            }).map(boardName => {
+            {(activeView === 'roadmap' ? ['main'] : TEAM_BOARDS).map(boardName => {
               const boardProjects = filteredProjects.filter(p => (p.board_type || 'main') === boardName.toLowerCase() && !p.is_completed);
               const completedProjects = filteredProjects.filter(p => (p.board_type || 'main') === boardName.toLowerCase() && p.is_completed);
-              const boardDisplayName = boardName === 'main' ? '전체 프로젝트 보드' : `${boardName} 보드`;
-              const boardIcon = boardName === 'main' ? '🌐' : boardName === '개발팀' ? '⚙️' : '📂';
-              const isMain = boardName === 'main';
-              const isCollapsed = isMain && isMainBoardCollapsed;
-              
+              const boardDisplayName = boardName === 'main' ? '전사 로드맵' : `${boardName} 보드`;
+              const boardIcon = boardName === 'main' ? '🗺️' : boardName === '개발팀' ? '⚙️' : '📂';
+
               return (
-                <section key={boardName} className={`flex flex-col gap-8 border-t border-gray-100 dark:border-border-subtle pt-16 first:border-none first:pt-0 ${isCollapsed ? 'pb-2' : ''} transition-all duration-300 ease-notion`}>
+                <section key={boardName} className="flex flex-col gap-8 border-t border-gray-100 dark:border-border-subtle pt-16 first:border-none first:pt-0 transition-all duration-300 ease-notion">
                   <div className="flex items-center justify-between px-4 group">
                     <div className="flex items-center gap-4">
-                      {isMain && (
-                        <button 
-                          onClick={() => setIsMainBoardCollapsed(!isMainBoardCollapsed)}
-                          className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-bg-hover transition-all text-gray-400 hover:text-gray-900 dark:hover:text-text-primary cursor-pointer border border-transparent hover:border-gray-200 dark:hover:border-border-strong shadow-sm"
-                        >
-                          <span className={`transform transition-transform duration-300 ease-notion text-2xl ${isMainBoardCollapsed ? '-rotate-90' : 'rotate-0'}`}>▼</span>
-                        </button>
-                      )}
                       <div className="text-3xl filter drop-shadow-sm">{boardIcon}</div>
                       <div className="flex flex-col">
                         <h2 className="text-2xl font-black text-gray-900 dark:text-text-primary tracking-tight leading-tight">{boardDisplayName}</h2>
@@ -769,7 +809,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                         </div>
                       </div>
                     </div>
-                    {user && !isCollapsed && (
+                    {user && (
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => showPrompt('새 섹션 추가', '섹션 이름을 입력하세요', (title) => { if (title) { addSection(boardName.toLowerCase(), title); showToast(`'${title}' 섹션이 생성되었습니다.`); setPrompt(null); } })}
@@ -820,7 +860,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                     )}
                   </div>
 
-                  {!isCollapsed && (() => {
+                  {(() => {
                     const standaloneProjects = boardProjects.filter(p => !p.section_id);
                     const boardSections = sections
                       .filter(s => s.board_type === boardName.toLowerCase())
@@ -1118,8 +1158,21 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                 error={peopleError}
                 onOpenItem={handleOpenDetail}
                 projectAssignees={projects.reduce((acc, p) => { acc[p.title] = p.assignees || []; return acc; }, {})}
+                currentUserId={user?.id || null}
+                onShowToast={showToast}
               />
             </Suspense>
+          )}
+          {user && (
+            <ProfileSettingsModal
+              key={profileModalSeed}
+              isOpen={isProfileModalOpen}
+              profileName={user?.user_metadata?.name || user?.email?.split('@')[0] || '익명'}
+              initialValue={profileCustomization}
+              saving={isSavingProfile}
+              onClose={() => setIsProfileModalOpen(false)}
+              onSave={handleSaveProfileCustomization}
+            />
           )}
         </div>
 

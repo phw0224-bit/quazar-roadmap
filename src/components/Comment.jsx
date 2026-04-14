@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Edit2, Trash2, CornerDownRight } from 'lucide-react';
+import ProfileAvatar from './ProfileAvatar';
 
 export default function Comment({
   comment,
@@ -58,16 +59,22 @@ export default function Comment({
 
   const userName = comment.profiles?.name || '익명 사용자';
   const userDept = comment.profiles?.department ? ` (${comment.profiles.department})` : '';
+  const moodEmoji = comment.profiles?.customization?.moodEmoji || comment.profiles?.customization?.mood_emoji || '';
 
   return (
     <div className="group flex flex-col gap-2 transition-all duration-300 ease-notion p-4 rounded-2xl hover:bg-gray-50/50 dark:hover:bg-bg-hover/30 border border-transparent hover:border-gray-100 dark:hover:border-border-subtle" onPointerDown={e => e.stopPropagation()}>
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-full bg-gray-900 dark:bg-brand-accent flex items-center justify-center text-sm font-black text-white uppercase shadow-lg border-2 border-white dark:border-border-strong shrink-0">
-          {userName.charAt(0)}
-        </div>
+        <ProfileAvatar
+          name={userName}
+          customization={comment.profiles?.customization}
+          size="sm"
+          showMood={false}
+          className="shrink-0"
+        />
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-black text-gray-900 dark:text-text-primary truncate">{userName}</span>
+            {moodEmoji && <span className="text-sm leading-none">{moodEmoji}</span>}
             <span className="text-[11px] font-black text-gray-400 dark:text-text-tertiary uppercase tracking-widest">{userDept}</span>
           </div>
           <span className="text-[11px] font-bold text-gray-300 dark:text-text-tertiary uppercase tracking-widest leading-none mt-0.5">{formatDate(comment.created_at)}</span>

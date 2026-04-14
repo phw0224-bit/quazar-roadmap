@@ -43,10 +43,13 @@ function parseSort(str) {
   return field ? { field, dir: dir === 'desc' ? 'desc' : 'asc' } : null;
 }
 
+const VALID_VIEWS = ['board', 'timeline', 'people', 'roadmap'];
+
 function parseUrlState() {
   const params = new URLSearchParams(window.location.search);
+  const rawView = params.get('view') || 'board';
   return {
-    view: params.get('view') || 'board',
+    view: VALID_VIEWS.includes(rawView) ? rawView : 'board',
     itemId: params.get('item') || null,
     fullscreen: params.get('fullscreen') === '1',
     scrollTo: params.get('scrollTo') || null,

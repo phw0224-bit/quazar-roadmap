@@ -9,13 +9,15 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { normalizeProfileCustomization } from '../lib/profileAppearance';
 
-export function usePresence({ user, itemId, isReadOnly }) {
+export function usePresence({ user, itemId, isReadOnly, customization }) {
   const [onlineUsers, setOnlineUsers] = useState([]);
   const channelRef = useRef(null);
   const itemIdRef = useRef(itemId);
   const editingFieldRef = useRef(null);
   const displayName = user?.user_metadata?.name || user?.email?.split('@')[0] || '익명';
+  const normalizedCustomization = normalizeProfileCustomization(customization);
 
   // itemIdRef를 최신 값으로 유지 (클로저 문제 방지)
   useEffect(() => {
@@ -32,6 +34,10 @@ export function usePresence({ user, itemId, isReadOnly }) {
         name: p.name,
         itemId: p.itemId ?? null,
         editingField: p.editingField ?? null,
+        avatarStyle: p.avatarStyle ?? null,
+        themeColor: p.themeColor ?? null,
+        moodEmoji: p.moodEmoji ?? null,
+        statusMessage: p.statusMessage ?? '',
       });
     });
     setOnlineUsers(Array.from(userMap.values()));
@@ -59,6 +65,10 @@ export function usePresence({ user, itemId, isReadOnly }) {
             name: displayName,
             itemId: itemIdRef.current ?? null,
             editingField: null,
+            avatarStyle: normalizedCustomization.avatarStyle,
+            themeColor: normalizedCustomization.themeColor,
+            moodEmoji: normalizedCustomization.moodEmoji,
+            statusMessage: normalizedCustomization.statusMessage,
           });
         }
       });
@@ -69,7 +79,7 @@ export function usePresence({ user, itemId, isReadOnly }) {
       supabase.removeChannel(channel);
       channelRef.current = null;
     };
-  }, [user, isReadOnly, syncPresenceState]);
+  }, [user, isReadOnly, syncPresenceState, displayName, normalizedCustomization.avatarStyle, normalizedCustomization.themeColor, normalizedCustomization.moodEmoji, normalizedCustomization.statusMessage]);
 
   // itemId 변경 시 track() 재호출
   useEffect(() => {
@@ -80,11 +90,15 @@ export function usePresence({ user, itemId, isReadOnly }) {
       name: displayName,
       itemId: itemId ?? null,
       editingField: null,
+      avatarStyle: normalizedCustomization.avatarStyle,
+      themeColor: normalizedCustomization.themeColor,
+      moodEmoji: normalizedCustomization.moodEmoji,
+      statusMessage: normalizedCustomization.statusMessage,
     });
 
     // 아이템 닫힐 때 editingField도 초기화
     editingFieldRef.current = null;
-  }, [itemId, user, isReadOnly]);
+  }, [itemId, user, isReadOnly, displayName, normalizedCustomization.avatarStyle, normalizedCustomization.themeColor, normalizedCustomization.moodEmoji, normalizedCustomization.statusMessage]);
 
   /**
    * @description 편집 중인 필드를 Presence에 반영한다.
@@ -98,8 +112,12 @@ export function usePresence({ user, itemId, isReadOnly }) {
       name: displayName,
       itemId: itemIdRef.current ?? null,
       editingField: field ?? null,
+      avatarStyle: normalizedCustomization.avatarStyle,
+      themeColor: normalizedCustomization.themeColor,
+      moodEmoji: normalizedCustomization.moodEmoji,
+      statusMessage: normalizedCustomization.statusMessage,
     });
-  }, [user, isReadOnly]);
+  }, [user, isReadOnly, displayName, normalizedCustomization.avatarStyle, normalizedCustomization.themeColor, normalizedCustomization.moodEmoji, normalizedCustomization.statusMessage]);
 
   return { onlineUsers, updateEditing };
 }
