@@ -179,12 +179,20 @@ const supabaseAPI = {
 
     if (projectError) throw projectError;
 
-    const { data: items, error: itemError } = await supabase
-      .from('items')
-      .select('id, title, status, assignees, project_id')
-      .order('order_index', { ascending: true });
-
+    const [
+      { data: teamItems, error: itemError },
+      { data: mainItems, error: mainItemError },
+    ] = await Promise.all([
+      supabase.from('items').select('id, title, status, assignees, project_id')
+        .not('assignees', 'eq', '{}')
+        .not('assignees', 'is', null),
+      supabase.from('roadmap_items').select('id, title, status, assignees, project_id')
+        .not('assignees', 'eq', '{}')
+        .not('assignees', 'is', null),
+    ]);
     if (itemError) throw itemError;
+    if (mainItemError) throw mainItemError;
+    const allItems = [...(mainItems || []), ...(teamItems || [])];
 
     const projectMap = new Map((projects || []).map((project) => [project.id, project]));
     const membersByName = new Map();
@@ -216,7 +224,7 @@ const supabaseAPI = {
       teamsByName.get(department).push(member);
     });
 
-    (items || []).forEach((item) => {
+    (allItems || []).forEach((item) => {
       const assignees = Array.isArray(item.assignees) ? item.assignees : [];
       if (assignees.length === 0) return;
 
@@ -552,7 +560,10 @@ const supabaseAPI = {
   },
 
   deleteSection: async (sectionId) => {
-    await supabase.from('projects').update({ section_id: null }).eq('section_id', sectionId);
+    await Promise.all([
+      supabase.from('projects').update({ section_id: null }).eq('section_id', sectionId),
+      supabase.from('roadmap_projects').update({ section_id: null }).eq('section_id', sectionId),
+    ]);
     const { error } = await supabase.from('sections').delete().eq('id', sectionId);
     if (error) throw error;
   },
@@ -864,9 +875,9 @@ export async function createChildPage(projectId, parentItemId, title, inheritedP
 // NOTE: 현재 미사용. usePageTree 훅이 이미 로드된 phases 데이터에서
 // 하위 페이지를 파생하므로 직접 API 호출이 필요없음.
 // 향후 on-demand 로딩 시 사용 예정.
-export async function getChildPages(parentItemId) {
+export async function getChildPages(parentItemId, boardType = 'main') {
   const { data, error } = await supabase
-    .from('items')
+    .from(itemsTable(boardType))
     .select('*')
     .eq('parent_item_id', parentItemId)
     .eq('page_type', 'page')
