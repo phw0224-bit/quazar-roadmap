@@ -631,9 +631,9 @@ export default function TimelineView({ projects = [], phases = projects, section
 
                       {/* 프로젝트 목록 */}
                       {(!showSectionHeader || !isSectionCollapsed) && sectionPhases.map(phase => (
-                        <PhaseRow
+                        <ProjectRow
                           key={phase.id}
-                          phase={phase}
+                          project={phase}
                           isReadOnly={isReadOnly}
                           collapsedProjects={collapsedProjects}
                           toggleProjectCollapse={toggleProjectCollapse}
