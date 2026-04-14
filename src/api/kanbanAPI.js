@@ -20,6 +20,9 @@ import {
 
 const normalizeNameKey = (value) => (value || '').trim().toLowerCase();
 
+const itemsTable = (boardType) => boardType === 'main' ? 'roadmap_items' : 'items';
+const projectsTable = (boardType) => boardType === 'main' ? 'roadmap_projects' : 'projects';
+
 const supabaseAPI = {
   /**
    * @description 전체 보드 데이터를 단일 조회로 로드. projects + items(with comments) + sections + generalDocs.
@@ -34,45 +37,39 @@ const supabaseAPI = {
     } = await supabase.auth.getUser();
     const isAuthenticated = Boolean(user);
 
-    // 1. 프로젝트 가져오기
-    const { data: projects, error: pError } = await supabase
-      .from('projects')
-      .select('*')
-      .order('order_index', { ascending: true });
-
+    // 1+2: projects, roadmap_projects, items, roadmap_items 병렬 조회
+    const [
+      { data: teamProjects, error: pError },
+      { data: mainProjects, error: rpError },
+      { data: teamItems, error: iError },
+      { data: mainItemsData, error: riError },
+    ] = await Promise.all([
+      supabase.from('projects').select('*').order('order_index', { ascending: true }),
+      supabase.from('roadmap_projects').select('*').order('order_index', { ascending: true }),
+      supabase.from('items').select(`*, comments (*, profiles (name, department))`).order('order_index', { ascending: true }),
+      supabase.from('roadmap_items').select(`*, comments (*, profiles (name, department))`).order('order_index', { ascending: true }),
+    ]);
     if (pError) throw pError;
-
-    // 2. 아이템과 댓글(작성자 이름 포함) 가져오기
-    const { data: items, error: iError } = await supabase
-      .from('items')
-      .select(`
-        *,
-        comments (
-          *,
-          profiles (name, department)
-        )
-      `)
-      .order('order_index', { ascending: true });
-
+    if (rpError) throw rpError;
     if (iError) throw iError;
+    if (riError) throw riError;
+
+    const allProjects = [...(mainProjects || []), ...(teamProjects || [])];
+    const allItems = [...(mainItemsData || []), ...(teamItems || [])];
 
     // 2.5 일반 문서 + 폴더 가져오기 (project_id=null, page_type='page'|'folder')
     // 최상위 + 자식 문서/폴더 모두 포함 (GeneralDocumentSection에서 트리 구조 생성)
-    const { data: generalDocItems, error: docError } = await supabase
-      .from('items')
-      .select(`
-        *,
-        comments (
-          *,
-          profiles (name, department)
-        )
-      `)
-      .is('project_id', null)
-      .in('page_type', ['page', 'folder'])
-      .order('board_type', { ascending: true })
-      .order('order_index', { ascending: true });
-
+    const [
+      { data: teamGeneralDocs, error: docError },
+      { data: mainGeneralDocs, error: rdocError },
+    ] = await Promise.all([
+      supabase.from('items').select(`*, comments (*, profiles (name, department))`).is('project_id', null).in('page_type', ['page', 'folder']).order('board_type', { ascending: true }).order('order_index', { ascending: true }),
+      supabase.from('roadmap_items').select(`*, comments (*, profiles (name, department))`).is('project_id', null).in('page_type', ['page', 'folder']).order('order_index', { ascending: true }),
+    ]);
     if (docError) throw docError;
+    if (rdocError) throw rdocError;
+
+    const generalDocItems = [...(mainGeneralDocs || []), ...(teamGeneralDocs || [])];
 
     const { data: profiles, error: profileError } = await supabase
       .from('profiles')
@@ -113,10 +110,10 @@ const supabaseAPI = {
     );
 
     // 4. 트리 구조로 조립
-    const formattedProjects = projects.map(project => ({
+    const formattedProjects = allProjects.map(project => ({
       ...project,
       assignees: Array.isArray(project.assignees) ? project.assignees : [],
-      items: items
+      items: allItems
         .filter(item => item.project_id === project.id)
         .sort((a, b) => a.order_index - b.order_index)
         .map(item => ({
@@ -277,11 +274,11 @@ const supabaseAPI = {
   },
 
   addProject: async (title, boardType = 'main', sectionId = null) => {
-    const { data: existingProjects } = await supabase.from('projects').select('order_index').order('order_index', { ascending: false }).limit(1);
+    const { data: existingProjects } = await supabase.from(projectsTable(boardType)).select('order_index').order('order_index', { ascending: false }).limit(1);
     const nextOrder = existingProjects?.[0] ? existingProjects[0].order_index + 1 : 0;
 
     const { data, error } = await supabase
-      .from('projects')
+      .from(projectsTable(boardType))
       .insert([{ title, order_index: nextOrder, board_type: boardType, assignees: [], section_id: sectionId }])
       .select();
 
@@ -289,9 +286,9 @@ const supabaseAPI = {
     return data[0];
   },
 
-  updateProject: async (projectId, updates) => {
+  updateProject: async (projectId, updates, boardType = 'main') => {
     const { data, error } = await supabase
-      .from('projects')
+      .from(projectsTable(boardType))
       .update(updates)
       .eq('id', projectId)
       .select();
@@ -307,7 +304,7 @@ const supabaseAPI = {
    * @param {Object} meta - { sectionId, orderIndex } 완료 시 저장할 현재 위치
    *                      - { preCompletionSectionId, preCompletionOrderIndex } 복귀 시 복원할 위치
    */
-  completeProject: async (projectId, isCompleted, meta = {}) => {
+  completeProject: async (projectId, isCompleted, meta = {}, boardType = 'main') => {
     const updates = isCompleted
       ? {
           is_completed: true,
@@ -320,7 +317,7 @@ const supabaseAPI = {
           order_index: meta.preCompletionOrderIndex ?? null,
         };
     const { data, error } = await supabase
-      .from('projects')
+      .from(projectsTable(boardType))
       .update(updates)
       .eq('id', projectId)
       .select();
@@ -328,19 +325,19 @@ const supabaseAPI = {
     return data[0];
   },
 
-  deleteProject: async (projectId) => {
-    const { error } = await supabase.from('projects').delete().eq('id', projectId);
+  deleteProject: async (projectId, boardType = 'main') => {
+    const { error } = await supabase.from(projectsTable(boardType)).delete().eq('id', projectId);
     if (error) throw error;
   },
 
-  moveProject: async (projectId, targetIndex) => {
-    const { data: projects } = await supabase.from('projects').select('id, order_index').order('order_index', { ascending: true });
+  moveProject: async (projectId, targetIndex, boardType = 'main') => {
+    const { data: projects } = await supabase.from(projectsTable(boardType)).select('id, order_index').order('order_index', { ascending: true });
     const movingProjectIdx = projects.findIndex(p => p.id === projectId);
     const [movingProject] = projects.splice(movingProjectIdx, 1);
     projects.splice(targetIndex, 0, movingProject);
 
     const updatePromises = projects.map((p, idx) =>
-      supabase.from('projects').update({ order_index: idx }).eq('id', p.id)
+      supabase.from(projectsTable(boardType)).update({ order_index: idx }).eq('id', p.id)
     );
     const results = await Promise.all(updatePromises);
     const errors = results.filter(r => r.error);
@@ -353,9 +350,9 @@ const supabaseAPI = {
    * @param {string|null} targetSectionId 대상 섹션 ID (null이면 standalone)
    * @param {number} targetIndex 대상 섹션 내 위치
    */
-  moveProjectSidebar: async (projectId, targetSectionId, targetIndex) => {
+  moveProjectSidebar: async (projectId, targetSectionId, targetIndex, boardType = 'main') => {
     // 1. 대상 section 내 현재 프로젝트들 가져오기
-    let query = supabase.from('projects').select('id, order_index');
+    let query = supabase.from(projectsTable(boardType)).select('id, order_index');
     if (targetSectionId) {
       query = query.eq('section_id', targetSectionId);
     } else {
@@ -378,7 +375,7 @@ const supabaseAPI = {
 
     // 3. 순서 + section_id 업데이트
     const updatePromises = newList.map((p, idx) =>
-      supabase.from('projects').update({
+      supabase.from(projectsTable(boardType)).update({
         order_index: idx,
         section_id: targetSectionId,
       }).eq('id', p.id)
@@ -388,12 +385,12 @@ const supabaseAPI = {
     if (errors.length > 0) throw errors[0].error;
   },
 
-  addItem: async (projectId, title, content = '', createdBy = null) => {
-    const { data: existingItems } = await supabase.from('items').select('order_index').eq('project_id', projectId).order('order_index', { ascending: false }).limit(1);
+  addItem: async (projectId, title, content = '', createdBy = null, boardType = 'main') => {
+    const { data: existingItems } = await supabase.from(itemsTable(boardType)).select('order_index').eq('project_id', projectId).order('order_index', { ascending: false }).limit(1);
     const nextOrder = existingItems?.[0] ? existingItems[0].order_index + 1 : 0;
 
     const { data, error } = await supabase
-      .from('items')
+      .from(itemsTable(boardType))
       .insert([{
         project_id: projectId,
         title,
@@ -401,6 +398,7 @@ const supabaseAPI = {
         order_index: nextOrder,
         status: 'none',
         created_by: createdBy,
+        board_type: boardType,
         teams: [],
         assignees: [],
         tags: [],
@@ -412,9 +410,9 @@ const supabaseAPI = {
     return data[0];
   },
 
-  updateItem: async (projectId, itemId, updates) => {
+  updateItem: async (projectId, itemId, updates, boardType = 'main') => {
     const { data, error } = await supabase
-      .from('items')
+      .from(itemsTable(boardType))
       .update(updates)
       .eq('id', itemId)
       .select();
@@ -423,8 +421,8 @@ const supabaseAPI = {
     return data[0];
   },
 
-  deleteItem: async (projectId, itemId) => {
-    const { error } = await supabase.from('items').delete().eq('id', itemId);
+  deleteItem: async (projectId, itemId, boardType = 'main') => {
+    const { error } = await supabase.from(itemsTable(boardType)).delete().eq('id', itemId);
     if (error) throw error;
   },
 
@@ -436,10 +434,10 @@ const supabaseAPI = {
    * @param {number} targetIndex - 0-based 삽입 위치
    * @param {string|null} targetParentId - 새로운 부모 아이템 ID (undefined면 기존 로직 동작)
    */
-  moveItem: async (sourceProjectId, targetProjectId, itemId, targetIndex, targetParentId = undefined) => {
+  moveItem: async (sourceProjectId, targetProjectId, itemId, targetIndex, targetParentId = undefined, boardType = 'main') => {
     const projectIds = [...new Set([sourceProjectId, targetProjectId].filter(Boolean))];
     const { data: allItems, error: fetchError } = await supabase
-      .from('items')
+      .from(itemsTable(boardType))
       .select('id, project_id, parent_item_id, order_index')
       .in('project_id', projectIds);
 
@@ -456,7 +454,7 @@ const supabaseAPI = {
 
     const results = await Promise.all(
       plan.updates.map(({ id, updates }) =>
-        supabase.from('items').update(updates).eq('id', id)
+        supabase.from(itemsTable(boardType)).update(updates).eq('id', id)
       )
     );
     const errors = results.filter(r => r.error);
@@ -611,9 +609,9 @@ const supabaseAPI = {
    * @param {string} sectionId - 속한 섹션 ID (null 허용)
    * @param {number} targetIndex - 0-based 타임라인 내 목표 위치
    */
-  moveProjectTimeline: async (projectId, sectionId, targetIndex) => {
+  moveProjectTimeline: async (projectId, sectionId, targetIndex, boardType = 'main') => {
     let query = supabase
-      .from('projects')
+      .from(projectsTable(boardType))
       .select('id, timeline_order_index')
       .order('timeline_order_index', { ascending: true });
 
@@ -627,12 +625,12 @@ const supabaseAPI = {
     const { data: projects } = await query;
     const movingIdx = projects.findIndex(p => p.id === projectId);
     if (movingIdx === -1) throw new Error('Project not found in section');
-    
+
     const [moving] = projects.splice(movingIdx, 1);
     projects.splice(targetIndex, 0, moving);
 
     const results = await Promise.all(
-      projects.map((p, idx) => supabase.from('projects').update({ timeline_order_index: idx }).eq('id', p.id))
+      projects.map((p, idx) => supabase.from(projectsTable(boardType)).update({ timeline_order_index: idx }).eq('id', p.id))
     );
     const errors = results.filter(r => r.error);
     if (errors.length > 0) throw errors[0].error;
@@ -644,21 +642,21 @@ const supabaseAPI = {
    * @param {string} projectId - 속한 프로젝트 ID
    * @param {number} targetIndex - 0-based 타임라인 내 목표 위치
    */
-  moveItemTimeline: async (itemId, projectId, targetIndex) => {
+  moveItemTimeline: async (itemId, projectId, targetIndex, boardType = 'main') => {
     const { data: items } = await supabase
-      .from('items')
+      .from(itemsTable(boardType))
       .select('id, timeline_order_index')
       .eq('project_id', projectId)
       .order('timeline_order_index', { ascending: true });
 
     const movingIdx = items.findIndex(i => i.id === itemId);
     if (movingIdx === -1) throw new Error('Item not found in project');
-    
+
     const [moving] = items.splice(movingIdx, 1);
     items.splice(targetIndex, 0, moving);
 
     const results = await Promise.all(
-      items.map((item, idx) => supabase.from('items').update({ timeline_order_index: idx }).eq('id', item.id))
+      items.map((item, idx) => supabase.from(itemsTable(boardType)).update({ timeline_order_index: idx }).eq('id', item.id))
     );
     const errors = results.filter(r => r.error);
     if (errors.length > 0) throw errors[0].error;
@@ -833,9 +831,9 @@ const supabaseAPI = {
  * @param {Object} inheritedProps - { teams: string[], tags: string[] } 상속받을 속성
  * @returns {Promise<Object>} 생성된 아이템 객체
  */
-export async function createChildPage(projectId, parentItemId, title, inheritedProps = {}) {
+export async function createChildPage(projectId, parentItemId, title, inheritedProps = {}, boardType = 'main') {
   const { data: existing } = await supabase
-    .from('items')
+    .from(itemsTable(boardType))
     .select('order_index')
     .eq('parent_item_id', parentItemId)
     .order('order_index', { ascending: false })
@@ -844,7 +842,7 @@ export async function createChildPage(projectId, parentItemId, title, inheritedP
   const nextOrder = existing?.length > 0 ? existing[0].order_index + 1 : 0;
 
   const { data, error } = await supabase
-    .from('items')
+    .from(itemsTable(boardType))
     .insert([{
       project_id: projectId,
       parent_item_id: parentItemId,
@@ -885,32 +883,46 @@ export async function getChildPages(parentItemId) {
  * @returns {Array} backlink 아이템 목록 (id, title, content, page_type)
  */
 export async function getBacklinks(itemId) {
-  const { data: directMatches, error: directError } = await supabase
-    .from('items')
-    .select('id, title, content, page_type, project_id')
-    .ilike('description', `%|${itemId}]]%`);
+  // directMatches: 두 테이블 모두 검색
+  const [
+    { data: directMatchesTeam, error: directError },
+    { data: directMatchesMain, error: directErrorMain },
+  ] = await Promise.all([
+    supabase.from('items').select('id, title, content, page_type, project_id').ilike('description', `%|${itemId}]]%`),
+    supabase.from('roadmap_items').select('id, title, content, page_type, project_id').ilike('description', `%|${itemId}]]%`),
+  ]);
   if (directError) throw directError;
+  if (directErrorMain) throw directErrorMain;
 
-  const backlinkMap = new Map((directMatches || []).map((item) => [item.id, item]));
+  const backlinkMap = new Map(
+    [...(directMatchesTeam || []), ...(directMatchesMain || [])].map((item) => [item.id, item])
+  );
 
-  const { data: targetItem, error: targetError } = await supabase
-    .from('items')
-    .select('title, content')
-    .eq('id', itemId)
-    .maybeSingle();
-  if (targetError) throw targetError;
+  // targetItem: 두 테이블에서 검색
+  const [
+    { data: targetItemTeam },
+    { data: targetItemMain },
+  ] = await Promise.all([
+    supabase.from('items').select('title, content').eq('id', itemId).maybeSingle(),
+    supabase.from('roadmap_items').select('title, content').eq('id', itemId).maybeSingle(),
+  ]);
+  const targetItem = targetItemMain || targetItemTeam;
 
   const titleCandidates = [targetItem?.title, targetItem?.content]
     .map((value) => `${value || ''}`.trim())
     .filter(Boolean);
 
   for (const title of titleCandidates) {
-    const { data: titleMatches, error: titleError } = await supabase
-      .from('items')
-      .select('id, title, content, page_type, project_id')
-      .ilike('description', `%[[${title}]]%`);
+    const [
+      { data: titleMatchesTeam, error: titleError },
+      { data: titleMatchesMain, error: titleErrorMain },
+    ] = await Promise.all([
+      supabase.from('items').select('id, title, content, page_type, project_id').ilike('description', `%[[${title}]]%`),
+      supabase.from('roadmap_items').select('id, title, content, page_type, project_id').ilike('description', `%[[${title}]]%`),
+    ]);
     if (titleError) throw titleError;
-    (titleMatches || []).forEach((item) => backlinkMap.set(item.id, item));
+    if (titleErrorMain) throw titleErrorMain;
+    [...(titleMatchesTeam || []), ...(titleMatchesMain || [])].forEach((item) => backlinkMap.set(item.id, item));
   }
 
   backlinkMap.delete(itemId);
@@ -924,7 +936,7 @@ export async function getBacklinks(itemId) {
  */
 export async function getPersonalMemos(userId) {
   const { data, error } = await supabase
-    .from('items')
+    .from('roadmap_items')
     .select(`
       *,
       comments (
@@ -953,7 +965,7 @@ export async function getPersonalMemos(userId) {
  */
 export async function createPersonalMemo(title, content = '', createdBy) {
   const { data: existingItems, error: orderError } = await supabase
-    .from('items')
+    .from('roadmap_items')
     .select('order_index')
     .eq('is_private', true)
     .eq('owner_id', createdBy)
@@ -964,7 +976,7 @@ export async function createPersonalMemo(title, content = '', createdBy) {
   const nextOrder = existingItems?.[0] ? existingItems[0].order_index + 1 : 0;
 
   const { data, error } = await supabase
-    .from('items')
+    .from('roadmap_items')
     .insert([{
       project_id: null,
       title,
@@ -998,7 +1010,7 @@ export async function createPersonalMemo(title, content = '', createdBy) {
 export async function updatePersonalMemo(memoId, updates, userId) {
   // 권한 확인: 소유자만 수정 가능
   const { data: memo, error: checkError } = await supabase
-    .from('items')
+    .from('roadmap_items')
     .select('owner_id')
     .eq('id', memoId)
     .eq('is_private', true)
@@ -1009,7 +1021,7 @@ export async function updatePersonalMemo(memoId, updates, userId) {
   }
 
   const { data, error } = await supabase
-    .from('items')
+    .from('roadmap_items')
     .update(updates)
     .eq('id', memoId)
     .select();
@@ -1027,7 +1039,7 @@ export async function updatePersonalMemo(memoId, updates, userId) {
 export async function deletePersonalMemo(memoId, userId) {
   // 권한 확인: 소유자만 삭제 가능
   const { data: memo, error: checkError } = await supabase
-    .from('items')
+    .from('roadmap_items')
     .select('owner_id')
     .eq('id', memoId)
     .eq('is_private', true)
@@ -1038,7 +1050,7 @@ export async function deletePersonalMemo(memoId, userId) {
   }
 
   const { error } = await supabase
-    .from('items')
+    .from('roadmap_items')
     .delete()
     .eq('id', memoId);
 
@@ -1058,7 +1070,7 @@ export async function createGeneralDocument(boardType, title, type = 'document',
   const pageType = type === 'folder' ? 'folder' : 'page';
 
   const { data, error } = await supabase
-    .from('items')
+    .from(itemsTable(boardType))
     .insert([
       {
         board_type: boardType,
