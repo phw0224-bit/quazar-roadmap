@@ -392,7 +392,9 @@ export default function TimelineView({ projects = [], phases = projects, section
         const overIndex = sectionPhases.findIndex(p => `project-${p.id}` === over.id);
         if (overIndex === -1) return;
       const projectId = active.id.replace('project-', '');
-      await kanbanAPI.moveProjectTimeline(projectId, activeSectionId, overIndex);
+      const movedProject = phases.find(p => p.id === projectId);
+      const boardType = movedProject?.board_type ?? 'main';
+      await kanbanAPI.moveProjectTimeline(projectId, activeSectionId, overIndex, boardType);
         showToast?.('프로젝트 순서를 변경했습니다', 'success');
       } else if (activeType === 'item') {
         const activeProjectId = active.data.current.projectId;
@@ -406,7 +408,9 @@ export default function TimelineView({ projects = [], phases = projects, section
         const overIndex = phase.items.findIndex(i => `item-${i.id}` === over.id);
         if (overIndex === -1) return;
         const itemId = active.id.replace('item-', '');
-        await kanbanAPI.moveItemTimeline(itemId, activeProjectId, overIndex);
+        const movedProject = phases.find(p => p.id === activeProjectId);
+        const boardType = movedProject?.board_type ?? 'main';
+        await kanbanAPI.moveItemTimeline(itemId, activeProjectId, overIndex, boardType);
         showToast?.('업무 순서를 변경했습니다', 'success');
       }
     } catch (err) {

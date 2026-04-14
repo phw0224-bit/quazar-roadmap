@@ -309,6 +309,7 @@ export const useKanbanData = () => {
     // Real-time Subscriptions
     const itemsChannel = supabase.channel('items-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'items' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'roadmap_items' }, () => fetchData())
       .subscribe();
 
     const commentsChannel = supabase.channel('comments-db-changes')
@@ -331,6 +332,7 @@ export const useKanbanData = () => {
 
     const projectsChannel = supabase.channel('projects-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'roadmap_projects' }, () => fetchData())
       .subscribe();
 
     const profileCustomizationChannel = supabase.channel('profile-customizations-db-changes')
@@ -357,13 +359,16 @@ export const useKanbanData = () => {
   };
 
   const updateProject = async (projectId, updates) => {
-    const updated = await API.updateProject(projectId, updates);
+    const project = state.projects.find(p => p.id === projectId);
+    const boardType = project?.board_type ?? 'main';
+    const updated = await API.updateProject(projectId, updates, boardType);
     dispatch({ type: 'UPDATE_PROJECT', payload: { id: projectId, updates: updated } });
   };
 
   const completeProject = async (projectId, isCompleted) => {
     const project = state.projects.find(p => p.id === projectId);
     if (!project) return;
+    const boardType = project.board_type ?? 'main';
     const meta = isCompleted
       ? { sectionId: project.section_id, orderIndex: project.order_index }
       : { preCompletionSectionId: project.pre_completion_section_id, preCompletionOrderIndex: project.pre_completion_order_index };
@@ -371,31 +376,41 @@ export const useKanbanData = () => {
       ? { is_completed: true, pre_completion_section_id: project.section_id, pre_completion_order_index: project.order_index }
       : { is_completed: false, section_id: project.pre_completion_section_id, order_index: project.pre_completion_order_index };
     dispatch({ type: 'UPDATE_PROJECT', payload: { id: projectId, updates } });
-    await API.completeProject(projectId, isCompleted, meta);
+    await API.completeProject(projectId, isCompleted, meta, boardType);
   };
 
   const deleteProject = async (projectId) => {
-    await API.deleteProject(projectId);
+    const project = state.projects.find(p => p.id === projectId);
+    const boardType = project?.board_type ?? 'main';
+    await API.deleteProject(projectId, boardType);
     dispatch({ type: 'DELETE_PROJECT', payload: projectId });
   };
 
   const moveProject = async (projectId, targetIndex) => {
+    const project = state.projects.find(p => p.id === projectId);
+    const boardType = project?.board_type ?? 'main';
     dispatch({ type: 'MOVE_PROJECT', payload: { projectId, targetIndex } });
-    await API.moveProject(projectId, targetIndex);
+    await API.moveProject(projectId, targetIndex, boardType);
   };
 
   const addItem = async (projectId, title, content, createdBy = null) => {
-    const newItem = await API.addItem(projectId, title, content, createdBy);
+    const project = state.projects.find(p => p.id === projectId);
+    const boardType = project?.board_type ?? 'main';
+    const newItem = await API.addItem(projectId, title, content, createdBy, boardType);
     dispatch({ type: 'ADD_ITEM', payload: { projectId, item: newItem } });
   };
 
   const updateItem = async (projectId, itemId, updates) => {
-    const updated = await API.updateItem(projectId, itemId, updates);
+    const project = state.projects.find(p => p.id === projectId);
+    const boardType = project?.board_type ?? 'main';
+    const updated = await API.updateItem(projectId, itemId, updates, boardType);
     dispatch({ type: 'UPDATE_ITEM', payload: { projectId, itemId, updates: updated } });
   };
 
   const deleteItem = async (projectId, itemId) => {
-    await API.deleteItem(projectId, itemId);
+    const project = state.projects.find(p => p.id === projectId);
+    const boardType = project?.board_type ?? 'main';
+    await API.deleteItem(projectId, itemId, boardType);
     dispatch({ type: 'DELETE_ITEM', payload: { projectId, itemId } });
   };
 
@@ -409,8 +424,10 @@ export const useKanbanData = () => {
    * @param {number} targetIndex - 목적 project에서의 위치 (0-based)
    */
   const moveItem = async (sourceProjectId, targetProjectId, itemId, targetIndex) => {
+    const project = state.projects.find(p => p.id === sourceProjectId);
+    const boardType = project?.board_type ?? 'main';
     dispatch({ type: 'MOVE_ITEM', payload: { sourceProjectId, targetProjectId, itemId, targetIndex } });
-    await API.moveItem(sourceProjectId, targetProjectId, itemId, targetIndex);
+    await API.moveItem(sourceProjectId, targetProjectId, itemId, targetIndex, undefined, boardType);
   };
 
   /**
@@ -424,8 +441,9 @@ export const useKanbanData = () => {
   const addChildPage = async (projectId, parentItemId, title) => {
     let inheritedTeams = [];
     let inheritedTags = [];
+    const parentProject = state.projects.find(p => p.id === projectId);
+    const boardType = parentProject?.board_type ?? 'main';
     if (parentItemId) {
-      const parentProject = state.projects.find(p => p.id === projectId);
       const parentItem = parentProject?.items?.find(i => i.id === parentItemId);
       if (parentItem) {
         inheritedTeams = parentItem.teams || [];
@@ -436,7 +454,7 @@ export const useKanbanData = () => {
     const newPage = await createChildPage(projectId, parentItemId, title, {
       teams: inheritedTeams,
       tags: inheritedTags,
-    });
+    }, boardType);
     
     // 1. 하위 페이지(자기 자신)의 related_items에 부모 페이지를 추가 (상위 페이지 연결)
     if (parentItemId) {
@@ -493,14 +511,18 @@ export const useKanbanData = () => {
   };
 
   const updateGeneralDocument = async (itemId, updates) => {
-    const updated = await API.updateItem(null, itemId, updates);  // project_id=null
+    const doc = state.generalDocs.find(d => d.id === itemId);
+    const boardType = doc?.board_type ?? 'main';
+    const updated = await API.updateItem(null, itemId, updates, boardType);
     dispatch({ type: 'UPDATE_GENERAL_DOC', payload: { itemId, updates: updated } });
   };
 
   const deleteGeneralDocument = async (itemId) => {
     console.log('[deleteGeneralDocument] itemId:', itemId);
     try {
-      await API.deleteGeneralDocument(itemId);
+      const doc = state.generalDocs.find(d => d.id === itemId);
+      const boardType = doc?.board_type ?? 'main';
+      await API.deleteGeneralDocument(itemId, boardType);
       console.log('[deleteGeneralDocument] deleted from API');
       dispatch({ type: 'DELETE_GENERAL_DOC', payload: itemId });
       console.log('[deleteGeneralDocument] dispatched');
@@ -511,8 +533,10 @@ export const useKanbanData = () => {
   };
 
   const moveGeneralDocument = async (itemId, newIndex) => {
+    const doc = state.generalDocs.find(d => d.id === itemId);
+    const boardType = doc?.board_type ?? 'main';
     dispatch({ type: 'MOVE_GENERAL_DOC', payload: { itemId, newIndex } });
-    await API.moveGeneralDocument(itemId, newIndex);
+    await API.moveGeneralDocument(itemId, newIndex, boardType);
   };
 
   const setBoardType = (boardType) => {
@@ -536,11 +560,13 @@ export const useKanbanData = () => {
 
   const moveSidebarItem = async (sourceProjectId, targetProjectId, itemId, targetIndex, targetParentId = null) => {
     const snapshot = cloneProjectsSnapshot(state.projects);
+    const project = state.projects.find(p => p.id === sourceProjectId);
+    const boardType = project?.board_type ?? 'main';
     const payload = { sourceProjectId, targetProjectId, itemId, targetIndex, targetParentId };
     dispatch({ type: 'SIDEBAR_MOVE_ITEM', payload });
 
     try {
-      await API.moveItem(sourceProjectId, targetProjectId, itemId, targetIndex, targetParentId);
+      await API.moveItem(sourceProjectId, targetProjectId, itemId, targetIndex, targetParentId, boardType);
     } catch (err) {
       dispatch({ type: 'RESTORE_PROJECTS', payload: { projects: snapshot } });
       throw err;
@@ -549,11 +575,13 @@ export const useKanbanData = () => {
 
   const moveSidebarProject = async (projectId, targetSectionId, targetIndex) => {
     const snapshot = cloneProjectsSnapshot(state.projects);
+    const project = state.projects.find(p => p.id === projectId);
+    const boardType = project?.board_type ?? 'main';
     const payload = { projectId, targetSectionId, targetIndex };
     dispatch({ type: 'SIDEBAR_MOVE_PROJECT', payload });
 
     try {
-      await API.moveProjectSidebar(projectId, targetSectionId, targetIndex);
+      await API.moveProjectSidebar(projectId, targetSectionId, targetIndex, boardType);
     } catch (err) {
       dispatch({ type: 'RESTORE_PROJECTS', payload: { projects: snapshot } });
       throw err;
