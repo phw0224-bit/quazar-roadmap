@@ -1,5 +1,5 @@
 import { useState, useEffect, createElement, useMemo, useCallback } from 'react';
-import { ChevronRight, LayoutGrid, Clock, Users, PanelLeft, MousePointer2, Ellipsis, BellDot, Moon, Sun, LogOut } from 'lucide-react';
+import { ChevronRight, LayoutGrid, Clock, Users, PanelLeft, MousePointer2, Ellipsis, BellDot, Moon, Sun, LogOut, Map } from 'lucide-react';
 import {
   DndContext,
   PointerSensor,
@@ -16,7 +16,8 @@ import { getDropTypeFromRelativeY, getRelativeY } from './sidebarDropZones';
 const stopProp = (e) => e.stopPropagation();
 
 const NAV_ITEMS = [
-  { view: 'board', label: '메인 보드', icon: LayoutGrid },
+  { view: 'roadmap', label: '전사 로드맵', icon: Map },
+  { view: 'board', label: '팀 보드', icon: LayoutGrid },
   { view: 'timeline', label: '타임라인', icon: Clock },
   { view: 'people', label: '피플 보드', icon: Users },
 ];

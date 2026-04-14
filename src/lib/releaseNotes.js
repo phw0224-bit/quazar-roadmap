@@ -9,6 +9,21 @@ export const RELEASE_NOTES_STORAGE_KEY = 'kanban-release-notes-last-seen';
 
 export const RELEASE_NOTES = [
   {
+    id: '2026-04-15-roadmap-separate-page',
+    version: 'v0.9.3',
+    title: '전사 로드맵 전용 페이지',
+    description: '전사 로드맵이 별도 페이지로 분리됩니다. 사이드바의 "전사 로드맵" 버튼으로 바로 이동할 수 있습니다.',
+    sections: [
+      {
+        title: '추가',
+        items: [
+          '사이드바에 "전사 로드맵" 메뉴 항목 추가 — 클릭 시 전용 페이지로 이동',
+          '"팀 보드" 뷰에서 전사 로드맵 제거 — 팀 보드(개발팀·AI팀·지원팀)만 표시',
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-04-15-roadmap-table-separation',
     version: 'v0.9.2',
     title: '로드맵 데이터 분리 & 안정성 개선',
