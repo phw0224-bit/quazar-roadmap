@@ -467,7 +467,6 @@ export const useKanbanData = () => {
 
     // 2. 부모 아이템의 related_items에도 하위 페이지를 추가 (양방향 연결)
     if (parentItemId) {
-      const parentProject = state.projects.find(p => p.id === projectId);
       const parentItem = parentProject?.items.find(i => i.id === parentItemId);
       if (parentItem) {
         const currentRelations = parentItem.related_items || [];
@@ -518,18 +517,10 @@ export const useKanbanData = () => {
   };
 
   const deleteGeneralDocument = async (itemId) => {
-    console.log('[deleteGeneralDocument] itemId:', itemId);
-    try {
-      const doc = state.generalDocs.find(d => d.id === itemId);
-      const boardType = doc?.board_type ?? 'main';
-      await API.deleteGeneralDocument(itemId, boardType);
-      console.log('[deleteGeneralDocument] deleted from API');
-      dispatch({ type: 'DELETE_GENERAL_DOC', payload: itemId });
-      console.log('[deleteGeneralDocument] dispatched');
-    } catch (err) {
-      console.error('[deleteGeneralDocument] error:', err);
-      throw err;
-    }
+    const doc = state.generalDocs.find(d => d.id === itemId);
+    const boardType = doc?.board_type ?? 'main';
+    await API.deleteGeneralDocument(itemId, boardType);
+    dispatch({ type: 'DELETE_GENERAL_DOC', payload: itemId });
   };
 
   const moveGeneralDocument = async (itemId, newIndex) => {
