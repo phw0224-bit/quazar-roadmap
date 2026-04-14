@@ -12,6 +12,7 @@
 import { useEffect, useReducer, useCallback } from 'react';
 import API, { createChildPage } from '../api/kanbanAPI';
 import { supabase } from '../lib/supabase';
+import { normalizeProfileCustomization } from '../lib/profileAppearance';
 import {
   applySidebarItemMove,
   applySidebarProjectMove,
@@ -288,7 +289,20 @@ export const useKanbanData = () => {
         .select('*, profiles(name, department)')
         .eq('id', commentId)
         .single();
-      if (!error) return data;
+      if (!error) {
+        const { data: customization } = await supabase
+          .from('profile_customizations')
+          .select('avatar_style, theme_color, status_message, mood_emoji')
+          .eq('user_id', data.user_id)
+          .maybeSingle();
+        return {
+          ...data,
+          profiles: {
+            ...(data.profiles || {}),
+            customization: normalizeProfileCustomization(customization),
+          },
+        };
+      }
       return null;
     };
 
@@ -319,10 +333,15 @@ export const useKanbanData = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => fetchData())
       .subscribe();
 
+    const profileCustomizationChannel = supabase.channel('profile-customizations-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profile_customizations' }, () => fetchData())
+      .subscribe();
+
     return () => {
       supabase.removeChannel(itemsChannel);
       supabase.removeChannel(commentsChannel);
       supabase.removeChannel(projectsChannel);
+      supabase.removeChannel(profileCustomizationChannel);
     };
   }, [fetchData]);
 

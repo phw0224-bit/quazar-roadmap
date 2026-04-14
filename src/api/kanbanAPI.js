@@ -11,6 +11,12 @@
  */
 import { supabase } from '../lib/supabase';
 import { buildProjectMovePlan } from './projectMove';
+import {
+  DEFAULT_PROFILE_CUSTOMIZATION,
+  REACTION_TYPES,
+  normalizeProfileCustomization,
+  toCustomizationPayload,
+} from '../lib/profileAppearance';
 
 const normalizeNameKey = (value) => (value || '').trim().toLowerCase();
 
@@ -23,6 +29,11 @@ const supabaseAPI = {
    * projects: 각 project에 items 배열 내장, items에 comments(with profiles) 배열 내장
    */
   getBoardData: async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const isAuthenticated = Boolean(user);
+
     // 1. 프로젝트 가져오기
     const { data: projects, error: pError } = await supabase
       .from('projects')
@@ -69,6 +80,18 @@ const supabaseAPI = {
 
     if (profileError) throw profileError;
 
+    let customizationRows = [];
+    if (isAuthenticated) {
+      const { data: customizationData, error: customizationError } = await supabase
+        .from('profile_customizations')
+        .select('user_id, avatar_style, theme_color, status_message, mood_emoji');
+      if (customizationError) {
+        console.warn('[getBoardData] profile_customizations 조회 실패:', customizationError.message);
+      } else {
+        customizationRows = customizationData || [];
+      }
+    }
+
     // 3. 섹션 가져오기
     const { data: sections, error: sError } = await supabase
       .from('sections')
@@ -76,7 +99,18 @@ const supabaseAPI = {
       .order('order_index', { ascending: true });
     if (sError) throw sError;
 
-    const profilesById = new Map((profiles || []).map((profile) => [profile.id, profile]));
+    const customizationsByUserId = new Map(
+      customizationRows.map((row) => [row.user_id, normalizeProfileCustomization(row)])
+    );
+    const profilesById = new Map(
+      (profiles || []).map((profile) => [
+        profile.id,
+        {
+          ...profile,
+          customization: customizationsByUserId.get(profile.id) || DEFAULT_PROFILE_CUSTOMIZATION,
+        },
+      ])
+    );
 
     // 4. 트리 구조로 조립
     const formattedProjects = projects.map(project => ({
@@ -89,7 +123,20 @@ const supabaseAPI = {
           ...item,
           related_items: Array.isArray(item.related_items) ? item.related_items : [],
           creator_profile: item.created_by ? profilesById.get(item.created_by) || null : null,
-          comments: (item.comments || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+          comments: (item.comments || [])
+            .map((comment) => {
+              if (!comment?.user_id) return comment;
+              const userProfile = profilesById.get(comment.user_id);
+              if (!userProfile) return comment;
+              return {
+                ...comment,
+                profiles: {
+                  ...(comment.profiles || {}),
+                  customization: userProfile.customization,
+                },
+              };
+            })
+            .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
         }))
     }));
 
@@ -98,7 +145,20 @@ const supabaseAPI = {
       ...item,
       related_items: Array.isArray(item.related_items) ? item.related_items : [],
       creator_profile: item.created_by ? profilesById.get(item.created_by) || null : null,
-      comments: (item.comments || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+      comments: (item.comments || [])
+        .map((comment) => {
+          if (!comment?.user_id) return comment;
+          const userProfile = profilesById.get(comment.user_id);
+          if (!userProfile) return comment;
+          return {
+            ...comment,
+            profiles: {
+              ...(comment.profiles || {}),
+              customization: userProfile.customization,
+            },
+          };
+        })
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
     }));
 
     return {
@@ -420,7 +480,19 @@ const supabaseAPI = {
       `);
     
     if (error) throw error;
-    return data[0];
+    const comment = data[0];
+    const { data: customization } = await supabase
+      .from('profile_customizations')
+      .select('avatar_style, theme_color, status_message, mood_emoji')
+      .eq('user_id', userData.user.id)
+      .maybeSingle();
+    return {
+      ...comment,
+      profiles: {
+        ...(comment.profiles || {}),
+        customization: normalizeProfileCustomization(customization),
+      },
+    };
   },
 
   updateComment: async (projectId, itemId, commentId, updates) => {
@@ -434,7 +506,19 @@ const supabaseAPI = {
       `);
     
     if (error) throw error;
-    return data[0];
+    const comment = data[0];
+    const { data: customization } = await supabase
+      .from('profile_customizations')
+      .select('avatar_style, theme_color, status_message, mood_emoji')
+      .eq('user_id', comment.user_id)
+      .maybeSingle();
+    return {
+      ...comment,
+      profiles: {
+        ...(comment.profiles || {}),
+        customization: normalizeProfileCustomization(customization),
+      },
+    };
   },
 
   deleteComment: async (projectId, itemId, commentId) => {
@@ -578,6 +662,158 @@ const supabaseAPI = {
     );
     const errors = results.filter(r => r.error);
     if (errors.length > 0) throw errors[0].error;
+  },
+
+  getCurrentProfileBundle: async () => {
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError) throw userError;
+    if (!user) return null;
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, name, department')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (profileError) throw profileError;
+
+    const { data: customization, error: customizationError } = await supabase
+      .from('profile_customizations')
+      .select('avatar_style, theme_color, status_message, mood_emoji')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (customizationError) throw customizationError;
+
+    return {
+      ...profile,
+      customization: normalizeProfileCustomization(customization),
+    };
+  },
+
+  getProfileDirectory: async () => {
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError) throw userError;
+    if (!user) return [];
+
+    const { data: profiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, name, department')
+      .order('name', { ascending: true });
+    if (profileError) throw profileError;
+
+    const { data: customizationRows, error: customizationError } = await supabase
+      .from('profile_customizations')
+      .select('user_id, avatar_style, theme_color, status_message, mood_emoji');
+    if (customizationError) throw customizationError;
+
+    const customizationByUserId = new Map(
+      (customizationRows || []).map((row) => [row.user_id, normalizeProfileCustomization(row)])
+    );
+
+    return (profiles || []).map((profile) => ({
+      ...profile,
+      customization: customizationByUserId.get(profile.id) || DEFAULT_PROFILE_CUSTOMIZATION,
+    }));
+  },
+
+  updateCurrentProfileCustomization: async (customizationUpdates) => {
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError) throw userError;
+    if (!user) throw new Error('User not authenticated');
+
+    const payload = toCustomizationPayload(customizationUpdates);
+    const { data, error } = await supabase
+      .from('profile_customizations')
+      .upsert(
+        {
+          user_id: user.id,
+          ...payload,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      )
+      .select('avatar_style, theme_color, status_message, mood_emoji')
+      .single();
+    if (error) throw error;
+    return normalizeProfileCustomization(data);
+  },
+
+  getProfileReactionSummary: async (targetUserId, lookbackHours = 24) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const currentUserId = user?.id || null;
+
+    const cutoffDate = new Date(Date.now() - lookbackHours * 60 * 60 * 1000).toISOString();
+    const { data: rows, error } = await supabase
+      .from('profile_reactions')
+      .select('reaction_type, actor_user_id')
+      .eq('target_user_id', targetUserId)
+      .gte('created_at', cutoffDate);
+    if (error) throw error;
+
+    const counts = REACTION_TYPES.reduce((acc, type) => ({ ...acc, [type]: 0 }), {});
+    const myReactions = {};
+    (rows || []).forEach((row) => {
+      if (!REACTION_TYPES.includes(row.reaction_type)) return;
+      counts[row.reaction_type] += 1;
+      if (row.actor_user_id === currentUserId) {
+        myReactions[row.reaction_type] = true;
+      }
+    });
+
+    return { counts, myReactions };
+  },
+
+  toggleProfileReaction: async (targetUserId, reactionType) => {
+    if (!REACTION_TYPES.includes(reactionType)) {
+      throw new Error('Unsupported reaction type');
+    }
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError) throw userError;
+    if (!user) throw new Error('User not authenticated');
+
+    if (user.id === targetUserId) {
+      return supabaseAPI.getProfileReactionSummary(targetUserId);
+    }
+
+    const { data: existing, error: existingError } = await supabase
+      .from('profile_reactions')
+      .select('id')
+      .eq('target_user_id', targetUserId)
+      .eq('actor_user_id', user.id)
+      .eq('reaction_type', reactionType)
+      .maybeSingle();
+    if (existingError) throw existingError;
+
+    if (existing?.id) {
+      const { error: deleteError } = await supabase
+        .from('profile_reactions')
+        .delete()
+        .eq('id', existing.id);
+      if (deleteError) throw deleteError;
+    } else {
+      const { error: insertError } = await supabase.from('profile_reactions').insert({
+        target_user_id: targetUserId,
+        actor_user_id: user.id,
+        reaction_type: reactionType,
+      });
+      if (insertError) throw insertError;
+    }
+
+    return supabaseAPI.getProfileReactionSummary(targetUserId);
   },
 };
 

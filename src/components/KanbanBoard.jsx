@@ -37,6 +37,8 @@ import { PresenceContext } from '../hooks/usePresenceContext';
 import PresenceAvatars from './PresenceAvatars';
 import { useLayoutState } from '../hooks/useLayoutState';
 import API from '../api/kanbanAPI';
+import ProfileAvatar from './ProfileAvatar';
+import ProfileSettingsModal from './ProfileSettingsModal';
 import ProjectColumn from './ProjectColumn';
 import KanbanCard from './KanbanCard';
 import BoardSection from './BoardSection';
@@ -46,6 +48,7 @@ import { buildEntityContext, ENTITY_TYPES } from '../lib/entityModel';
 import FilterBar from './FilterBar';
 import AppLayout from './AppLayout';
 import { useFilterState, applyFilterSort } from '../hooks/useFilterState';
+import { DEFAULT_PROFILE_CUSTOMIZATION, normalizeProfileCustomization } from '../lib/profileAppearance';
 
 import { Toast, ConfirmModal, InputModal } from './UI/Feedback';
 
@@ -85,7 +88,16 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   const activeView = urlState.view;
   const detailItemId = urlState.itemId;
   const isReadOnly = !user;
-  const { onlineUsers, updateEditing } = usePresence({ user, itemId: detailItemId, isReadOnly });
+  const [profileCustomization, setProfileCustomization] = useState(DEFAULT_PROFILE_CUSTOMIZATION);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileModalSeed, setProfileModalSeed] = useState(0);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const { onlineUsers, updateEditing } = usePresence({
+    user,
+    itemId: detailItemId,
+    isReadOnly,
+    customization: profileCustomization,
+  });
   const isDetailFullscreen = urlState.fullscreen;
   const [peopleTeams, setPeopleTeams] = useState([]);
   const [peopleLoading, setPeopleLoading] = useState(true);
@@ -100,6 +112,28 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
 
   // Ctrl+K / Cmd+K 전체 검색 단축키
   useEffect(() => {
+    if (!user?.id) {
+      setProfileCustomization(DEFAULT_PROFILE_CUSTOMIZATION);
+      return;
+    }
+    let mounted = true;
+    const fetchProfileCustomization = async () => {
+      try {
+        const profileBundle = await API.getCurrentProfileBundle();
+        if (!mounted) return;
+        setProfileCustomization(normalizeProfileCustomization(profileBundle?.customization));
+      } catch (error) {
+        console.warn('프로필 꾸미기 데이터 로드 실패:', error.message);
+        if (mounted) setProfileCustomization(DEFAULT_PROFILE_CUSTOMIZATION);
+      }
+    };
+    fetchProfileCustomization();
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
     const handler = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
@@ -109,6 +143,26 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
+
+  const handleSaveProfileCustomization = async (nextCustomization) => {
+    try {
+      setIsSavingProfile(true);
+      const saved = await API.updateCurrentProfileCustomization(nextCustomization);
+      const normalized = normalizeProfileCustomization(saved);
+      setProfileCustomization(normalized);
+      setIsProfileModalOpen(false);
+      showToast('프로필이 업데이트되었습니다.');
+    } catch (error) {
+      showToast(`프로필 저장 실패: ${error.message}`, 'error');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleOpenProfileModal = () => {
+    setProfileModalSeed((prev) => prev + 1);
+    setIsProfileModalOpen(true);
+  };
 
   useEffect(() => {
     if (loading || !urlState.scrollTo) return;
@@ -678,14 +732,28 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                 <kbd className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-bg-hover text-gray-400 dark:text-text-tertiary font-mono">⌘K</kbd>
               </button>
               {user ? (
-                <div className="flex items-center gap-3 bg-gray-50 dark:bg-bg-elevated px-4 py-2 rounded-xl border border-gray-100 dark:border-border-subtle shadow-sm transition-colors duration-200">
+                <button
+                  type="button"
+                  onClick={handleOpenProfileModal}
+                  className="flex items-center gap-3 bg-gray-50 dark:bg-bg-elevated px-4 py-2 rounded-xl border border-gray-100 dark:border-border-subtle shadow-sm transition-colors duration-200 cursor-pointer hover:border-gray-300 dark:hover:border-border-strong"
+                  title="프로필 꾸미기"
+                >
                   <div className="flex flex-col items-end">
-                    <span className="text-sm font-bold text-gray-800 dark:text-text-primary leading-tight">{user?.user_metadata?.name || user?.email?.split('@')[0]}</span>
+                    <span className="text-sm font-bold text-gray-800 dark:text-text-primary leading-tight">
+                      {user?.user_metadata?.name || user?.email?.split('@')[0]}
+                    </span>
+                    {profileCustomization.statusMessage && (
+                      <span className="text-[11px] text-gray-400 dark:text-text-tertiary max-w-[160px] truncate">
+                        {profileCustomization.statusMessage}
+                      </span>
+                    )}
                   </div>
-                  <div className="w-10 h-10 rounded-full bg-gray-900 dark:bg-brand-accent flex items-center justify-center text-white text-sm font-black shadow-inner uppercase border-2 border-white dark:border-border-strong">
-                    {(user?.user_metadata?.name || user?.email || 'U').charAt(0)}
-                  </div>
-                </div>
+                  <ProfileAvatar
+                    name={user?.user_metadata?.name || user?.email || 'U'}
+                    customization={profileCustomization}
+                    size="md"
+                  />
+                </button>
               ) : (
                 <button onClick={onShowLogin} className="px-6 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-sm font-black uppercase tracking-widest hover:bg-black dark:hover:bg-gray-100 transition-all shadow-md hover:shadow-lg active:scale-95">Login to Edit</button>
               )}
@@ -1118,8 +1186,21 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                 error={peopleError}
                 onOpenItem={handleOpenDetail}
                 projectAssignees={projects.reduce((acc, p) => { acc[p.title] = p.assignees || []; return acc; }, {})}
+                currentUserId={user?.id || null}
+                onShowToast={showToast}
               />
             </Suspense>
+          )}
+          {user && (
+            <ProfileSettingsModal
+              key={profileModalSeed}
+              isOpen={isProfileModalOpen}
+              profileName={user?.user_metadata?.name || user?.email?.split('@')[0] || '익명'}
+              initialValue={profileCustomization}
+              saving={isSavingProfile}
+              onClose={() => setIsProfileModalOpen(false)}
+              onSave={handleSaveProfileCustomization}
+            />
           )}
         </div>
 

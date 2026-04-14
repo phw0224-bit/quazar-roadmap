@@ -9,6 +9,34 @@ export const RELEASE_NOTES_STORAGE_KEY = 'kanban-release-notes-last-seen';
 
 export const RELEASE_NOTES = [
   {
+    id: '2026-04-14-profile-customization-reactions',
+    version: '2026-04-14.2',
+    title: '업데이트 내역',
+    description: '내 아바타 스타일·테마 컬러·무드 이모지·상태 메시지를 직접 꾸밀 수 있게 되었고, People 보드에서 팀원 프로필에 이모지 리액션을 남길 수 있습니다.',
+    sections: [
+      {
+        title: '추가',
+        items: [
+          '프로필 꾸미기: 상단 아바타 클릭 시 아바타 스타일(12종)·테마 컬러(6종)·무드 이모지·상태 메시지를 설정하는 모달 추가',
+          'ProfileAvatar 컴포넌트: 꾸미기 데이터를 반영한 공용 아바타 컴포넌트 추가',
+          'People 보드 프로필 카드: 멤버 클릭 시 프로필 카드 팝업(아바타·상태 메시지·이모지 리액션) 표시',
+          '이모지 리액션: People 보드에서 팀원에게 👍🔥👏😂 반응 전송/취소 가능 (24시간 집계)',
+          'profile_customizations / profile_reactions 테이블 연동 API 추가 (getCurrentProfileBundle, getProfileDirectory, updateCurrentProfileCustomization, getProfileReactionSummary, toggleProfileReaction)',
+        ],
+      },
+      {
+        title: '변경',
+        items: [
+          '댓글·Presence 아바타에 ProfileAvatar 컴포넌트를 적용해 꾸미기 스타일 반영',
+          '댓글 작성자 이름 옆에 무드 이모지 표시',
+          '상단 유저 정보 영역을 클릭 가능한 프로필 꾸미기 버튼으로 전환하고 상태 메시지 표시 추가',
+          'Presence 훅에 customization 파라미터 추가해 온라인 유저 목록에 꾸미기 데이터 전달',
+          'getBoardData에서 profile_customizations를 일괄 조회해 댓글·아이템에 customization 데이터를 사전 합성',
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-04-14-sidebar-dnd-project-rename',
     version: '2026-04-14.1',
     title: '업데이트 내역',

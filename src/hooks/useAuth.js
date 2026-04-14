@@ -8,6 +8,7 @@
  */
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { DEFAULT_PROFILE_CUSTOMIZATION, toCustomizationPayload } from '../lib/profileAppearance';
 
 export const useAuth = () => {
   const [user, setUser] = useState(null);
@@ -87,6 +88,16 @@ export const useAuth = () => {
       updated_at: new Date().toISOString()
     });
     if (profileError) throw profileError;
+
+    const { error: customizationError } = await supabase.from('profile_customizations').upsert(
+      {
+        user_id: user.id,
+        ...toCustomizationPayload(DEFAULT_PROFILE_CUSTOMIZATION),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id' }
+    );
+    if (customizationError) throw customizationError;
 
     setNeedsPasswordSetup(false);
   };
