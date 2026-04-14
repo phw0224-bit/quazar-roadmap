@@ -47,7 +47,7 @@ const supabaseAPI = {
       supabase.from('projects').select('*').order('order_index', { ascending: true }),
       supabase.from('roadmap_projects').select('*').order('order_index', { ascending: true }),
       supabase.from('items').select(`*, comments (*, profiles (name, department))`).order('order_index', { ascending: true }),
-      supabase.from('roadmap_items').select(`*, comments (*, profiles (name, department))`).order('order_index', { ascending: true }),
+      supabase.from('roadmap_items').select('*').order('order_index', { ascending: true }),
     ]);
     if (pError) throw pError;
     if (rpError) throw rpError;
@@ -64,7 +64,7 @@ const supabaseAPI = {
       { data: mainGeneralDocs, error: rdocError },
     ] = await Promise.all([
       supabase.from('items').select(`*, comments (*, profiles (name, department))`).is('project_id', null).in('page_type', ['page', 'folder']).order('board_type', { ascending: true }).order('order_index', { ascending: true }),
-      supabase.from('roadmap_items').select(`*, comments (*, profiles (name, department))`).is('project_id', null).in('page_type', ['page', 'folder']).order('order_index', { ascending: true }),
+      supabase.from('roadmap_items').select('*').is('project_id', null).in('page_type', ['page', 'folder']).order('order_index', { ascending: true }),
     ]);
     if (docError) throw docError;
     if (rdocError) throw rdocError;
@@ -948,13 +948,7 @@ export async function getBacklinks(itemId) {
 export async function getPersonalMemos(userId) {
   const { data, error } = await supabase
     .from('roadmap_items')
-    .select(`
-      *,
-      comments (
-        *,
-        profiles (name, department)
-      )
-    `)
+    .select('*')
     .eq('is_private', true)
     .eq('owner_id', userId)
     .order('order_index', { ascending: true });
@@ -963,7 +957,7 @@ export async function getPersonalMemos(userId) {
   return (data || []).map(item => ({
     ...item,
     related_items: Array.isArray(item.related_items) ? item.related_items : [],
-    comments: (item.comments || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+    comments: [],
   }));
 }
 
