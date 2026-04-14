@@ -9,6 +9,30 @@ export const RELEASE_NOTES_STORAGE_KEY = 'kanban-release-notes-last-seen';
 
 export const RELEASE_NOTES = [
   {
+    id: '2026-04-15-roadmap-table-separation',
+    version: 'v0.9.2',
+    title: '로드맵 데이터 분리 & 안정성 개선',
+    description: '전사 로드맵(main 보드) 데이터를 별도 테이블로 분리해 관리 효율을 높이고, 타임라인 뷰 렌더링 버그를 수정했습니다.',
+    sections: [
+      {
+        title: '변경',
+        items: [
+          '전사 로드맵 아이템·프로젝트를 roadmap_items / roadmap_projects 전용 테이블로 분리 (팀 보드 데이터와 독립 관리)',
+          'Realtime 구독 범위를 roadmap 테이블까지 확장 — 로드맵 변경 사항도 실시간 반영',
+          '보드별 API 라우팅 최적화: 각 CRUD 요청이 올바른 테이블로 직접 전달',
+        ],
+      },
+      {
+        title: '수정',
+        items: [
+          '타임라인 뷰에서 프로젝트 행이 표시되지 않던 컴포넌트 참조 오류 수정',
+          '일반 문서 삭제·이동이 로드맵 보드에서 동작하지 않던 문제 수정',
+          'People 보드 담당자 집계 시 로드맵 아이템 누락 문제 수정',
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-04-14-profile-customization-reactions',
     version: 'v0.9.1',
     title: '프로필 꾸미기 & 이모지 리액션',
