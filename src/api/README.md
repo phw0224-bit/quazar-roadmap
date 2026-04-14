@@ -35,7 +35,7 @@ return data;
 
 ```javascript
 {
-  phases: [{
+  projects: [{
     ...project,
     items: [{ ...item, comments: [{ ...comment, profiles: { name, department } }] }]
   }],
@@ -46,5 +46,5 @@ return data;
 **오류 처리:** 모든 함수는 Supabase/HTTP error를 throw. 호출 측(훅/컴포넌트)에서 toast 또는 fallback 처리.
 
 **관련 규칙:**
-- `completePhase()`는 완료 시 원래 위치(`pre_completion_*`)를 저장하고, 복귀 시 복원한다.
+- `completeProject()`는 완료 시 원래 위치(`pre_completion_*`)를 저장하고, 복귀 시 복원한다.
 - `moveItem()`은 칸반 보드뿐 아니라 Sidebar 트리 이동도 지원하도록 `targetParentId`를 받을 수 있다.

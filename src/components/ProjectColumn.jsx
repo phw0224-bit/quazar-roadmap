@@ -1,12 +1,12 @@
 /**
- * @fileoverview 칸반 컬럼 하나 (Phase/Project). DnD droppable + draggable 이중 역할.
+ * @fileoverview 칸반 컬럼 하나 (Project). DnD droppable + draggable 이중 역할.
  *
  * - 컬럼 자체: useSortable (가로 드래그로 순서 변경)
  * - 컬럼 내부: useDroppable (다른 컬럼에서 카드 드롭 수신)
  * - 컬럼 내 카드들: SortableContext(verticalListSortingStrategy)
  * - 담당자 편집은 AssigneePicker 공용 UI 사용
  *
- * 색상 테마: PROJECT_TINTS 배열에서 phaseIndex % 4 로 결정.
+ * 색상 테마: PROJECT_TINTS 배열에서 projectIndex % 4 로 결정.
  */
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -39,10 +39,10 @@ function getProjectTint(projectId, projectIndex) {
 }
 
 export default function ProjectColumn({
-  phase: project, phaseIndex: projectIndex, isDragging: isDraggingProp = false,
-  onAddItem, onUpdateItem, onDeleteItem, onUpdatePhase: onUpdateProject,
+  project, projectIndex, isDragging: isDraggingProp = false,
+  onAddItem, onUpdateItem, onDeleteItem, onUpdateProject,
   onOpenDetail, onShowToast,
-  onCompletePhase,
+  onCompleteProject,
   isCompletedView = false,
   currentUserId = null,
   isReadOnly = false,
@@ -66,7 +66,7 @@ export default function ProjectColumn({
   const { setNodeRef: setDroppableRef } = useDroppable({ id: project.id });
   const { attributes, listeners, setNodeRef: setSortableRef, transform, transition, isDragging: isSortableDragging } = useSortable({
     id: project.id,
-    data: { type: 'Phase', phase: project },
+    data: { type: 'Project', project },
     disabled: isReadOnly || isEditingAssignees || showAddItem || showMenu,
   });
 
@@ -86,9 +86,9 @@ export default function ProjectColumn({
     const kanbanItems = project.items.filter(item => !item.page_type || item.page_type === 'task');
     const allDone = kanbanItems.length > 0 && kanbanItems.every(item => item.status === 'done');
     if (allDone && !project.is_completed) {
-      onCompletePhase?.(project.id, true);
+      onCompleteProject?.(project.id, true);
     } else if (!allDone && project.is_completed) {
-      onCompletePhase?.(project.id, false);
+      onCompleteProject?.(project.id, false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.items, isReadOnly]);
@@ -223,7 +223,7 @@ export default function ProjectColumn({
                         : 'text-gray-700 hover:bg-gray-50 dark:text-text-secondary dark:hover:bg-bg-hover'
                     }`}
                     onClick={() => {
-                      onCompletePhase?.(project.id, !project.is_completed);
+                      onCompleteProject?.(project.id, !project.is_completed);
                       setShowMenu(false);
                     }}
                   >
@@ -309,8 +309,8 @@ export default function ProjectColumn({
         )}
         <SortableContext items={visibleItems.map(i => i.id)} strategy={verticalListSortingStrategy} disabled={isReadOnly}>
           {visibleItems.map((item, idx) => (
-            <KanbanCard
-              key={item.id} item={item} itemIndex={idx + 1} phaseId={project.id}
+                <KanbanCard
+                  key={item.id} item={item} itemIndex={idx + 1} projectId={project.id}
               onUpdateItem={onUpdateItem} onDeleteItem={onDeleteItem}
               onOpenDetail={onOpenDetail}
               onShowToast={onShowToast}

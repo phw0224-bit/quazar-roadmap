@@ -3,7 +3,7 @@ import { Edit2, Trash2, CornerDownRight } from 'lucide-react';
 
 export default function Comment({
   comment,
-  phaseId,
+  projectId,
   itemId,
   onUpdateComment,
   onDeleteComment,
@@ -20,7 +20,7 @@ export default function Comment({
     }
 
     try {
-      await onUpdateComment(phaseId, itemId, comment.id, { content: editedText });
+      await onUpdateComment(projectId, itemId, comment.id, { content: editedText });
       setIsEditing(false);
       onShowToast?.('댓글이 수정되었습니다.');
     } catch {
@@ -31,7 +31,7 @@ export default function Comment({
   const handleDeleteComment = async () => {
     onShowConfirm?.('댓글 삭제', '이 댓글을 정말 삭제하시겠습니까?', async () => {
       try {
-        await onDeleteComment(phaseId, itemId, comment.id);
+        await onDeleteComment(projectId, itemId, comment.id);
         onShowToast?.('댓글이 삭제되었습니다.');
       } catch {
         onShowToast?.('댓글 삭제에 실패했습니다.');

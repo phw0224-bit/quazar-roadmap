@@ -27,14 +27,14 @@ export function resolveEntityType(item) {
 }
 
 /**
- * @param {{ item: Object|null|undefined, phase?: Object|null }} params
+ * @param {{ item: Object|null|undefined, project?: Object|null, phase?: Object|null }} params
  * @returns {{
  *   type: 'task'|'document'|'folder'|'memo'|'project',
  *   boardType: string,
  *   collection: 'project'|'general'|'personal',
  * }}
  */
-export function buildEntityContext({ item, phase = null }) {
+export function buildEntityContext({ item, project = null, phase = project }) {
   const type = resolveEntityType(item);
   const boardType = (phase?.board_type || item?.board_type || (type === ENTITY_TYPES.MEMO ? 'personal' : 'main'));
   let collection = 'project';

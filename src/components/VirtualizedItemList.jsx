@@ -11,7 +11,7 @@ import KanbanCard from './KanbanCard';
 
 export default function VirtualizedItemList({
   items,
-  phaseId,
+  projectId,
   onUpdateItem,
   onDeleteItem,
   onOpenDetail,
@@ -56,7 +56,7 @@ export default function VirtualizedItemList({
                 <KanbanCard
                   item={item}
                   itemIndex={virtualItem.index + 1}
-                  phaseId={phaseId}
+                  projectId={projectId}
                   onUpdateItem={onUpdateItem}
                   onDeleteItem={onDeleteItem}
                   onOpenDetail={onOpenDetail}

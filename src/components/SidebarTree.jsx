@@ -1,10 +1,11 @@
+import { memo } from 'react';
 import { ChevronRight, Plus, GripVertical } from 'lucide-react';
 import { useSortable, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
 const stopProp = (e) => e.stopPropagation();
 
-function SortableTreeItem({
+const SortableTreeItem = memo(function SortableTreeItem({
   node,
   depth,
   expandedIds,
@@ -13,7 +14,10 @@ function SortableTreeItem({
   onSelectItem,
   onAddChild,
   isReadOnly,
+  dragOverInfo,
 }) {
+  const isProject = Array.isArray(node.pageChildren);
+
   const {
     attributes,
     listeners,
@@ -30,11 +34,10 @@ function SortableTreeItem({
     zIndex: isDragging ? 50 : 'auto',
   };
 
-  const children = depth === 0 ? (node.pageChildren || []) : (node.children || []);
+  const children = node.pageChildren || node.children || [];
   const hasChildren = children.length > 0;
   const isExpanded = expandedIds?.has(node.id);
   const isActive = activeItemId === node.id;
-  const isPhase = depth === 0;
 
   const paddingLeft = depth * 12 + 4;
 
@@ -50,20 +53,26 @@ function SortableTreeItem({
 
   const handleAddChild = (e) => {
     e.stopPropagation();
-    onAddChild?.(isPhase ? null : node.id, isPhase ? node.id : node.project_id ?? null);
+    onAddChild?.(isProject ? null : node.id, isProject ? node.id : node.project_id ?? null);
   };
 
   const label = node.title || node.content || '제목 없음';
-  const icon = isPhase ? '📋' : '📄';
+  const icon = isProject ? '📋' : node.page_type === 'folder' ? '📁' : '📄';
+  const isOver = dragOverInfo?.id === node.id;
+  const canAddChild = !isReadOnly && Boolean(isProject || node.project_id);
 
   return (
     <li ref={setNodeRef} style={style} className="select-none list-none">
+      {isOver && dragOverInfo.type === 'before' && (
+        <div className="h-0.5 bg-green-400 rounded mx-1" />
+      )}
       <div
         className={`group flex items-center gap-1 py-[3px] pr-1 rounded-md cursor-pointer transition-colors duration-100
           ${isActive
             ? 'bg-blue-500/10 text-blue-500 dark:text-blue-400'
             : 'text-[color:var(--color-text-secondary)] hover:bg-[color:var(--color-bg-hover)] hover:text-[color:var(--color-text-primary)]'
-          }`}
+          }
+          ${isOver && dragOverInfo.type === 'inside' ? 'bg-green-100/50 dark:bg-green-900/20' : ''}`}
         style={{ paddingLeft }}
         onClick={handleClick}
       >
@@ -104,7 +113,7 @@ function SortableTreeItem({
         </span>
 
         {/* + button */}
-        {!isReadOnly && (
+        {canAddChild && (
           <button
             className="flex-shrink-0 opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded
               text-[color:var(--color-text-tertiary)] hover:text-[color:var(--color-text-primary)]
@@ -131,15 +140,19 @@ function SortableTreeItem({
               onSelectItem={onSelectItem}
               onAddChild={onAddChild}
               isReadOnly={isReadOnly}
+              dragOverInfo={dragOverInfo}
             />
           </SortableContext>
         </div>
       )}
+      {isOver && dragOverInfo.type === 'after' && (
+        <div className="h-0.5 bg-green-400 rounded mx-1" />
+      )}
     </li>
   );
-}
+});
 
-export default function SidebarTree({
+const SidebarTree = memo(function SidebarTree({
   nodes = [],
   depth = 0,
   expandedIds,
@@ -148,6 +161,7 @@ export default function SidebarTree({
   onSelectItem,
   onAddChild,
   isReadOnly = false,
+  dragOverInfo = null,
 }) {
   if (!nodes || nodes.length === 0) return null;
 
@@ -165,9 +179,12 @@ export default function SidebarTree({
             onSelectItem={onSelectItem}
             onAddChild={onAddChild}
             isReadOnly={isReadOnly}
+            dragOverInfo={dragOverInfo}
           />
         ))}
       </SortableContext>
     </ul>
   );
-}
+});
+
+export default SidebarTree;

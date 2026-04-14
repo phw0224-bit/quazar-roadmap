@@ -30,10 +30,10 @@ export const STATUS_MAP = {
 };
 
 export const PRIORITY_MAP = {
-  0: { label: '없음', icon: null,  color: '' },
-  1: { label: '낮음', icon: '🔵', color: 'text-blue-500 dark:text-blue-400' },
-  2: { label: '중간', icon: '🟡', color: 'text-amber-500 dark:text-amber-400' },
-  3: { label: '높음', icon: '🔴', color: 'text-red-500 dark:text-red-400' },
+  0: { label: '없음', icon: null,  color: '', borderColor: null },
+  1: { label: '낮음', icon: '🔵', color: 'text-blue-500 dark:text-blue-400', borderColor: '#22C55E' },
+  2: { label: '중간', icon: '🟡', color: 'text-amber-500 dark:text-amber-400', borderColor: '#F97316' },
+  3: { label: '높음', icon: '🔴', color: 'text-red-500 dark:text-red-400', borderColor: '#EF4444' },
 };
 
 export const PROJECT_TINTS = [

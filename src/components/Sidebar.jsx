@@ -1,16 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, createElement, useMemo, useCallback } from 'react';
 import { ChevronRight, LayoutGrid, Clock, Users, PanelLeft, MousePointer2, Ellipsis, BellDot, Moon, Sun, LogOut } from 'lucide-react';
 import {
   DndContext,
   PointerSensor,
   useSensor,
   useSensors,
+  useDroppable,
   closestCenter,
   DragOverlay
 } from '@dnd-kit/core';
 import { usePageTree } from '../hooks/usePageTree';
 import SidebarTree from './SidebarTree';
-import kanbanAPI from '../api/kanbanAPI';
+import { getDropTypeFromRelativeY, getRelativeY } from './sidebarDropZones';
 
 const stopProp = (e) => e.stopPropagation();
 
@@ -20,9 +21,22 @@ const NAV_ITEMS = [
   { view: 'people', label: '피플 보드', icon: Users },
 ];
 
+function BoardRootDropZone({ boardId, isActive, children }) {
+  const { setNodeRef, isOver } = useDroppable({ id: boardId });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={isActive || isOver ? 'rounded-md ring-1 ring-green-400/60 bg-green-50/30 dark:bg-green-900/10' : ''}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function Sidebar({
   sections,
-  phases,
+  projects,
   activeView,
   activeItemId,
   onNavigate,
@@ -30,7 +44,6 @@ export default function Sidebar({
   onAddChildPage,
   onShowPrompt,
   onShowReleaseNotes,
-  onShowConfirm,  // 신규: 삭제 확인용
   isReadOnly,
   user,
   theme,
@@ -39,8 +52,11 @@ export default function Sidebar({
   onLogout,
   hoverMode,
   onHoverModeToggle,
-  onRefresh, // 데이터 갱신을 위한 콜백
   onSetBoardType,  // 보드 선택 시 호출
+  generalDocs = [],  // 신규: 독립 폴더/문서
+  onShowToast,
+  onMoveSidebarItem,
+  onMoveSidebarProject,
 }) {
   const [expandedIds, setExpandedIds] = useState(() => {
     try {
@@ -51,6 +67,8 @@ export default function Sidebar({
     }
   });
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [dragOverInfo, setDragOverInfo] = useState(null);
+  const [activeDragItem, setActiveDragItem] = useState(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -73,109 +91,207 @@ export default function Sidebar({
     return () => window.removeEventListener('click', handleWindowClick);
   }, [showMoreMenu]);
 
-  const pageTree = usePageTree(phases, sections);
+  const pageTree = usePageTree(projects, sections, generalDocs);
+  const allItems = useMemo(() => projects.flatMap((p) => p.items || []), [projects]);
+  const projectIdSet = useMemo(() => new Set(projects.map((p) => p.id)), [projects]);
+  const projectItemIdSet = useMemo(() => new Set(allItems.map((i) => i.id)), [allItems]);
+  const generalDocIdSet = useMemo(() => new Set(generalDocs.map((d) => d.id)), [generalDocs]);
 
-  const handleToggle = (id) => {
+  const getNodeKind = useCallback((nodeId) => {
+    const id = String(nodeId);
+    if (id.startsWith('board-root-')) return 'board-root';
+    if (projectIdSet.has(id)) return 'project';
+    if (generalDocIdSet.has(id)) return 'general-doc';
+    if (projectItemIdSet.has(id)) return 'project-item';
+    return 'unknown';
+  }, [projectIdSet, generalDocIdSet, projectItemIdSet]);
+
+  const canDropByKind = useCallback((activeKind, overKind) => {
+    if (activeKind === 'project') return overKind === 'project' || overKind === 'board-root';
+    if (activeKind === 'general-doc') return overKind === 'general-doc';
+    if (activeKind === 'project-item') return overKind === 'project-item' || overKind === 'project';
+    return false;
+  }, []);
+
+  const handleToggle = useCallback((id) => {
     setExpandedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  };
+  }, []);
 
-  const handleAddChild = (parentItemId, phaseId) => {
+  const handleAddChild = useCallback((parentItemId, projectId) => {
     onShowPrompt?.('하위 페이지 추가', '페이지 제목을 입력하세요', async (title) => {
       if (!title?.trim()) return;
-      await onAddChildPage?.(phaseId, parentItemId, title.trim());
+      await onAddChildPage?.(projectId, parentItemId, title.trim());
     });
-  };
+  }, [onAddChildPage, onShowPrompt]);
 
   // 보드 토글 시 board type 업데이트
-  const handleBoardToggle = (id) => {
+  const handleBoardToggle = useCallback((id) => {
     handleToggle(id);
     // board id format: 'board-main', 'board-개발팀' 등
     if (id?.startsWith('board-')) {
       const boardType = id.replace('board-', '');
       onSetBoardType?.(boardType);
     }
-  };
+  }, [handleToggle, onSetBoardType]);
 
-  const handleDragEnd = async (event) => {
+  const handleDragStart = useCallback((event) => {
+    const draggedProject = projects.find(p => p.id === event.active.id);
+    const draggedItem = allItems.find(i => i.id === event.active.id);
+    setActiveDragItem(draggedProject || draggedItem || null);
+  }, [allItems, projects]);
+
+  const handleDragOver = useCallback((event) => {
+    const { over, active } = event;
+    if (!over || !active) {
+      setDragOverInfo((prev) => (prev === null ? prev : null));
+      return;
+    }
+    const activeKind = getNodeKind(active.id);
+    const overKind = getNodeKind(over.id);
+    if (!canDropByKind(activeKind, overKind)) {
+      setDragOverInfo((prev) => (prev === null ? prev : null));
+      return;
+    }
+
+    const relativeY = getRelativeY({
+      overRect: over.rect,
+      draggedRect: active.rect?.current?.translated,
+      fallbackY: event.activatorEvent?.clientY ?? 0,
+    });
+    const nextInfo = { id: over.id, type: getDropTypeFromRelativeY(relativeY) };
+
+    setDragOverInfo((prev) => (
+      prev?.id === nextInfo.id && prev?.type === nextInfo.type ? prev : nextInfo
+    ));
+  }, [canDropByKind, getNodeKind]);
+
+  const handleDragEnd = useCallback(async (event) => {
+    setDragOverInfo(null);
+    setActiveDragItem(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
+    const activeKind = getNodeKind(active.id);
+    const overKind = getNodeKind(over.id);
+    if (!canDropByKind(activeKind, overKind)) return;
 
-    // 1. 모든 아이템 평면화하여 위치 찾기
-    const allItems = phases.flatMap(p => p.items || []);
+    const draggedProject = projects.find(p => p.id === active.id);
+
+    // === Project 드래그 처리 ===
+    if (draggedProject) {
+      const overIdString = String(over.id);
+      const rootBoardPrefix = 'board-root-';
+      if (overIdString.startsWith(rootBoardPrefix)) {
+        const targetBoardType = overIdString.slice(rootBoardPrefix.length);
+        const standaloneProjects = projects
+          .filter((p) => (p.board_type || 'main') === targetBoardType && !p.section_id)
+          .sort((a, b) => a.order_index - b.order_index);
+
+        try {
+          await onMoveSidebarProject?.(active.id, null, standaloneProjects.length);
+        } catch (err) {
+          console.error('Failed to move project to board root:', err);
+          onShowToast?.('프로젝트 이동에 실패했습니다. 잠시 후 다시 시도해주세요.', 'error');
+        }
+        return;
+      }
+
+      const overProject = projects.find(p => p.id === over.id);
+      if (!overProject) return;
+
+      const targetSectionId = overProject.section_id;
+      const sectionProjects = projects
+        .filter(p => p.section_id === targetSectionId)
+        .sort((a, b) => a.order_index - b.order_index);
+      const overIndex = sectionProjects.findIndex(p => p.id === over.id);
+
+      const relativeY = getRelativeY({
+        overRect: over.rect,
+        draggedRect: active.rect?.current?.translated,
+        fallbackY: event.activatorEvent?.clientY ?? 0,
+      });
+      const targetIndex = relativeY <= 0.5 ? overIndex : overIndex + 1;
+
+      try {
+        await onMoveSidebarProject?.(active.id, targetSectionId, targetIndex);
+      } catch (err) {
+        console.error('Failed to move project:', err);
+        onShowToast?.('프로젝트 이동에 실패했습니다. 잠시 후 다시 시도해주세요.', 'error');
+      }
+      return;
+    }
+
+    // === Item 드래그 처리 ===
     const activeItem = allItems.find(i => i.id === active.id);
-    const overItem = allItems.find(i => i.id === over.id);
-
-    // over 아이템이 phase(프로젝트)인 경우 처리
-    const overPhase = phases.find(p => p.id === over.id);
-
     if (!activeItem) return;
 
-    // 방어 로직: 드롭 대상이 유효한 아이템도 아니고 프로젝트도 아니면 무시
-    if (!overPhase && !overItem) return;
+    const overProject = projects.find(p => p.id === over.id);
+    const overItem = allItems.find(i => i.id === over.id);
+    if (!overProject && !overItem) return;
 
     let targetParentId = null;
     let targetProjectId = activeItem.project_id;
     let targetIndex = 0;
 
-    if (overPhase) {
-      // 프로젝트(Phase) 위로 드롭한 경우 -> 해당 프로젝트의 루트로 이동
-      targetProjectId = overPhase.id;
+    if (overProject) {
+      targetProjectId = overProject.id;
       targetParentId = null;
       targetIndex = 0;
-    } else if (overItem) {
+    } else {
+      const relativeY = getRelativeY({
+        overRect: over.rect,
+        draggedRect: active.rect?.current?.translated,
+        fallbackY: event.activatorEvent?.clientY ?? 0,
+      });
       targetProjectId = overItem.project_id;
-      
-      // 마우스 위치에 따른 Nesting 여부 판단
-      const overRect = over.rect;
-      const dragY = event.activatorEvent.clientY;
-      const overTop = overRect.top;
-      const overHeight = overRect.height;
-      const relativeY = (dragY - overTop) / overHeight;
 
-      if (relativeY > 0.25 && relativeY < 0.75) {
-        // 중앙에 드롭 -> 자식으로 편입 (Nesting)
+      if (getDropTypeFromRelativeY(relativeY) === 'inside') {
         targetParentId = overItem.id;
-        targetIndex = 0; // 자식 목록의 맨 앞으로
+        targetIndex = 0;
       } else {
-        // 상단 또는 하단에 드롭 -> 형제로 순서 변경
         targetParentId = overItem.parent_item_id;
         const siblings = allItems
           .filter(i => i.project_id === targetProjectId && i.parent_item_id === targetParentId)
           .sort((a, b) => a.order_index - b.order_index);
-        
-        const overIndex = siblings.findIndex(s => s.id === over.id);
-        targetIndex = relativeY <= 0.25 ? overIndex : overIndex + 1;
+        const overIdx = siblings.findIndex(s => s.id === over.id);
+        targetIndex = relativeY <= 0.5 ? overIdx : overIdx + 1;
       }
     }
 
     try {
-      // 3. API 호출
-      await kanbanAPI.moveItem(
+      await onMoveSidebarItem?.(
         activeItem.project_id,
         targetProjectId,
         active.id,
         targetIndex,
         targetParentId
       );
-      // 4. 데이터 갱신
-      onRefresh?.();
     } catch (err) {
-      console.error('Failed to move sidebar item:', err);
+      console.error('Failed to move item:', err);
+      onShowToast?.('아이템 이동에 실패했습니다. 잠시 후 다시 시도해주세요.', 'error');
     }
-  };
+  }, [allItems, canDropByKind, getNodeKind, onMoveSidebarItem, onMoveSidebarProject, onShowToast, projects]);
 
 
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
+      <DragOverlay>
+        {activeDragItem ? (
+          <div className="px-2 py-1 rounded-md bg-white dark:bg-bg-elevated shadow-lg text-sm opacity-90">
+            {activeDragItem.title || activeDragItem.content || '제목 없음'}
+          </div>
+        ) : null}
+      </DragOverlay>
       <div className="w-full h-full flex flex-col bg-[color:var(--color-bg-elevated)] overflow-hidden">
         {/* Header */}
         <div className="flex-shrink-0 flex items-center justify-between px-3 py-3 border-b border-[color:var(--color-border-subtle)]">
@@ -270,8 +386,9 @@ export default function Sidebar({
 
         {/* Fixed nav items */}
         <nav className="flex-shrink-0 px-2 pt-2 pb-1">
-          {NAV_ITEMS.map(({ view, label, icon: Icon }) => {
+          {NAV_ITEMS.map(({ view, label, icon }) => {
             const isActive = activeView === view;
+            const iconNode = createElement(icon, { size: 15, strokeWidth: 1.75, className: 'flex-shrink-0' });
             return (
               <button
                 key={view}
@@ -284,7 +401,7 @@ export default function Sidebar({
                 onClick={() => onNavigate?.(view)}
                 onPointerDown={stopProp}
               >
-                <Icon size={15} strokeWidth={1.75} className="flex-shrink-0" />
+                {iconNode}
                 <span className="truncate">{label}</span>
               </button>
             );
@@ -296,8 +413,13 @@ export default function Sidebar({
 
         {/* Scrollable page tree */}
         <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1 min-h-0">
-          {pageTree.map((board) => (
-            <div key={board.id} className="mb-2">
+          {pageTree.map((board) => {
+            const boardRootDropId = `board-root-${board.title}`;
+            const isBoardRootOver = dragOverInfo?.id === boardRootDropId;
+
+            return (
+              <div key={board.id} className="mb-2">
+                <BoardRootDropZone boardId={boardRootDropId} isActive={isBoardRootOver}>
               {/* Board header */}
               <button
                 className="group w-full flex items-center gap-1 px-2 py-[3px] rounded-md cursor-pointer
@@ -340,11 +462,11 @@ export default function Sidebar({
                         </span>
                       </button>
 
-                      {/* Section's phases + their page children */}
-                      {expandedIds.has(`section-${section.id}`) && section.phases.length > 0 && (
+                      {/* Section's projects + their page children */}
+                      {expandedIds.has(`section-${section.id}`) && section.projects.length > 0 && (
                         <div className="ml-3 border-l border-[color:var(--color-border-subtle)] pl-1">
                           <SidebarTree
-                            nodes={section.phases}
+                            nodes={section.projects}
                             depth={0}
                             expandedIds={expandedIds}
                             onToggle={handleToggle}
@@ -352,13 +474,14 @@ export default function Sidebar({
                             onSelectItem={onOpenItem}
                             onAddChild={handleAddChild}
                             isReadOnly={isReadOnly}
+                            dragOverInfo={dragOverInfo}
                           />
                         </div>
                       )}
                     </div>
                   ))}
 
-                  {/* Standalone phases */}
+                  {/* Standalone projects */}
                   {board.standalone.length > 0 && (
                     <SidebarTree
                       nodes={board.standalone}
@@ -369,12 +492,33 @@ export default function Sidebar({
                       onSelectItem={onOpenItem}
                       onAddChild={handleAddChild}
                       isReadOnly={isReadOnly}
+                      dragOverInfo={dragOverInfo}
                     />
+                  )}
+
+                  {/* General docs (폴더/문서) */}
+                  {board.generalDocs?.length > 0 && (
+                    <div className="mt-3 pt-2 border-t border-[color:var(--color-border-subtle)]">
+                      <span className="px-2 text-[11px] font-semibold text-[color:var(--color-text-tertiary)] uppercase tracking-wide">문서</span>
+                      <SidebarTree
+                        nodes={board.generalDocs}
+                        depth={0}
+                        expandedIds={expandedIds}
+                        onToggle={handleToggle}
+                        activeItemId={activeItemId}
+                        onSelectItem={onOpenItem}
+                        onAddChild={handleAddChild}
+                        isReadOnly={isReadOnly}
+                        dragOverInfo={dragOverInfo}
+                      />
+                    </div>
                   )}
                 </div>
               )}
-            </div>
-          ))}
+                </BoardRootDropZone>
+              </div>
+            );
+          })}
         </div>
       </div>
     </DndContext>

@@ -29,7 +29,7 @@ import { ENTITY_TYPES } from '../lib/entityModel';
 
 export default function ItemDescriptionSection({
   item,
-  phaseId,
+  projectId,
   allItems = [],
   isReadOnly,
   entityContext = null,
@@ -92,7 +92,7 @@ export default function ItemDescriptionSection({
   const handleDescriptionBlur = async () => {
     const originalDescription = normalizeDescriptionSource(item.description || '');
     if (description === originalDescription) return;
-    await onUpdateItem(phaseId, item.id, { description });
+    await onUpdateItem(projectId, item.id, { description });
   };
 
   const handleLinkExistingPage = useCallback((callback) => {
@@ -107,7 +107,7 @@ export default function ItemDescriptionSection({
 
       const currentRelations = item.related_items || [];
       if (!currentRelations.includes(itemId) && item.id !== itemId) {
-        await onUpdateItem(phaseId, item.id, { related_items: [...currentRelations, itemId] });
+        await onUpdateItem(projectId, item.id, { related_items: [...currentRelations, itemId] });
         onShowToast?.('연관 업무가 추가되었습니다.');
       }
     } else {
@@ -154,7 +154,7 @@ export default function ItemDescriptionSection({
         : convertMarkdownToEditorHTML(description);
       const result = await summarizeContent(summaryHTML);
       setAiSummary(result);
-      await onUpdateItem(phaseId, item.id, { ai_summary: result });
+      await onUpdateItem(projectId, item.id, { ai_summary: result });
       onShowToast?.('AI 요약이 완료되었습니다.');
     } catch (error) {
       setSummaryError(error.message);
@@ -183,11 +183,11 @@ export default function ItemDescriptionSection({
     setDescription((prev) => {
       const next = toggleMarkdownTaskItem(prev || '', taskIndex, checked);
       if (next !== prev) {
-        onUpdateItem(phaseId, item.id, { description: next });
+        onUpdateItem(projectId, item.id, { description: next });
       }
       return next;
     });
-  }, [isReadOnly, item.id, onUpdateItem, phaseId]);
+  }, [isReadOnly, item.id, onUpdateItem, projectId]);
 
   const linkModalPhases = useMemo(
     () => [{ title: '전체 아이템', items: allItems }],
@@ -329,7 +329,7 @@ export default function ItemDescriptionSection({
               onFocus={() => setIsEditorFocused(true)}
               onBlur={handleDescriptionBlur}
               onEditorBlur={() => setIsEditorFocused(false)}
-              onAddChildPage={onAddChildPage ? async (title) => onAddChildPage(phaseId, item.id, title) : null}
+              onAddChildPage={onAddChildPage ? async (title) => onAddChildPage(projectId, item.id, title) : null}
               onShowPrompt={onShowPrompt}
               onLinkExistingPage={handleLinkExistingPage}
               editorViewRef={editorViewRef}
@@ -351,7 +351,7 @@ export default function ItemDescriptionSection({
 
       {showLinkModal && (
         <SearchModal
-          phases={linkModalPhases}
+          projects={linkModalPhases}
           onOpenDetail={handleLinkSelect}
           onClose={() => {
             linkCallbackRef.current?.(null);
