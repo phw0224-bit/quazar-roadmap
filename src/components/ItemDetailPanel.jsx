@@ -29,7 +29,7 @@ import ItemViewers from './ItemViewers';
 import { ENTITY_TYPES, getEntityLabel } from '../lib/entityModel';
 
 function ItemDetailPanel({
-  item, phase, entityContext = null, allItems = [], onClose, onUpdateItem, onUpdatePhase, isReadOnly,
+  item, project = null, phase = project, entityContext = null, allItems = [], onClose, onUpdateItem, onUpdateProject, onUpdatePhase = onUpdateProject, isReadOnly,
   isFullscreen = false, onToggleFullscreen,
   onBreadcrumbNavigate,
   onAddComment, onUpdateComment, onDeleteComment, onOpenDetail,
@@ -37,7 +37,7 @@ function ItemDetailPanel({
   onAddChildPage,
   onShowPrompt,
   onDeleteItem,
-  onDeletePhase,
+  onDeleteProject, onDeletePhase = onDeleteProject,
 }) {
   const stopProp = (e) => e.stopPropagation();
   const { updateEditing } = usePresenceContext();
@@ -645,7 +645,13 @@ function ItemDetailPanel({
                 <Flag size={18} strokeWidth={2.5} />
                 <span className="text-[13px] font-black uppercase tracking-widest">우선순위</span>
               </div>
-              <div className="flex-1 px-3 py-2 rounded-xl hover:bg-white dark:hover:bg-bg-hover hover:shadow-sm hover:ring-1 hover:ring-gray-100 dark:hover:ring-border-subtle transition-all">
+              <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white dark:hover:bg-bg-hover hover:shadow-sm hover:ring-1 hover:ring-gray-100 dark:hover:ring-border-subtle transition-all">
+                {PRIORITY_MAP[item.priority ?? 0]?.borderColor && (
+                  <span
+                    className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: PRIORITY_MAP[item.priority ?? 0].borderColor }}
+                  />
+                )}
                 <select
                   disabled={isReadOnly}
                   value={item.priority ?? 0}
@@ -664,7 +670,7 @@ function ItemDetailPanel({
           {/* Description Section */}
           <ItemDescriptionSection
             item={item}
-            phaseId={phase.id}
+                projectId={phase.id}
             allItems={allItems}
             isReadOnly={isReadOnly}
             entityContext={entityContext}
@@ -745,8 +751,8 @@ function ItemDetailPanel({
                   </span>
                 )}
               </div>
-              <CommentSection 
-                phaseId={phase.id} itemId={item.id} comments={item.comments || []} 
+              <CommentSection
+                projectId={phase.id} itemId={item.id} comments={item.comments || []}
                 onAddComment={onAddComment} onUpdateComment={onUpdateComment} onDeleteComment={onDeleteComment}
                 onShowConfirm={onShowConfirm} onShowToast={onShowToast}
               />

@@ -3,7 +3,7 @@ import { Send, MessageSquarePlus } from 'lucide-react';
 import Comment from './Comment';
 
 export default function CommentSection({
-  phaseId,
+  projectId,
   itemId,
   comments = [],
   onAddComment,
@@ -19,7 +19,7 @@ export default function CommentSection({
     if (!newCommentText.trim()) return;
 
     try {
-      await onAddComment(phaseId, itemId, newCommentText);
+      await onAddComment(projectId, itemId, newCommentText);
       setNewCommentText('');
       setShowAddComment(false);
       onShowToast?.('댓글이 작성되었습니다.');
@@ -36,7 +36,7 @@ export default function CommentSection({
             <Comment
               key={comment.id}
               comment={comment}
-              phaseId={phaseId}
+              projectId={projectId}
               itemId={itemId}
               onUpdateComment={onUpdateComment}
               onDeleteComment={onDeleteComment}

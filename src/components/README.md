@@ -23,7 +23,7 @@
 | `ItemDescriptionSection.jsx` | ItemDetailPanel 내부의 Markdown live/source/view editor, AI 요약, 링크 모달 전담 섹션 |
 | `itemDescriptionMode.js` | 상세 설명 섹션이 본문 유무와 읽기 전용 여부에 따라 기본 모드를 정하는 규칙 |
 | `BoardSection.jsx` | 섹션 그룹 (프로젝트 컬럼들을 묶음) |
-| `ProjectColumn.jsx` | **핵심.** 칸반 컬럼 하나 (Phase). 완료 프로젝트 전환, 프로젝트 가상 페이지 진입 포함 |
+| `ProjectColumn.jsx` | **핵심.** 칸반 컬럼 하나 (Project). 완료 프로젝트 전환, 프로젝트 가상 페이지 진입 포함 |
 | `projectColumnMenu.js` | ProjectColumn 메뉴를 body 포털의 fixed 오버레이로 배치하는 위치 계산/스타일 규칙 |
 | `KanbanCard.jsx` | 카드 (Item). DnD sortable |
 | `TimelineView.jsx` | 간트 스타일 타임라인 뷰 |
@@ -48,7 +48,7 @@ isReadOnly         // boolean — 비로그인 시 true, 수정 UI 렌더링 제
 onShowToast(msg)   // 성공/실패 알림
 onShowConfirm(title, msg, cb)  // 삭제 확인 모달
 onShowPrompt(title, placeholder, cb)  // 이름 입력 모달
-onCompletePhase(phaseId, isCompleted, meta?)  // 프로젝트 완료/복귀
+onCompleteProject(projectId, isCompleted, meta?)  // 프로젝트 완료/복귀
 ```
 
 **stopProp 패턴:** DnD 컨텍스트 내 모든 interactive 요소에 필수.

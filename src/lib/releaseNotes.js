@@ -9,6 +9,30 @@ export const RELEASE_NOTES_STORAGE_KEY = 'kanban-release-notes-last-seen';
 
 export const RELEASE_NOTES = [
   {
+    id: '2026-04-14-sidebar-dnd-project-rename',
+    version: '2026-04-14.1',
+    title: '업데이트 내역',
+    description: '사이드바에서 프로젝트와 페이지를 드래그로 재배치할 수 있게 되었고, 로그인 없이는 보드에 접근할 수 없도록 인증 정책을 변경했습니다.',
+    sections: [
+      {
+        title: '추가',
+        items: [
+          '사이드바 드래그 앤 드롭: 프로젝트와 하위 페이지를 사이드바 내에서 드래그해 순서·계층을 바꿀 수 있는 기능 추가',
+          '프로젝트 이동 시 드롭 위치(앞/뒤/안)를 시각적으로 표시하는 드롭 존 하이라이트 적용',
+          '크로스 프로젝트 아이템 이동: 페이지를 다른 프로젝트로 드래그해 이동 가능, Optimistic Update + 실패 시 롤백 처리',
+        ],
+      },
+      {
+        title: '변경',
+        items: [
+          '로그인이 필요한 상태에서 비로그인 사용자가 보드 화면으로 돌아가는 경로를 제거하고 로그인 화면을 강제 표시',
+          '내부 상태명을 phases → projects로 일괄 정리해 도메인 용어와 코드 일관성 향상',
+          '릴리즈 노트 표시 여부를 useEffect 대신 useState 초기값으로 계산하도록 개선',
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-04-09-live-preview-detail-panel-fixes',
     version: '2026-04-09.1',
     title: '업데이트 내역',

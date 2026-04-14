@@ -5,11 +5,12 @@
  *       if (error) throw error;
  *
  * order_index 관리: 이동 시 영향받는 배열 전체를 재계산하여 upsert. gap 없이 0부터 연속.
- * cross-phase moveItem: source/target 두 phase 배열 모두 갱신.
+ * cross-project moveItem: source/target 두 project 배열 모두 갱신.
  * related_items: A→B 추가 시 B→A도 자동 추가 (양방향).
  * items.created_by는 auth.users.id를 저장하고, 조회 시 creator_profile로 표시용 이름을 붙인다.
  */
 import { supabase } from '../lib/supabase';
+import { buildProjectMovePlan } from './projectMove';
 
 const normalizeNameKey = (value) => (value || '').trim().toLowerCase();
 
@@ -18,8 +19,8 @@ const supabaseAPI = {
    * @description 전체 보드 데이터를 단일 조회로 로드. projects + items(with comments) + sections + generalDocs.
    * page_type='page' 아이템은 포함됨 (useKanbanData reducer에서 필터링).
    * generalDocs: project_id=null && page_type='page'인 문서들 (팀별 분리).
-   * @returns {Promise<{ phases: Array, sections: Array, generalDocs: Array }>}
-   * phases: 각 project에 items 배열 내장, items에 comments(with profiles) 배열 내장
+   * @returns {Promise<{ projects: Array, sections: Array, generalDocs: Array }>}
+   * projects: 각 project에 items 배열 내장, items에 comments(with profiles) 배열 내장
    */
   getBoardData: async () => {
     // 1. 프로젝트 가져오기
@@ -101,7 +102,7 @@ const supabaseAPI = {
     }));
 
     return {
-      phases: formattedProjects,
+      projects: formattedProjects,
       sections: sections || [],
       generalDocs: formattedGeneralDocs
     };
@@ -128,7 +129,7 @@ const supabaseAPI = {
 
     if (itemError) throw itemError;
 
-    const phaseMap = new Map((projects || []).map((project) => [project.id, project]));
+    const projectMap = new Map((projects || []).map((project) => [project.id, project]));
     const membersByName = new Map();
     const teamsByName = new Map();
     const unassignedTeamName = '미분류';
@@ -162,7 +163,7 @@ const supabaseAPI = {
       const assignees = Array.isArray(item.assignees) ? item.assignees : [];
       if (assignees.length === 0) return;
 
-      const project = phaseMap.get(item.project_id);
+      const project = projectMap.get(item.project_id);
       const task = {
         id: item.id,
         title: item.title || '제목 없음',
@@ -215,7 +216,7 @@ const supabaseAPI = {
     return { teams };
   },
 
-  addPhase: async (title, boardType = 'main', sectionId = null) => {
+  addProject: async (title, boardType = 'main', sectionId = null) => {
     const { data: existingProjects } = await supabase.from('projects').select('order_index').order('order_index', { ascending: false }).limit(1);
     const nextOrder = existingProjects?.[0] ? existingProjects[0].order_index + 1 : 0;
 
@@ -228,11 +229,11 @@ const supabaseAPI = {
     return data[0];
   },
 
-  updatePhase: async (phaseId, updates) => {
+  updateProject: async (projectId, updates) => {
     const { data, error } = await supabase
       .from('projects')
       .update(updates)
-      .eq('id', phaseId)
+      .eq('id', projectId)
       .select();
 
     if (error) throw error;
@@ -241,12 +242,12 @@ const supabaseAPI = {
 
   /**
    * @description 프로젝트 완료/복귀 처리. 완료 시 현재 위치를 저장, 복귀 시 복원.
-   * @param {string} phaseId
+   * @param {string} projectId
    * @param {boolean} isCompleted - true: 완료, false: 복귀
    * @param {Object} meta - { sectionId, orderIndex } 완료 시 저장할 현재 위치
    *                      - { preCompletionSectionId, preCompletionOrderIndex } 복귀 시 복원할 위치
    */
-  completePhase: async (phaseId, isCompleted, meta = {}) => {
+  completeProject: async (projectId, isCompleted, meta = {}) => {
     const updates = isCompleted
       ? {
           is_completed: true,
@@ -261,20 +262,20 @@ const supabaseAPI = {
     const { data, error } = await supabase
       .from('projects')
       .update(updates)
-      .eq('id', phaseId)
+      .eq('id', projectId)
       .select();
     if (error) throw error;
     return data[0];
   },
 
-  deletePhase: async (phaseId) => {
-    const { error } = await supabase.from('projects').delete().eq('id', phaseId);
+  deleteProject: async (projectId) => {
+    const { error } = await supabase.from('projects').delete().eq('id', projectId);
     if (error) throw error;
   },
 
-  movePhase: async (phaseId, targetIndex) => {
+  moveProject: async (projectId, targetIndex) => {
     const { data: projects } = await supabase.from('projects').select('id, order_index').order('order_index', { ascending: true });
-    const movingProjectIdx = projects.findIndex(p => p.id === phaseId);
+    const movingProjectIdx = projects.findIndex(p => p.id === projectId);
     const [movingProject] = projects.splice(movingProjectIdx, 1);
     projects.splice(targetIndex, 0, movingProject);
 
@@ -286,14 +287,55 @@ const supabaseAPI = {
     if (errors.length > 0) throw errors[0].error;
   },
 
-  addItem: async (phaseId, title, content = '', createdBy = null) => {
-    const { data: existingItems } = await supabase.from('items').select('order_index').eq('project_id', phaseId).order('order_index', { ascending: false }).limit(1);
+  /**
+   * @description 사이드바 DnD용: section 내에서 프로젝트 이동 (section_id 변경 포함).
+   * @param {string} projectId 이동할 프로젝트 ID
+   * @param {string|null} targetSectionId 대상 섹션 ID (null이면 standalone)
+   * @param {number} targetIndex 대상 섹션 내 위치
+   */
+  moveProjectSidebar: async (projectId, targetSectionId, targetIndex) => {
+    // 1. 대상 section 내 현재 프로젝트들 가져오기
+    let query = supabase.from('projects').select('id, order_index');
+    if (targetSectionId) {
+      query = query.eq('section_id', targetSectionId);
+    } else {
+      query = query.is('section_id', null);
+    }
+
+    const { data: sectionProjects, error: fetchError } = await query.order('order_index', { ascending: true });
+    if (fetchError) throw fetchError;
+
+    // 2. 현재 위치에서 제거 후 targetIndex에 삽입
+    const movingIdx = sectionProjects.findIndex(p => p.id === projectId);
+    const newList = [...sectionProjects];
+    if (movingIdx !== -1) {
+      newList.splice(movingIdx, 1);
+    } else {
+      // 다른 section에서 이동하는 경우 시작점에 임시 추가
+      newList.splice(0, 0, { id: projectId });
+    }
+    newList.splice(targetIndex, 0, { id: projectId });
+
+    // 3. 순서 + section_id 업데이트
+    const updatePromises = newList.map((p, idx) =>
+      supabase.from('projects').update({
+        order_index: idx,
+        section_id: targetSectionId,
+      }).eq('id', p.id)
+    );
+    const results = await Promise.all(updatePromises);
+    const errors = results.filter(r => r.error);
+    if (errors.length > 0) throw errors[0].error;
+  },
+
+  addItem: async (projectId, title, content = '', createdBy = null) => {
+    const { data: existingItems } = await supabase.from('items').select('order_index').eq('project_id', projectId).order('order_index', { ascending: false }).limit(1);
     const nextOrder = existingItems?.[0] ? existingItems[0].order_index + 1 : 0;
 
     const { data, error } = await supabase
       .from('items')
       .insert([{
-        project_id: phaseId,
+        project_id: projectId,
         title,
         content,
         order_index: nextOrder,
@@ -310,7 +352,7 @@ const supabaseAPI = {
     return data[0];
   },
 
-  updateItem: async (phaseId, itemId, updates) => {
+  updateItem: async (projectId, itemId, updates) => {
     const { data, error } = await supabase
       .from('items')
       .update(updates)
@@ -321,66 +363,47 @@ const supabaseAPI = {
     return data[0];
   },
 
-  deleteItem: async (phaseId, itemId) => {
+  deleteItem: async (projectId, itemId) => {
     const { error } = await supabase.from('items').delete().eq('id', itemId);
     if (error) throw error;
   },
 
   /**
-   * @description 아이템을 다른 phase나 부모로 이동하거나 같은 레벨 내에서 재정렬.
-   * @param {string} sourcePhaseId
-   * @param {string} targetPhaseId
+   * @description 아이템을 다른 project나 부모로 이동하거나 같은 레벨 내에서 재정렬.
+   * @param {string} sourceProjectId
+   * @param {string} targetProjectId
    * @param {string} itemId
    * @param {number} targetIndex - 0-based 삽입 위치
    * @param {string|null} targetParentId - 새로운 부모 아이템 ID (undefined면 기존 로직 동작)
    */
-  moveItem: async (sourcePhaseId, targetPhaseId, itemId, targetIndex, targetParentId = undefined) => {
-    // 1. 대상 부모/프로젝트 내의 현재 아이템들 가져오기
-    let query = supabase
+  moveItem: async (sourceProjectId, targetProjectId, itemId, targetIndex, targetParentId = undefined) => {
+    const projectIds = [...new Set([sourceProjectId, targetProjectId].filter(Boolean))];
+    const { data: allItems, error: fetchError } = await supabase
       .from('items')
-      .select('id, order_index, page_type')
-      .eq('project_id', targetPhaseId);
+      .select('id, project_id, parent_item_id, order_index')
+      .in('project_id', projectIds);
 
-    // 사이드바 계층 이동인 경우에만 parent_item_id 필터링 적용
-    if (targetParentId === null) {
-      query = query.is('parent_item_id', null);
-    } else if (targetParentId !== undefined) {
-      query = query.eq('parent_item_id', targetParentId);
-    }
-
-    const { data: targetItems, error: fetchError } = await query.order('order_index', { ascending: true });
     if (fetchError) throw fetchError;
 
-    // 2. 이동할 아이템의 인덱스 찾기 및 배열 재조립
-    const movingItemIdx = targetItems.findIndex(i => i.id === itemId);
-    let newItems = [...targetItems];
-
-    if (movingItemIdx !== -1) {
-      const [movingItem] = newItems.splice(movingItemIdx, 1);
-      newItems.splice(targetIndex, 0, movingItem);
-    } else {
-      // 다른 부모/프로젝트에서 넘어온 경우
-      newItems.splice(targetIndex, 0, { id: itemId });
-    }
-
-    // 3. 전체 순서 재계산 및 업데이트
-    const updatePromises = newItems.map((item, idx) => {
-      const updates = {
-        project_id: targetPhaseId,
-        order_index: idx
-      };
-      if (targetParentId !== undefined) {
-        updates.parent_item_id = targetParentId;
-      }
-      return supabase.from('items').update(updates).eq('id', item.id);
+    const plan = buildProjectMovePlan({
+      allItems: allItems || [],
+      sourceProjectId,
+      targetProjectId,
+      itemId,
+      targetIndex,
+      targetParentId,
     });
 
-    const results = await Promise.all(updatePromises);
+    const results = await Promise.all(
+      plan.updates.map(({ id, updates }) =>
+        supabase.from('items').update(updates).eq('id', id)
+      )
+    );
     const errors = results.filter(r => r.error);
     if (errors.length > 0) throw errors[0].error;
   },
 
-  addComment: async (phaseId, itemId, content) => {
+  addComment: async (projectId, itemId, content) => {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) throw new Error('User not authenticated');
 
@@ -400,7 +423,7 @@ const supabaseAPI = {
     return data[0];
   },
 
-  updateComment: async (phaseId, itemId, commentId, updates) => {
+  updateComment: async (projectId, itemId, commentId, updates) => {
     const { data, error } = await supabase
       .from('comments')
       .update(updates)
@@ -414,7 +437,7 @@ const supabaseAPI = {
     return data[0];
   },
 
-  deleteComment: async (phaseId, itemId, commentId) => {
+  deleteComment: async (projectId, itemId, commentId) => {
     const { error } = await supabase.from('comments').delete().eq('id', commentId);
     if (error) throw error;
   },
@@ -500,11 +523,11 @@ const supabaseAPI = {
 
   /**
    * @description 타임라인 뷰에서 프로젝트 순서 변경. 같은 섹션 내에서만 이동 가능.
-   * @param {string} phaseId 
+   * @param {string} projectId 
    * @param {string} sectionId - 속한 섹션 ID (null 허용)
    * @param {number} targetIndex - 0-based 타임라인 내 목표 위치
    */
-  movePhaseTimeline: async (phaseId, sectionId, targetIndex) => {
+  moveProjectTimeline: async (projectId, sectionId, targetIndex) => {
     let query = supabase
       .from('projects')
       .select('id, timeline_order_index')
@@ -517,15 +540,15 @@ const supabaseAPI = {
       query = query.eq('section_id', sectionId);
     }
 
-    const { data: phases } = await query;
-    const movingIdx = phases.findIndex(p => p.id === phaseId);
+    const { data: projects } = await query;
+    const movingIdx = projects.findIndex(p => p.id === projectId);
     if (movingIdx === -1) throw new Error('Project not found in section');
     
-    const [moving] = phases.splice(movingIdx, 1);
-    phases.splice(targetIndex, 0, moving);
+    const [moving] = projects.splice(movingIdx, 1);
+    projects.splice(targetIndex, 0, moving);
 
     const results = await Promise.all(
-      phases.map((p, idx) => supabase.from('projects').update({ timeline_order_index: idx }).eq('id', p.id))
+      projects.map((p, idx) => supabase.from('projects').update({ timeline_order_index: idx }).eq('id', p.id))
     );
     const errors = results.filter(r => r.error);
     if (errors.length > 0) throw errors[0].error;

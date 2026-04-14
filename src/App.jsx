@@ -5,7 +5,7 @@
  * localStorage에 저장된 마지막 확인 버전을 비교해 자동 노출한다.
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from './hooks/useAuth';
 import KanbanBoard from './components/KanbanBoard';
 import LoginForm from './components/Auth/LoginForm';
@@ -18,21 +18,16 @@ import {
 
 function App() {
   const { user, loading, needsPasswordSetup, login, updateProfileAndStep } = useAuth();
-  const [showLogin, setShowLogin] = useState(false);
-  const [showReleaseNotes, setShowReleaseNotes] = useState(false);
   const currentReleaseNote = RELEASE_NOTES?.[0] || null;
-
-  useEffect(() => {
-    if (!currentReleaseNote) return;
+  const [showReleaseNotes, setShowReleaseNotes] = useState(() => {
+    if (!currentReleaseNote) return false;
     try {
       const lastSeenReleaseId = localStorage.getItem(RELEASE_NOTES_STORAGE_KEY);
-      if (lastSeenReleaseId !== currentReleaseNote.id) {
-        setShowReleaseNotes(true);
-      }
-    } catch (e) {
-      // Ignore
+      return lastSeenReleaseId !== currentReleaseNote.id;
+    } catch {
+      return false;
     }
-  }, [currentReleaseNote]);
+  });
 
   const handleCloseReleaseNotes = () => {
     if (!currentReleaseNote) {
@@ -41,7 +36,7 @@ function App() {
     }
     try {
       localStorage.setItem(RELEASE_NOTES_STORAGE_KEY, currentReleaseNote.id);
-    } catch (e) {
+    } catch {
       // Ignore
     }
     setShowReleaseNotes(false);
@@ -73,19 +68,12 @@ function App() {
     );
   }
 
-  // 2. 로그인 버튼을 눌렀거나, 로그인이 안 된 상태에서 로그인이 필요한 경우
-  if (!user && showLogin) {
+  // 2. 로그인 필수: 비로그인 사용자는 로그인 화면만 접근 가능
+  if (!user) {
     return (
       <div className="relative">
-        <button 
-          onClick={() => setShowLogin(false)}
-          className="absolute top-8 left-8 z-50 px-5 py-2.5 bg-white dark:bg-bg-elevated border border-gray-200 dark:border-border-subtle rounded-xl text-sm font-bold uppercase tracking-widest text-gray-500 dark:text-text-secondary hover:text-gray-900 dark:hover:text-text-primary hover:border-gray-400 dark:hover:border-border-strong transition-all shadow-sm cursor-pointer"
-        >
-          ← 보드로 돌아가기
-        </button>
         <LoginForm onLogin={async (email, password) => {
           await login(email, password);
-          setShowLogin(false);
         }} />
         {showReleaseNotes && (
           <ReleaseNotesModal
@@ -101,7 +89,7 @@ function App() {
   return (
     <>
       <KanbanBoard
-        onShowLogin={() => setShowLogin(true)}
+        onShowLogin={() => {}}
         onShowReleaseNotes={() => setShowReleaseNotes(true)}
       />
       {showReleaseNotes && (

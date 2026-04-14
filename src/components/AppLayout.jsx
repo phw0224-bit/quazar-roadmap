@@ -4,7 +4,7 @@ import Sidebar from './Sidebar';
 
 export default function AppLayout({
   sections,
-  phases,
+  projects,
   activeView,
   activeItemId,
   onNavigate,
@@ -21,6 +21,10 @@ export default function AppLayout({
   onLogout,
   children,
   onSetBoardType,
+  generalDocs,
+  onShowToast,
+  onMoveSidebarItem,
+  onMoveSidebarProject,
 }) {
   const { isOpen, hoverMode, toggleHoverMode } = useLayoutState();
   const [isHovering, setIsHovering] = useState(false);
@@ -31,12 +35,16 @@ export default function AppLayout({
   };
 
   const sidebarProps = {
-    sections, phases, activeView, activeItemId,
+    sections, projects, activeView, activeItemId,
     onNavigate, onOpenItem, onAddChildPage, onShowPrompt, onShowConfirm, onShowReleaseNotes, isReadOnly,
     user, theme, mounted, onToggleTheme, onLogout,
     hoverMode,
     onHoverModeToggle: handleHoverModeToggle,
     onSetBoardType,
+    generalDocs,
+    onShowToast,
+    onMoveSidebarItem,
+    onMoveSidebarProject,
   };
 
   return (

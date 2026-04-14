@@ -1,20 +1,25 @@
 /**
  * @fileoverview 전체 칸반 보드 상태의 단일 진실 소스(Single Source of Truth).
  *
- * useReducer로 phases/sections를 관리하고, Supabase Realtime으로 다른 클라이언트와 동기화.
+ * useReducer로 projects/sections를 관리하고, Supabase Realtime으로 다른 클라이언트와 동기화.
  * 모든 CRUD 작업은 "dispatch 먼저 → API 호출 나중" 패턴(Optimistic Update)을 사용.
  *
  * 상태 구조:
- * - phases: 칸반 컬럼(project) 배열. 각 phase는 items 배열 내장.
- * - sections: 컬럼 그룹. phases와 별도 관리.
- * - page_type='page' 아이템은 SET_DATA에서 phases에서 제거됨 (사이드바 전용).
+ * - projects: 칸반 컬럼(project) 배열. 각 project는 items 배열 내장.
+ * - sections: 컬럼 그룹. projects와 별도 관리.
+ * - page_type='page' 아이템은 SET_DATA에서 projects에서 제거됨 (사이드바 전용).
  */
 import { useEffect, useReducer, useCallback } from 'react';
 import API, { createChildPage } from '../api/kanbanAPI';
 import { supabase } from '../lib/supabase';
+import {
+  applySidebarItemMove,
+  applySidebarProjectMove,
+  cloneProjectsSnapshot,
+} from './sidebarMoveState.js';
 
 const INITIAL_STATE = {
-  phases: [],
+  projects: [],
   sections: [],
   generalDocs: [],  // project_id=null, page_type='page' 문서들 (팀별 분리)
   loading: true,
@@ -27,13 +32,13 @@ const INITIAL_STATE = {
  *
  * 지원 액션:
  * - SET_DATA: 초기 로드 또는 Realtime 재조회 후 전체 교체
- * - ADD/UPDATE/DELETE/MOVE_PHASE: 칸반 컬럼(project) CRUD
- * - ADD/UPDATE/DELETE/MOVE_ITEM: 카드(item) CRUD. MOVE는 cross-phase 지원
+ * - ADD/UPDATE/DELETE/MOVE_PROJECT: 칸반 컬럼(project) CRUD
+ * - ADD/UPDATE/DELETE/MOVE_ITEM: 카드(item) CRUD. MOVE는 cross-project 지원
  * - ADD/UPDATE/DELETE_COMMENT: 댓글 CRUD
  * - ADD/UPDATE/DELETE/MOVE_SECTION: 섹션 그룹 CRUD
  * - ADD_CHILD_PAGE: page_type='page' 아이템 추가 (사이드바용)
  *
- * @param {Object} state - 현재 상태 { phases, sections, loading, error }
+ * @param {Object} state - 현재 상태 { projects, sections, loading, error }
  * @param {Object} action - { type: string, payload: any }
  * @returns {Object} 새 상태 (항상 새 객체 반환, 불변성 유지)
  */
@@ -42,7 +47,7 @@ const kanbanReducer = (state, action) => {
     case 'SET_DATA':
       return {
         ...state,
-        phases: action.payload.phases,
+        projects: action.payload.projects,
         sections: action.payload.sections,
         generalDocs: action.payload.generalDocs || [],  // 신규: 일반 문서 추가
         loading: false
@@ -60,7 +65,7 @@ const kanbanReducer = (state, action) => {
       return {
         ...state,
         sections: state.sections.filter(s => s.id !== action.payload),
-        phases: state.phases.map(p =>
+        projects: state.projects.map(p =>
           p.section_id === action.payload ? { ...p, section_id: null } : p
         ),
       };
@@ -79,22 +84,27 @@ const kanbanReducer = (state, action) => {
     }
     case 'SET_ERROR':
       return { ...state, error: action.payload, loading: false };
-    case 'ADD_PHASE':
-      return { ...state, phases: [...state.phases, { ...action.payload, items: [] }] };
-    case 'UPDATE_PHASE':
+    case 'ADD_PROJECT':
+      return { ...state, projects: [...state.projects, { ...action.payload, items: [] }] };
+    case 'UPDATE_PROJECT':
       return {
         ...state,
-        phases: state.phases.map(p => p.id === action.payload.id ? { ...p, ...action.payload.updates } : p)
+        projects: state.projects.map(p => p.id === action.payload.id ? { ...p, ...action.payload.updates } : p)
       };
-    case 'DELETE_PHASE':
-      return { ...state, phases: state.phases.filter(p => p.id !== action.payload) };
-    case 'MOVE_PHASE': {
-      const newPhases = [...state.phases];
-      const movingIdx = newPhases.findIndex(p => p.id === action.payload.phaseId);
-      const [movingPhase] = newPhases.splice(movingIdx, 1);
-      newPhases.splice(action.payload.targetIndex, 0, movingPhase);
-      return { ...state, phases: newPhases };
+    case 'DELETE_PROJECT':
+      return { ...state, projects: state.projects.filter(p => p.id !== action.payload) };
+    case 'MOVE_PROJECT': {
+      const newProjects = [...state.projects];
+      const movingIdx = newProjects.findIndex(p => p.id === action.payload.projectId);
+      const [movingProject] = newProjects.splice(movingIdx, 1);
+      newProjects.splice(action.payload.targetIndex, 0, movingProject);
+      return { ...state, projects: newProjects };
     }
+    case 'SIDEBAR_MOVE_PROJECT':
+      return {
+        ...state,
+        projects: applySidebarProjectMove(state.projects, action.payload),
+      };
     // 신규: 일반 문서 액션들
     case 'ADD_GENERAL_DOC':
       return {
@@ -128,8 +138,8 @@ const kanbanReducer = (state, action) => {
     case 'ADD_ITEM':
       return {
         ...state,
-        phases: state.phases.map(p => 
-          p.id === action.payload.phaseId 
+        projects: state.projects.map(p =>
+          p.id === action.payload.projectId
             ? { ...p, items: [...p.items, { ...action.payload.item, comments: [] }].sort((a, b) => a.order_index - b.order_index) }
             : p
         )
@@ -137,8 +147,8 @@ const kanbanReducer = (state, action) => {
     case 'UPDATE_ITEM':
       return {
         ...state,
-        phases: state.phases.map(p => 
-          p.id === action.payload.phaseId
+        projects: state.projects.map(p =>
+          p.id === action.payload.projectId
             ? { ...p, items: p.items.map(i => i.id === action.payload.itemId ? { ...i, ...action.payload.updates } : i) }
             : p
         )
@@ -146,25 +156,25 @@ const kanbanReducer = (state, action) => {
     case 'DELETE_ITEM':
       return {
         ...state,
-        phases: state.phases.map(p => 
-          p.id === action.payload.phaseId
+        projects: state.projects.map(p =>
+          p.id === action.payload.projectId
             ? { ...p, items: p.items.filter(i => i.id !== action.payload.itemId) }
             : p
         )
       };
     case 'MOVE_ITEM': {
-      const { sourcePhaseId, targetPhaseId, itemId, targetIndex } = action.payload;
+      const { sourceProjectId, targetProjectId, itemId, targetIndex } = action.payload;
 
-      const sourcePhase = state.phases.find(p => p.id === sourcePhaseId);
-      const movingItem = sourcePhase.items.find(i => i.id === itemId);
+      const sourceProject = state.projects.find(p => p.id === sourceProjectId);
+      const movingItem = sourceProject.items.find(i => i.id === itemId);
       if (!movingItem) return state;
 
       // 같은 단계 내 이동인 경우
-      if (sourcePhaseId === targetPhaseId) {
+      if (sourceProjectId === targetProjectId) {
         return {
           ...state,
-          phases: state.phases.map(p => {
-            if (p.id === sourcePhaseId) {
+          projects: state.projects.map(p => {
+            if (p.id === sourceProjectId) {
               const newItems = p.items.filter(i => i.id !== itemId);
               newItems.splice(targetIndex, 0, movingItem);
               return { ...p, items: newItems.map((item, idx) => ({ ...item, order_index: idx })) };
@@ -177,24 +187,34 @@ const kanbanReducer = (state, action) => {
       // 다른 단계로 이동하는 경우
       return {
         ...state,
-        phases: state.phases.map(p => {
-          if (p.id === sourcePhaseId) {
+        projects: state.projects.map(p => {
+          if (p.id === sourceProjectId) {
             return { ...p, items: p.items.filter(i => i.id !== itemId) };
           }
-          if (p.id === targetPhaseId) {
+          if (p.id === targetProjectId) {
             const newItems = [...p.items];
-            newItems.splice(targetIndex, 0, { ...movingItem, project_id: targetPhaseId });
+            newItems.splice(targetIndex, 0, { ...movingItem, project_id: targetProjectId });
             return { ...p, items: newItems.map((item, idx) => ({ ...item, order_index: idx })) };
           }
           return p;
         })
       };
     }
+    case 'SIDEBAR_MOVE_ITEM':
+      return {
+        ...state,
+        projects: applySidebarItemMove(state.projects, action.payload),
+      };
+    case 'RESTORE_PROJECTS':
+      return {
+        ...state,
+        projects: action.payload.projects,
+      };
     case 'ADD_CHILD_PAGE':
       return {
         ...state,
-        phases: state.phases.map(p =>
-          p.id === action.payload.phaseId
+        projects: state.projects.map(p =>
+          p.id === action.payload.projectId
             ? { ...p, items: [...(p.items || []), { ...action.payload.newPage, comments: [] }].sort((a, b) => a.order_index - b.order_index) }
             : p
         ),
@@ -202,7 +222,7 @@ const kanbanReducer = (state, action) => {
     case 'ADD_COMMENT':
       return {
         ...state,
-        phases: state.phases.map(p => ({
+        projects: state.projects.map(p => ({
           ...p,
           items: p.items.map(i => 
             i.id === action.payload.itemId 
@@ -214,7 +234,7 @@ const kanbanReducer = (state, action) => {
     case 'UPDATE_COMMENT':
       return {
         ...state,
-        phases: state.phases.map(p => ({
+        projects: state.projects.map(p => ({
           ...p,
           items: p.items.map(i => 
             i.id === action.payload.itemId 
@@ -226,7 +246,7 @@ const kanbanReducer = (state, action) => {
     case 'DELETE_COMMENT':
       return {
         ...state,
-        phases: state.phases.map(p => ({
+        projects: state.projects.map(p => ({
           ...p,
           items: p.items.map(i => 
             i.id === action.payload.itemId 
@@ -249,7 +269,7 @@ export const useKanbanData = () => {
       dispatch({
         type: 'SET_DATA',
         payload: {
-          phases: data.phases,
+        projects: data.projects,
           sections: data.sections,
           generalDocs: data.generalDocs,  // 신규: 일반 문서 포함
         }
@@ -295,113 +315,113 @@ export const useKanbanData = () => {
       })
       .subscribe();
 
-    const phasesChannel = supabase.channel('projects-db-changes')
+    const projectsChannel = supabase.channel('projects-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => fetchData())
       .subscribe();
 
     return () => {
       supabase.removeChannel(itemsChannel);
       supabase.removeChannel(commentsChannel);
-      supabase.removeChannel(phasesChannel);
+      supabase.removeChannel(projectsChannel);
     };
   }, [fetchData]);
 
   /**
-   * @description 새 칸반 컬럼(Phase)을 추가. order_index는 현재 최대값+1 자동 계산.
+   * @description 새 칸반 컬럼(프로젝트)을 추가. order_index는 현재 최대값+1 자동 계산.
    * @param {string} title - 컬럼 제목
    * @param {string} [boardType='main'] - 'main'|'개발팀'|'AI팀'|'지원팀'
    * @param {string|null} [sectionId=null] - 속할 섹션 ID. null이면 섹션 없는 컬럼
    */
-  const addPhase = async (title, boardType = 'main', sectionId = null) => {
-    const newPhase = await API.addPhase(title, boardType, sectionId);
-    dispatch({ type: 'ADD_PHASE', payload: newPhase });
+  const addProject = async (title, boardType = 'main', sectionId = null) => {
+    const newProject = await API.addProject(title, boardType, sectionId);
+    dispatch({ type: 'ADD_PROJECT', payload: newProject });
   };
 
-  const updatePhase = async (phaseId, updates) => {
-    const updated = await API.updatePhase(phaseId, updates);
-    dispatch({ type: 'UPDATE_PHASE', payload: { id: phaseId, updates: updated } });
+  const updateProject = async (projectId, updates) => {
+    const updated = await API.updateProject(projectId, updates);
+    dispatch({ type: 'UPDATE_PROJECT', payload: { id: projectId, updates: updated } });
   };
 
-  const completePhase = async (phaseId, isCompleted) => {
-    const phase = state.phases.find(p => p.id === phaseId);
-    if (!phase) return;
+  const completeProject = async (projectId, isCompleted) => {
+    const project = state.projects.find(p => p.id === projectId);
+    if (!project) return;
     const meta = isCompleted
-      ? { sectionId: phase.section_id, orderIndex: phase.order_index }
-      : { preCompletionSectionId: phase.pre_completion_section_id, preCompletionOrderIndex: phase.pre_completion_order_index };
+      ? { sectionId: project.section_id, orderIndex: project.order_index }
+      : { preCompletionSectionId: project.pre_completion_section_id, preCompletionOrderIndex: project.pre_completion_order_index };
     const updates = isCompleted
-      ? { is_completed: true, pre_completion_section_id: phase.section_id, pre_completion_order_index: phase.order_index }
-      : { is_completed: false, section_id: phase.pre_completion_section_id, order_index: phase.pre_completion_order_index };
-    dispatch({ type: 'UPDATE_PHASE', payload: { id: phaseId, updates } });
-    await API.completePhase(phaseId, isCompleted, meta);
+      ? { is_completed: true, pre_completion_section_id: project.section_id, pre_completion_order_index: project.order_index }
+      : { is_completed: false, section_id: project.pre_completion_section_id, order_index: project.pre_completion_order_index };
+    dispatch({ type: 'UPDATE_PROJECT', payload: { id: projectId, updates } });
+    await API.completeProject(projectId, isCompleted, meta);
   };
 
-  const deletePhase = async (phaseId) => {
-    await API.deletePhase(phaseId);
-    dispatch({ type: 'DELETE_PHASE', payload: phaseId });
+  const deleteProject = async (projectId) => {
+    await API.deleteProject(projectId);
+    dispatch({ type: 'DELETE_PROJECT', payload: projectId });
   };
 
-  const movePhase = async (phaseId, targetIndex) => {
-    dispatch({ type: 'MOVE_PHASE', payload: { phaseId, targetIndex } });
-    await API.movePhase(phaseId, targetIndex);
+  const moveProject = async (projectId, targetIndex) => {
+    dispatch({ type: 'MOVE_PROJECT', payload: { projectId, targetIndex } });
+    await API.moveProject(projectId, targetIndex);
   };
 
-  const addItem = async (phaseId, title, content, createdBy = null) => {
-    const newItem = await API.addItem(phaseId, title, content, createdBy);
-    dispatch({ type: 'ADD_ITEM', payload: { phaseId, item: newItem } });
+  const addItem = async (projectId, title, content, createdBy = null) => {
+    const newItem = await API.addItem(projectId, title, content, createdBy);
+    dispatch({ type: 'ADD_ITEM', payload: { projectId, item: newItem } });
   };
 
-  const updateItem = async (phaseId, itemId, updates) => {
-    const updated = await API.updateItem(phaseId, itemId, updates);
-    dispatch({ type: 'UPDATE_ITEM', payload: { phaseId, itemId, updates: updated } });
+  const updateItem = async (projectId, itemId, updates) => {
+    const updated = await API.updateItem(projectId, itemId, updates);
+    dispatch({ type: 'UPDATE_ITEM', payload: { projectId, itemId, updates: updated } });
   };
 
-  const deleteItem = async (phaseId, itemId) => {
-    await API.deleteItem(phaseId, itemId);
-    dispatch({ type: 'DELETE_ITEM', payload: { phaseId, itemId } });
+  const deleteItem = async (projectId, itemId) => {
+    await API.deleteItem(projectId, itemId);
+    dispatch({ type: 'DELETE_ITEM', payload: { projectId, itemId } });
   };
 
   /**
-   * @description 아이템을 다른 Phase로 이동 또는 같은 Phase 내 재정렬.
+   * @description 아이템을 다른 프로젝트로 이동 또는 같은 프로젝트 내 재정렬.
    * Optimistic: dispatch로 UI 즉시 반영 후 API 호출.
-   * 이동 후 source/target phase 양쪽의 order_index 전체 재계산.
-   * @param {string} sourcePhaseId - 원래 phase ID
-   * @param {string} targetPhaseId - 목적 phase ID (같은 phase면 재정렬)
+   * 이동 후 source/target project 양쪽의 order_index 전체 재계산.
+   * @param {string} sourceProjectId - 원래 project ID
+   * @param {string} targetProjectId - 목적 project ID (같은 project면 재정렬)
    * @param {string} itemId - 이동할 아이템 ID
-   * @param {number} targetIndex - 목적 phase에서의 위치 (0-based)
+   * @param {number} targetIndex - 목적 project에서의 위치 (0-based)
    */
-  const moveItem = async (sourcePhaseId, targetPhaseId, itemId, targetIndex) => {
-    dispatch({ type: 'MOVE_ITEM', payload: { sourcePhaseId, targetPhaseId, itemId, targetIndex } });
-    await API.moveItem(sourcePhaseId, targetPhaseId, itemId, targetIndex);
+  const moveItem = async (sourceProjectId, targetProjectId, itemId, targetIndex) => {
+    dispatch({ type: 'MOVE_ITEM', payload: { sourceProjectId, targetProjectId, itemId, targetIndex } });
+    await API.moveItem(sourceProjectId, targetProjectId, itemId, targetIndex);
   };
 
   /**
    * @description page_type='page' 아이템(문서 페이지)을 생성하고 부모 아이템과 양방향 연결.
    * 칸반 카드가 아닌 중첩 페이지 생성 시 사용. 사이드바 트리에 표시됨.
    * 부모의 related_items에도 자동으로 추가됨.
-   * @param {string} phaseId - 속할 phase ID
+   * @param {string} projectId - 속할 project ID
    * @param {string} parentItemId - 부모 아이템 ID (related_items 양방향 연결)
    * @param {string} title - 페이지 제목
    */
-  const addChildPage = async (phaseId, parentItemId, title) => {
+  const addChildPage = async (projectId, parentItemId, title) => {
     let inheritedTeams = [];
     let inheritedTags = [];
     if (parentItemId) {
-      const parentPhase = state.phases.find(p => p.id === phaseId);
-      const parentItem = parentPhase?.items?.find(i => i.id === parentItemId);
+      const parentProject = state.projects.find(p => p.id === projectId);
+      const parentItem = parentProject?.items?.find(i => i.id === parentItemId);
       if (parentItem) {
         inheritedTeams = parentItem.teams || [];
         inheritedTags = parentItem.tags || [];
       }
     }
 
-    const newPage = await createChildPage(phaseId, parentItemId, title, {
+    const newPage = await createChildPage(projectId, parentItemId, title, {
       teams: inheritedTeams,
       tags: inheritedTags,
     });
     
     // 1. 하위 페이지(자기 자신)의 related_items에 부모 페이지를 추가 (상위 페이지 연결)
     if (parentItemId) {
-      await updateItem(phaseId, newPage.id, {
+      await updateItem(projectId, newPage.id, {
         related_items: [parentItemId]
       });
       // 로컬 상태 동기화를 위해 newPage 객체 업데이트
@@ -410,35 +430,35 @@ export const useKanbanData = () => {
 
     // 2. 부모 아이템의 related_items에도 하위 페이지를 추가 (양방향 연결)
     if (parentItemId) {
-      const parentPhase = state.phases.find(p => p.id === phaseId);
-      const parentItem = parentPhase?.items.find(i => i.id === parentItemId);
+      const parentProject = state.projects.find(p => p.id === projectId);
+      const parentItem = parentProject?.items.find(i => i.id === parentItemId);
       if (parentItem) {
         const currentRelations = parentItem.related_items || [];
         if (!currentRelations.includes(newPage.id)) {
-          await updateItem(phaseId, parentItemId, { 
+          await updateItem(projectId, parentItemId, { 
             related_items: [...currentRelations, newPage.id] 
           });
         }
       }
     }
 
-    dispatch({ type: 'ADD_CHILD_PAGE', payload: { phaseId, newPage } });
+    dispatch({ type: 'ADD_CHILD_PAGE', payload: { projectId, newPage } });
     return newPage;
   };
 
-  const addComment = async (phaseId, itemId, content) => {
-    const newComment = await API.addComment(phaseId, itemId, content);
+  const addComment = async (projectId, itemId, content) => {
+    const newComment = await API.addComment(projectId, itemId, content);
     // Real-time listener will also handle this, but we can update state immediately for speed
     dispatch({ type: 'ADD_COMMENT', payload: { itemId, comment: newComment } });
   };
 
-  const updateComment = async (phaseId, itemId, commentId, updates) => {
-    const updated = await API.updateComment(phaseId, itemId, commentId, updates);
+  const updateComment = async (projectId, itemId, commentId, updates) => {
+    const updated = await API.updateComment(projectId, itemId, commentId, updates);
     dispatch({ type: 'UPDATE_COMMENT', payload: { itemId, commentId, updates: updated } });
   };
 
-  const deleteComment = async (phaseId, itemId, commentId) => {
-    await API.deleteComment(phaseId, itemId, commentId);
+  const deleteComment = async (projectId, itemId, commentId) => {
+    await API.deleteComment(projectId, itemId, commentId);
     dispatch({ type: 'DELETE_COMMENT', payload: { itemId, commentId } });
   };
 
@@ -495,18 +515,44 @@ export const useKanbanData = () => {
     await API.moveSection(sectionId, targetIndex, boardType);
   };
 
+  const moveSidebarItem = async (sourceProjectId, targetProjectId, itemId, targetIndex, targetParentId = null) => {
+    const snapshot = cloneProjectsSnapshot(state.projects);
+    const payload = { sourceProjectId, targetProjectId, itemId, targetIndex, targetParentId };
+    dispatch({ type: 'SIDEBAR_MOVE_ITEM', payload });
+
+    try {
+      await API.moveItem(sourceProjectId, targetProjectId, itemId, targetIndex, targetParentId);
+    } catch (err) {
+      dispatch({ type: 'RESTORE_PROJECTS', payload: { projects: snapshot } });
+      throw err;
+    }
+  };
+
+  const moveSidebarProject = async (projectId, targetSectionId, targetIndex) => {
+    const snapshot = cloneProjectsSnapshot(state.projects);
+    const payload = { projectId, targetSectionId, targetIndex };
+    dispatch({ type: 'SIDEBAR_MOVE_PROJECT', payload });
+
+    try {
+      await API.moveProjectSidebar(projectId, targetSectionId, targetIndex);
+    } catch (err) {
+      dispatch({ type: 'RESTORE_PROJECTS', payload: { projects: snapshot } });
+      throw err;
+    }
+  };
+
   return {
-    phases: state.phases,
+        projects: state.projects,
     sections: state.sections,
     generalDocs: state.generalDocs,  // 신규: 일반 문서 (팀별 분리)
     currentBoardType: state.currentBoardType,  // 신규: 현재 보드 타입
     loading: state.loading,
     error: state.error,
-    addPhase,
-    updatePhase,
-    deletePhase,
-    completePhase,
-    movePhase,
+        addProject,
+        updateProject,
+        deleteProject,
+        completeProject,
+        moveProject,
     addItem,
     updateItem,
     deleteItem,
@@ -525,5 +571,7 @@ export const useKanbanData = () => {
     deleteGeneralDocument,
     moveGeneralDocument,
     setBoardType,
+    moveSidebarItem,
+    moveSidebarProject,
   };
 };

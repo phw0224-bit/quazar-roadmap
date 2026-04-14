@@ -13,16 +13,16 @@ import ProjectColumn from './ProjectColumn';
 
 export default function BoardSection({
   section,
-  phases,
+  projects,
   isCollapsed,
   onToggleCollapse,
   onUpdateSection,
   onDeleteSection,
-  onAddPhase,
+  onAddProject,
   onShowPrompt,
   selectedTeam, selectedTag, selectedStatus,
-  onAddItem, onUpdateItem, onDeleteItem, onUpdatePhase, onDeletePhase,
-  onCompletePhase,
+  onAddItem, onUpdateItem, onDeleteItem, onUpdateProject, onDeleteProject,
+  onCompleteProject,
   onOpenDetail, onShowConfirm, onShowToast,
   isReadOnly,
 }) {
@@ -110,7 +110,7 @@ export default function BoardSection({
         )}
 
         <span className="px-2 py-0.5 bg-gray-100 dark:bg-bg-hover text-gray-500 dark:text-text-tertiary rounded-md text-xs font-bold tabular-nums border border-gray-200 dark:border-border-subtle">
-          {phases.length} 프로젝트
+          {projects.length} 프로젝트
         </span>
 
         <div className="flex items-center gap-2 ml-auto">
@@ -129,7 +129,7 @@ export default function BoardSection({
                 '새 프로젝트의 이름을 입력하세요',
                 (title) => {
                   if (title) {
-                    onAddPhase(title, section.board_type, section.id);
+                    onAddProject(title, section.board_type, section.id);
                     onShowToast(`'${title}' 프로젝트가 생성되었습니다.`);
                   }
                 }
@@ -181,22 +181,22 @@ export default function BoardSection({
       {/* Projects inside section */}
       {!isCollapsed && (
         <div className="flex gap-12 overflow-x-auto py-3 pb-4 custom-scrollbar min-h-[300px] px-1">
-          {phases.length > 0 ? (
-            <SortableContext items={phases.map(p => p.id)} strategy={horizontalListSortingStrategy}>
-              {phases.map((phase, idx) => (
+          {projects.length > 0 ? (
+            <SortableContext items={projects.map(p => p.id)} strategy={horizontalListSortingStrategy}>
+              {projects.map((project, idx) => (
                 <ProjectColumn
-                  key={phase.id}
-                  phase={phase}
-                  phaseIndex={idx + 1}
+                  key={project.id}
+                  project={project}
+                  projectIndex={idx + 1}
                   selectedTeam={selectedTeam}
                   selectedTag={selectedTag}
                   selectedStatus={selectedStatus}
                   onAddItem={onAddItem}
                   onUpdateItem={onUpdateItem}
                   onDeleteItem={onDeleteItem}
-                  onUpdatePhase={onUpdatePhase}
-                  onDeletePhase={onDeletePhase}
-                  onCompletePhase={onCompletePhase}
+                  onUpdateProject={onUpdateProject}
+                  onDeleteProject={onDeleteProject}
+                  onCompleteProject={onCompleteProject}
                   onOpenDetail={onOpenDetail}
                   onShowConfirm={onShowConfirm}
                   onShowToast={onShowToast}

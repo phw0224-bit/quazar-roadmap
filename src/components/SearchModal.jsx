@@ -9,7 +9,7 @@ import { Search, X, FileText } from 'lucide-react';
 import { STATUS_MAP } from '../lib/constants';
 import { buildEntityContext, getEntityLabel } from '../lib/entityModel';
 
-export default function SearchModal({ phases = [], additionalItems = [], onOpenDetail, onClose }) {
+export default function SearchModal({ projects = [], phases = projects, additionalItems = [], onOpenDetail, onClose }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -22,7 +22,7 @@ export default function SearchModal({ phases = [], additionalItems = [], onOpenD
   }, []);
 
   /**
-   * @description 로컬 캐시된 phases 데이터를 기반으로 검색 수행.
+   * @description 로컬 캐시된 projects 데이터를 기반으로 검색 수행.
    * 제목(title), 부제목(content), 담당자(assignees) 필드를 포함하여 검색.
    * @param {string} q - 검색어
    */
@@ -31,18 +31,18 @@ export default function SearchModal({ phases = [], additionalItems = [], onOpenD
     setLoading(true);
     
     const lowerQ = q.toLowerCase();
-    const phaseItems = phases.flatMap(p =>
+    const projectItems = phases.flatMap(p =>
       (p.items || []).map(item => ({
         ...item,
         projects: { title: p.title },
-        _entityContext: buildEntityContext({ item, phase: p }),
+        _entityContext: buildEntityContext({ item, project: p }),
       }))
     );
     const indexedAdditionalItems = additionalItems.map(item => ({
       ...item,
       _entityContext: buildEntityContext({ item }),
     }));
-    const allItems = [...phaseItems, ...indexedAdditionalItems].filter(item => {
+    const allItems = [...projectItems, ...indexedAdditionalItems].filter(item => {
       const matchTitle = item.title?.toLowerCase().includes(lowerQ);
       const matchContent = item.content?.toLowerCase().includes(lowerQ);
       const matchAssignee = item.assignees?.some(a => a.toLowerCase().includes(lowerQ));

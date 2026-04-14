@@ -64,12 +64,12 @@ function barColor(item) {
   return 'bg-gray-300 dark:bg-gray-500';
 }
 
-// ── PhaseRow: 전체 phase 그룹(헤더 + 아이템)을 감싸는 sortable 컴포넌트
+// ── ProjectRow: 전체 project 그룹(헤더 + 아이템)을 감싸는 sortable 컴포넌트
 // setNodeRef를 outermost div에 적용해야 drag-over detection이 정확히 동작함.
 // sticky left-0 엘리먼트에 setNodeRef를 두면 bounding rect가 스크롤에 따라 변해
 // dnd-kit의 drop 좌표 계산이 틀어짐.
-function PhaseRow({
-  phase, isReadOnly, collapsedProjects, toggleProjectCollapse,
+function ProjectRow({
+  project: phase, isReadOnly, collapsedProjects, toggleProjectCollapse,
   onOpenDetail, totalWidth, dayWidth, days, rangeStart,
   hideUndated, onTooltipShow, onTooltipMove, onTooltipHide,
 }) {
@@ -261,7 +261,7 @@ function ItemRow({ item, phaseId, isReadOnly, totalWidth, dayWidth, days, rangeS
 
 // ── 메인 컴포넌트 ───────────────────────────────────────────────────
 
-export default function TimelineView({ phases, sections, onUpdateItem, onOpenDetail, isReadOnly = false, showToast }) {
+export default function TimelineView({ projects = [], phases = projects, sections, onUpdateItem, onOpenDetail, isReadOnly = false, showToast }) {
   const [zoom, setZoom] = useState('month');
   const [dayWidth, setDayWidth] = useState(ZOOM_PRESETS['month'].dayWidth);
   const containerRef = useRef(null);
@@ -391,8 +391,8 @@ export default function TimelineView({ phases, sections, onUpdateItem, onOpenDet
         const sectionPhases = sortedPhases.filter(p => p.section_id === activeSectionId);
         const overIndex = sectionPhases.findIndex(p => `project-${p.id}` === over.id);
         if (overIndex === -1) return;
-        const phaseId = active.id.replace('project-', '');
-        await kanbanAPI.movePhaseTimeline(phaseId, activeSectionId, overIndex);
+      const projectId = active.id.replace('project-', '');
+      await kanbanAPI.moveProjectTimeline(projectId, activeSectionId, overIndex);
         showToast?.('프로젝트 순서를 변경했습니다', 'success');
       } else if (activeType === 'item') {
         const activeProjectId = active.data.current.projectId;

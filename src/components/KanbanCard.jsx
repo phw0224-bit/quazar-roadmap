@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Calendar, GripVertical, MoreHorizontal } from 'lucide-react';
-import { STATUS_MAP } from '../lib/constants';
+import { STATUS_MAP, PRIORITY_MAP } from '../lib/constants';
 
 function formatDateRange(startDate, endDate) {
   if (startDate && endDate) return `${startDate} ~ ${endDate}`;
@@ -45,11 +45,13 @@ export default function KanbanCard({
   const assigneeText = formatAssignees(item.assignees || []);
   const statusLabel = item.status && item.status !== 'none' ? STATUS_MAP[item.status]?.label : '';
   const isCompleted = item.status === 'done';
+  const priorityBorderColor = PRIORITY_MAP[item.priority || 0]?.borderColor;
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition: isDraggingAny ? 'none' : transition,
     zIndex: isDraggingAny ? 100 : 1,
+    ...(priorityBorderColor ? { borderLeftColor: priorityBorderColor, borderLeftWidth: '3px' } : {}),
     ...(isDragging ? {
       transform: `${CSS.Transform.toString(transform)} scale(1.03)`,
       cursor: 'grabbing',
@@ -83,7 +85,7 @@ export default function KanbanCard({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group relative w-full rounded-xl border px-4 py-3 text-left transition-all duration-200 ease-notion
+      className={`group relative w-full ${priorityBorderColor ? 'rounded-r-xl' : 'rounded-xl'} border px-4 py-3 text-left transition-all duration-200 ease-notion
       ${isMoveMode && !isReadOnly ? 'cursor-default' : ''}
       ${isCompleted
         ? 'border-emerald-200 bg-emerald-50/35 dark:border-emerald-900/40 dark:bg-emerald-950/10'

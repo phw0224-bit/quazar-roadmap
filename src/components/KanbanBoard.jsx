@@ -2,7 +2,7 @@
  * @fileoverview 칸반 앱 최상위 오케스트레이터. board/timeline/people 뷰 전환 + DnD 컨텍스트.
  *
  * 담당:
- * - @dnd-kit DnD 컨텍스트 (sections, phases, items 세 레벨 드래그)
+ * - @dnd-kit DnD 컨텍스트 (sections, projects, items 세 레벨 드래그)
  * - Toast/Confirm/Prompt 전역 피드백 상태 관리 + 콜백 전달
  * - ItemDetailPanel 열림/닫힘 + 리사이즈 (panelWidth 20~80%)
  * - URL 상태 ↔ 필터/뷰 동기화
@@ -70,10 +70,12 @@ function ViewLoadingFallback({ label, fullHeight = true }) {
 export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   const { toggleSidebar } = useLayoutState();
   const {
-    phases, sections, loading, addPhase, addItem, updateItem, deleteItem,
-    moveItem, updatePhase, deletePhase, completePhase, movePhase, addComment, updateComment, deleteComment,
+    projects, sections, loading, addProject, addItem, updateItem, deleteItem,
+    moveItem, updateProject, deleteProject, completeProject, moveProject, addComment, updateComment, deleteComment,
     addSection, updateSection, deleteSection, moveSection,
     addChildPage,
+    moveSidebarItem,
+    moveSidebarProject,
     // 신규: 일반 문서
     generalDocs, addGeneralDocument, updateGeneralDocument, deleteGeneralDocument, setBoardType,
   } = useKanbanData();
@@ -236,20 +238,20 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  // 필터/정렬 적용된 phases 파생
-  const filteredPhases = useMemo(() => {
-    return phases.map(phase => ({
-      ...phase,
+  // 필터/정렬 적용된 projects 파생
+  const filteredProjects = useMemo(() => {
+    return projects.map(project => ({
+      ...project,
       items: applyFilterSort(
-        (phase.items || []).filter(item => !item.page_type || item.page_type === 'task'),
+        (project.items || []).filter(item => !item.page_type || item.page_type === 'task'),
         filters, sort
       ),
     }));
-  }, [phases, filters, sort]);
+  }, [projects, filters, sort]);
 
-  const phaseItems = useMemo(
-    () => phases.flatMap(phase => phase.items || []),
-    [phases],
+  const projectItems = useMemo(
+    () => projects.flatMap(project => project.items || []),
+    [projects],
   );
 
   const searchableAdditionalItems = useMemo(() => {
@@ -261,9 +263,9 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   }, [generalDocs, personalMemos, user]);
 
   const findContainer = (id) => {
-    if (phases.find((p) => p.id === id)) return id;
-    const phase = phases.find((p) => p.items.some((i) => i.id === id));
-    return phase ? phase.id : null;
+    if (projects.find((p) => p.id === id)) return id;
+    const project = projects.find((p) => p.items.some((i) => i.id === id));
+    return project ? project.id : null;
   };
 
   const handleDragStart = (event) => {
@@ -272,8 +274,8 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   };
 
   /**
-   * @description DnD 드롭 완료 시 타입(section/phase/item) 판별 후 해당 이동 메서드 호출.
-   * phase 이동 시 다른 section 위에 드롭하면 updatePhase로 section_id도 변경.
+   * @description DnD 드롭 완료 시 타입(section/project/item) 판별 후 해당 이동 메서드 호출.
+   * project 이동 시 다른 section 위에 드롭하면 updateProject로 section_id도 변경.
    * @param {Object} event - @dnd-kit DragEndEvent { active, over }
    */
   const handleDragEnd = async (event) => {
@@ -300,32 +302,30 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
       return;
     }
 
-    // Phase 이동 (가로 이동)
-    if (active.data.current?.type === 'Phase') {
+    // Project 이동 (가로 이동)
+    if (active.data.current?.type === 'Project') {
       const overIsSection = sections.some(s => s.id === overId);
 
       if (overIsSection) {
         // 섹션 헤더/바디 위에 직접 드롭 → section_id 변경
-        const activePhase = phases.find(p => p.id === activeId);
-        if (activePhase?.section_id !== overId) {
-          await updatePhase(activeId, { section_id: overId });
+        const activeProject = projects.find(p => p.id === activeId);
+        if (activeProject?.section_id !== overId) {
+          await updateProject(activeId, { section_id: overId });
         }
         return;
       }
 
       if (activeId !== overId) {
-        const overPhase = phases.find(p => p.id === overId);
-        const activePhase = phases.find(p => p.id === activeId);
+        const overProject = projects.find(p => p.id === overId);
+        const activeProject = projects.find(p => p.id === activeId);
 
-        if (overPhase && overPhase.section_id !== activePhase?.section_id) {
-          // 섹션이 다른 Phase 위에 드롭 → section_id만 변경 (순서 변경 없음)
-          await updatePhase(activeId, { section_id: overPhase.section_id });
+        if (overProject && overProject.section_id !== activeProject?.section_id) {
+          await updateProject(activeId, { section_id: overProject.section_id });
           return;
         }
 
-        // 같은 섹션/standalone 내 순서 변경
-        const newIndex = phases.findIndex((p) => p.id === overId);
-        if (newIndex !== -1) await movePhase(activeId, newIndex);
+        const newIndex = projects.findIndex((p) => p.id === overId);
+        if (newIndex !== -1) await moveProject(activeId, newIndex);
       }
       return;
     }
@@ -337,8 +337,8 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
     if (!activeContainer || !overContainer) return;
 
     if (activeId !== overId || activeContainer !== overContainer) {
-      const overPhase = phases.find(p => p.id === overContainer);
-      const overItems = overPhase.items;
+      const overProject = projects.find(p => p.id === overContainer);
+      const overItems = overProject.items;
       const overIndex = overItems.findIndex(i => i.id === overId);
       
       let newIndex;
@@ -408,31 +408,31 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
     );
   }
   
-  const activeItem = phaseItems.find(i => i.id === activeId);
-  const activePhase = phases.find(p => p.id === activeId);
+  const activeItem = projectItems.find(i => i.id === activeId);
+  const activeProject = projects.find(p => p.id === activeId);
   const activeSection = sections.find(s => s.id === activeId);
 
-  const getProjectDetailItem = (projectPhase) => ({
-    id: projectPhase.id,
-    title: projectPhase.title,
-    description: projectPhase.description || '',
+  const getProjectDetailItem = (project) => ({
+    id: project.id,
+    title: project.title,
+    description: project.description || '',
     status: 'none',
     page_type: 'project',
-    assignees: projectPhase.assignees || [],
+    assignees: project.assignees || [],
     teams: [],
     tags: [],
     related_items: [],
     creator_profile: null,
   });
 
-  let detailItem = detailItemId ? phaseItems.find(i => i.id === detailItemId) : null;
-  let detailPhase = detailItem ? phases.find(p => p.items.some(i => i.id === detailItemId)) : null;
+  let detailItem = detailItemId ? projectItems.find(i => i.id === detailItemId) : null;
+  let detailProject = detailItem ? projects.find(p => p.items.some(i => i.id === detailItemId)) : null;
 
   if (!detailItem && detailItemId) {
     const generalDoc = generalDocs.find(doc => doc.id === detailItemId);
     if (generalDoc) {
       detailItem = generalDoc;
-      detailPhase = {
+      detailProject = {
         id: 'general-docs',
         title: '일반 문서',
         board_type: generalDoc.board_type || 'main',
@@ -444,7 +444,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
     const personalMemo = personalMemos.find(memo => memo.id === detailItemId);
     if (personalMemo) {
       detailItem = personalMemo;
-      detailPhase = {
+      detailProject = {
         id: 'personal-memo',
         title: '개인 메모장',
         board_type: 'personal',
@@ -453,15 +453,15 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   }
 
   if (!detailItem && detailItemId) {
-    const projectPhase = phases.find(p => p.id === detailItemId);
-    if (projectPhase) {
-      detailItem = getProjectDetailItem(projectPhase);
-      detailPhase = projectPhase;
+    const project = projects.find(p => p.id === detailItemId);
+    if (project) {
+      detailItem = getProjectDetailItem(project);
+      detailProject = project;
     }
   }
 
   const detailEntityContext = detailItem
-    ? buildEntityContext({ item: detailItem, phase: detailPhase })
+    ? buildEntityContext({ item: detailItem, project: detailProject })
     : null;
 
   const handleOpenDetail = (entityOrId) => {
@@ -470,9 +470,9 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
     setUrlState({ itemId, fullscreen: true });
   };
 
-  const handleUpdateItem = async (phaseId, itemId, updates) => {
+  const handleUpdateItem = async (projectId, itemId, updates) => {
     if (detailEntityContext?.type === ENTITY_TYPES.PROJECT) {
-      await updatePhase(itemId, updates);
+      await updateProject(itemId, updates);
       return;
     }
     if (detailEntityContext?.type === ENTITY_TYPES.MEMO) {
@@ -483,10 +483,10 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
       await updateGeneralDocument(itemId, updates);
       return;
     }
-    await updateItem(phaseId, itemId, updates);
+    await updateItem(projectId, itemId, updates);
   };
 
-  const handleDeleteItem = async (phaseId, itemId) => {
+  const handleDeleteItem = async (projectId, itemId) => {
     if (detailEntityContext?.type === ENTITY_TYPES.MEMO) {
       await deletePersonalMemo(itemId);
       return;
@@ -495,12 +495,12 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
       await deleteGeneralDocument(itemId);
       return;
     }
-    await deleteItem(phaseId, itemId);
+    await deleteItem(projectId, itemId);
   };
 
-  const handleUpdatePhase = async (phaseId, updates) => {
+  const handleUpdateProject = async (projectId, updates) => {
     try {
-      await updatePhase(phaseId, updates);
+      await updateProject(projectId, updates);
     } catch (err) {
       showToast('프로젝트 업데이트 실패: ' + err.message, 'error');
     }
@@ -571,7 +571,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
     <PresenceContext.Provider value={{ onlineUsers, updateEditing, currentUserId: user?.id ?? null }}>
     <AppLayout
       sections={sections}
-      phases={phases}
+      projects={projects}
       activeView={activeView}
       activeItemId={detailItemId}
       onNavigate={(view) => setUrlState({ view, itemId: null })}
@@ -587,6 +587,10 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
       onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
       onLogout={logout}
       onSetBoardType={setBoardType}
+      generalDocs={generalDocs}
+      onShowToast={showToast}
+      onMoveSidebarItem={moveSidebarItem}
+      onMoveSidebarProject={moveSidebarProject}
     >
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="w-full h-full bg-white dark:bg-bg-base font-sans flex overflow-hidden transition-colors duration-200">
@@ -705,7 +709,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
           {activeView === 'timeline' ? (
             <Suspense fallback={<ViewLoadingFallback label="타임라인 준비 중..." />}>
               <TimelineView
-                phases={filteredPhases.filter(p => (p.board_type || 'main') !== 'main')}
+                projects={filteredProjects.filter(p => (p.board_type || 'main') !== 'main')}
                 sections={sections.filter(s => (s.board_type || 'main') !== 'main')}
                 onUpdateItem={updateItem}
                 onOpenDetail={handleOpenDetail}
@@ -732,8 +736,8 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
               if (userDept === b) return 1;
               return 0;
             }).map(boardName => {
-              const boardPhases = filteredPhases.filter(p => (p.board_type || 'main') === boardName.toLowerCase() && !p.is_completed);
-              const completedPhases = filteredPhases.filter(p => (p.board_type || 'main') === boardName.toLowerCase() && p.is_completed);
+              const boardProjects = filteredProjects.filter(p => (p.board_type || 'main') === boardName.toLowerCase() && !p.is_completed);
+              const completedProjects = filteredProjects.filter(p => (p.board_type || 'main') === boardName.toLowerCase() && p.is_completed);
               const boardDisplayName = boardName === 'main' ? '전체 프로젝트 보드' : `${boardName} 보드`;
               const boardIcon = boardName === 'main' ? '🌐' : boardName === '개발팀' ? '⚙️' : '📂';
               const isMain = boardName === 'main';
@@ -756,11 +760,11 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                         <h2 className="text-2xl font-black text-gray-900 dark:text-text-primary tracking-tight leading-tight">{boardDisplayName}</h2>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="px-2.5 py-0.5 bg-gray-100 dark:bg-bg-elevated text-gray-500 dark:text-text-tertiary rounded-md text-[13px] font-bold tabular-nums border border-gray-100 dark:border-border-subtle shadow-sm uppercase tracking-wider">
-                            {boardPhases.length} 프로젝트
+                            {boardProjects.length} 프로젝트
                           </span>
                           <span className="h-1 w-1 rounded-full bg-gray-300 dark:bg-text-tertiary"></span>
                           <span className="text-[13px] font-bold text-gray-400 dark:text-text-tertiary uppercase tracking-widest">
-                            {boardPhases.reduce((acc, p) => acc + p.items.length, 0)} Items
+                            {boardProjects.reduce((acc, p) => acc + p.items.length, 0)} Items
                           </span>
                         </div>
                       </div>
@@ -781,7 +785,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                               '새 프로젝트의 이름을 입력하세요',
                               (title) => {
                                 if (title) {
-                                  addPhase(title, boardName.toLowerCase());
+                                  addProject(title, boardName.toLowerCase());
                                   showToast(`'${title}' 프로젝트가 생성되었습니다.`);
                                   setPrompt(null);
                                 }
@@ -817,16 +821,16 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                   </div>
 
                   {!isCollapsed && (() => {
-                    const standalonePhases = boardPhases.filter(p => !p.section_id);
+                    const standaloneProjects = boardProjects.filter(p => !p.section_id);
                     const boardSections = sections
                       .filter(s => s.board_type === boardName.toLowerCase())
                       .sort((a, b) => a.order_index - b.order_index);
                     const boardGeneralDocs = generalDocs.filter(doc => (doc.board_type || 'main') === boardName.toLowerCase());
-                    const isEmpty = boardPhases.length === 0 && boardSections.length === 0 && boardGeneralDocs.length === 0;
+                    const isEmpty = boardProjects.length === 0 && boardSections.length === 0 && boardGeneralDocs.length === 0;
                     const projectColumnProps = {
                       onAddItem: addItem, onUpdateItem: updateItem, onDeleteItem: deleteItem,
-                      onUpdatePhase: updatePhase, onDeletePhase: deletePhase,
-                      onCompletePhase: completePhase,
+                      onUpdateProject: updateProject, onDeleteProject: deleteProject,
+                      onCompleteProject: completeProject,
                       onOpenDetail: handleOpenDetail,
                       onShowConfirm: showConfirm, onShowToast: showToast,
                       currentUserId: user?.id || null,
@@ -842,7 +846,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                               <p className="text-gray-400 dark:text-text-tertiary font-black text-xl mb-6 tracking-tight">이 보드에는 아직 프로젝트가 없습니다.</p>
                               {user && (
                                 <button
-                                  onClick={() => showPrompt(`${boardDisplayName} 첫 프로젝트 만들기`, '첫 번째 프로젝트의 이름을 입력하세요', (title) => { if (title) { addPhase(title, boardName.toLowerCase()); showToast(`'${title}' 프로젝트가 생성되었습니다.`); setPrompt(null); } })}
+                                  onClick={() => showPrompt(`${boardDisplayName} 첫 프로젝트 만들기`, '첫 번째 프로젝트의 이름을 입력하세요', (title) => { if (title) { addProject(title, boardName.toLowerCase()); showToast(`'${title}' 프로젝트가 생성되었습니다.`); setPrompt(null); } })}
                                   className="text-sm font-black text-blue-500 bg-white dark:bg-bg-elevated px-8 py-3.5 rounded-2xl shadow-lg border border-blue-100 dark:border-blue-900/30 hover:bg-blue-50 dark:hover:bg-bg-hover transition-all flex items-center gap-2 hover:scale-105 active:scale-95 cursor-pointer uppercase tracking-widest"
                                 >
                                   + 첫 번째 프로젝트 추가하기
@@ -858,7 +862,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                                   <BoardSection
                                     key={section.id}
                                     section={section}
-                                    phases={boardPhases.filter(p => p.section_id === section.id)}
+                                    projects={boardProjects.filter(p => p.section_id === section.id)}
                                     isCollapsed={!expandedSections.has(section.id)}
                                     onToggleCollapse={() => setExpandedSections(prev => {
                                       const next = new Set(prev);
@@ -867,7 +871,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                                     })}
                                     onUpdateSection={updateSection}
                                     onDeleteSection={deleteSection}
-                                    onAddPhase={addPhase}
+                                    onAddProject={addProject}
                                     onShowPrompt={showPrompt}
                                     {...projectColumnProps}
                                   />
@@ -1016,17 +1020,17 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                               </div>
                             )}
 
-                            {standalonePhases.length > 0 && (
+                            {standaloneProjects.length > 0 && (
                               <div className="flex gap-12 overflow-x-auto py-3 pb-6 custom-scrollbar min-h-[350px] px-2">
-                                <SortableContext items={standalonePhases.map(p => p.id)} strategy={horizontalListSortingStrategy}>
-                                  {standalonePhases.map((phase, idx) => (
-                                    <ProjectColumn key={phase.id} phase={phase} phaseIndex={idx + 1} {...projectColumnProps} />
+                                <SortableContext items={standaloneProjects.map(p => p.id)} strategy={horizontalListSortingStrategy}>
+                                  {standaloneProjects.map((project, idx) => (
+                                    <ProjectColumn key={project.id} project={project} projectIndex={idx + 1} {...projectColumnProps} />
                                   ))}
                                 </SortableContext>
                               </div>
                             )}
 
-                            {completedPhases.length > 0 && (
+                            {completedProjects.length > 0 && (
                               <div className="mt-2">
                                 <button
                                   className="flex items-center gap-2 px-2 py-2 text-sm font-bold text-gray-500 dark:text-text-secondary hover:text-gray-900 dark:hover:text-text-primary transition-colors cursor-pointer"
@@ -1042,34 +1046,34 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                                   />
                                   <span>완료된 프로젝트</span>
                                   <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full text-xs font-bold tabular-nums">
-                                    {completedPhases.length}
+                                    {completedProjects.length}
                                   </span>
                                 </button>
 
                                 {expandedCompletedBoards.has(boardName) && (
                                   <div className="flex flex-wrap gap-3 px-2 mt-3">
-                                    {completedPhases.map(phase => (
-                                      <div key={phase.id} className="flex flex-col gap-2">
+                                    {completedProjects.map(project => (
+                                      <div key={project.id} className="flex flex-col gap-2">
                                         <button
                                           className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-bg-elevated border border-gray-200 dark:border-border-subtle rounded-xl hover:border-green-300 dark:hover:border-green-700 transition-colors cursor-pointer"
                                           onClick={() => setExpandedCompletedPhases(prev => {
                                             const next = new Set(prev);
-                                            next.has(phase.id) ? next.delete(phase.id) : next.add(phase.id);
+                                            next.has(project.id) ? next.delete(project.id) : next.add(project.id);
                                             return next;
                                           })}
                                         >
                                           <CheckCircle2 size={14} className="text-green-500 shrink-0" />
-                                          <span className="text-sm font-bold text-gray-600 dark:text-text-secondary">{phase.title}</span>
-                                          <span className="text-xs text-gray-400 dark:text-text-tertiary tabular-nums">{phase.items.length}개</span>
+                                          <span className="text-sm font-bold text-gray-600 dark:text-text-secondary">{project.title}</span>
+                                          <span className="text-xs text-gray-400 dark:text-text-tertiary tabular-nums">{project.items.length}개</span>
                                           <ChevronDown
                                             size={12}
-                                            className={`text-gray-400 dark:text-text-tertiary transition-transform duration-200 ${expandedCompletedPhases.has(phase.id) ? 'rotate-180' : ''}`}
+                                            className={`text-gray-400 dark:text-text-tertiary transition-transform duration-200 ${expandedCompletedPhases.has(project.id) ? 'rotate-180' : ''}`}
                                           />
                                         </button>
-                                        {expandedCompletedPhases.has(phase.id) && (
+                                        {expandedCompletedPhases.has(project.id) && (
                                           <ProjectColumn
-                                            phase={phase}
-                                            phaseIndex={-1}
+                                            project={project}
+                                            projectIndex={-1}
                                             {...projectColumnProps}
                                             isCompletedView={true}
                                           />
@@ -1113,14 +1117,14 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                 loading={peopleLoading}
                 error={peopleError}
                 onOpenItem={handleOpenDetail}
-                projectAssignees={phases.reduce((acc, p) => { acc[p.title] = p.assignees || []; return acc; }, {})}
+                projectAssignees={projects.reduce((acc, p) => { acc[p.title] = p.assignees || []; return acc; }, {})}
               />
             </Suspense>
           )}
         </div>
 
         {/* Side Detail Panel (Fixed on the right when active) */}
-        {detailItemId && detailItem && detailPhase && (
+        {detailItemId && detailItem && detailProject && (
           <div 
             className={`fixed top-0 right-0 h-full bg-white dark:bg-bg-base z-[100] overflow-hidden flex ${
               isResizing ? '' : 'transition-all duration-500 ease-notion'
@@ -1145,17 +1149,17 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
               <Suspense fallback={<ViewLoadingFallback label="상세 정보를 불러오는 중..." fullHeight={false} />}>
                 <ItemDetailPanel
                   item={detailItem}
-                  phase={detailPhase}
+                  project={detailProject}
                   entityContext={detailEntityContext}
-                  allItems={[...phaseItems, ...generalDocs]}
+                  allItems={[...projectItems, ...generalDocs]}
                   onClose={closeDetailPanel}
                   isFullscreen={isDetailFullscreen}
                   onToggleFullscreen={() => setUrlState({ fullscreen: !isDetailFullscreen })}
                   onBreadcrumbNavigate={handleBreadcrumbNavigate}
                   onUpdateItem={handleUpdateItem}
-                  onUpdatePhase={handleUpdatePhase}
+                  onUpdateProject={handleUpdateProject}
                   onDeleteItem={handleDeleteItem}
-                  onDeletePhase={deletePhase}
+                  onDeleteProject={deleteProject}
                   onAddComment={addComment}
                   onUpdateComment={updateComment}
                   onDeleteComment={deleteComment}
@@ -1182,8 +1186,8 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
             </div>
           ) : activeItem ? (
             <KanbanCard item={activeItem} isDragging />
-          ) : activePhase ? (
-            <ProjectColumn phase={activePhase} phaseIndex={phases.findIndex(p => p.id === activePhase.id) + 1} isDragging />
+          ) : activeProject ? (
+            <ProjectColumn project={activeProject} projectIndex={projects.findIndex(p => p.id === activeProject.id) + 1} isDragging />
           ) : null}
         </DragOverlay>
 
@@ -1191,7 +1195,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
         {showSearch && (
           <Suspense fallback={<ViewLoadingFallback label="검색 창 준비 중..." />}>
             <SearchModal
-              phases={phases}
+              projects={projects}
               additionalItems={searchableAdditionalItems}
               onOpenDetail={handleOpenDetail}
               onClose={() => setShowSearch(false)}
