@@ -54,19 +54,23 @@ export default function ItemDescriptionSection({
   const [isEditorFocused, setIsEditorFocused] = useState(false);
   const linkCallbackRef = useRef(null);
   const descriptionRef = useRef(null);
+  const itemId = item?.id ?? null;
 
   const isMemo = entityContext?.type === ENTITY_TYPES.MEMO;
 
   useEffect(() => {
-    setDescription(normalizeDescriptionSource(item?.description || ''));
     setDescriptionMode(getInitialDescriptionMode({
       isReadOnly,
-      description: item?.description || '',
+      description: '',
     }));
-    setAiSummary(item?.ai_summary || null);
     setSummaryError(null);
     setIsEditorFocused(false);
-  }, [isReadOnly, item]);
+  }, [isReadOnly, itemId]);
+
+  useEffect(() => {
+    setDescription(normalizeDescriptionSource(item?.description || ''));
+    setAiSummary(item?.ai_summary || null);
+  }, [item?.description, item?.ai_summary, itemId]);
 
   useEffect(() => {
     if (!descriptionRef.current) return;
@@ -343,7 +347,6 @@ export default function ItemDescriptionSection({
               containerRef={descriptionRef}
               onOpenLink={handleOpenLink}
               onToggleTaskItem={handleToggleTaskItem}
-              allItems={allItems}
             />
           )}
         </div>

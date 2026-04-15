@@ -11,6 +11,7 @@
  */
 import { supabase } from '../lib/supabase';
 import { buildProjectMovePlan } from './projectMove';
+import { syncGitHubIssueStatus } from './githubAPI';
 import {
   DEFAULT_PROFILE_CUSTOMIZATION,
   REACTION_TYPES,
@@ -426,7 +427,16 @@ const supabaseAPI = {
       .select();
     
     if (error) throw error;
-    return data[0];
+    const updatedItem = data[0];
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'status') && updatedItem?.status) {
+      try {
+        await syncGitHubIssueStatus(itemId, updatedItem.status);
+      } catch (syncError) {
+        console.warn('[updateItem] GitHub issue status sync failed:', syncError.message);
+      }
+    }
+    return updatedItem;
   },
 
   deleteItem: async (projectId, itemId, boardType = 'main') => {
@@ -842,7 +852,7 @@ const supabaseAPI = {
  * @param {Object} inheritedProps - { teams: string[], tags: string[] } 상속받을 속성
  * @returns {Promise<Object>} 생성된 아이템 객체
  */
-export async function createChildPage(projectId, parentItemId, title, inheritedProps = {}, boardType = 'main') {
+export async function createChildPage(projectId, parentItemId, title, inheritedProps = {}, boardType = 'main', createdBy = null) {
   const { data: existing } = await supabase
     .from(itemsTable(boardType))
     .select('order_index')
@@ -865,6 +875,7 @@ export async function createChildPage(projectId, parentItemId, title, inheritedP
       tags: inheritedProps.tags || [],
       related_items: [],
       order_index: nextOrder,
+      created_by: createdBy,
     }])
     .select();
 
@@ -1071,7 +1082,7 @@ export async function deletePersonalMemo(memoId, userId) {
  * @param {string} parentFolderId - 부모 폴더 ID (선택사항)
  * @returns {Promise<Object>} 생성된 일반 문서/폴더 아이템
  */
-export async function createGeneralDocument(boardType, title, type = 'document', parentFolderId = null) {
+export async function createGeneralDocument(boardType, title, type = 'document', parentFolderId = null, createdBy = null) {
   const pageType = type === 'folder' ? 'folder' : 'page';
 
   const { data, error } = await supabase
@@ -1085,6 +1096,7 @@ export async function createGeneralDocument(boardType, title, type = 'document',
         status: 'none',
         order_index: 0,
         parent_item_id: parentFolderId,  // ← 부모 폴더 지정 (선택사항)
+        created_by: createdBy,
       },
     ])
     .select('*')

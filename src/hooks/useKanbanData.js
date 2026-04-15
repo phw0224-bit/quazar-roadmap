@@ -438,7 +438,7 @@ export const useKanbanData = () => {
    * @param {string} parentItemId - 부모 아이템 ID (related_items 양방향 연결)
    * @param {string} title - 페이지 제목
    */
-  const addChildPage = async (projectId, parentItemId, title) => {
+  const addChildPage = async (projectId, parentItemId, title, createdBy = null) => {
     let inheritedTeams = [];
     let inheritedTags = [];
     const parentProject = state.projects.find(p => p.id === projectId);
@@ -454,7 +454,7 @@ export const useKanbanData = () => {
     const newPage = await createChildPage(projectId, parentItemId, title, {
       teams: inheritedTeams,
       tags: inheritedTags,
-    }, boardType);
+    }, boardType, createdBy);
     
     // 1. 하위 페이지(자기 자신)의 related_items에 부모 페이지를 추가 (상위 페이지 연결)
     if (parentItemId) {
@@ -504,8 +504,8 @@ export const useKanbanData = () => {
   };
 
   // 신규: 일반 문서 관련 함수들
-  const addGeneralDocument = async (boardType, title, type = 'document', parentFolderId = null) => {
-    const newDoc = await API.createGeneralDocument(boardType, title, type, parentFolderId);
+  const addGeneralDocument = async (boardType, title, type = 'document', parentFolderId = null, createdBy = null) => {
+    const newDoc = await API.createGeneralDocument(boardType, title, type, parentFolderId, createdBy);
     dispatch({ type: 'ADD_GENERAL_DOC', payload: newDoc });
   };
 

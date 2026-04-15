@@ -510,6 +510,22 @@ input:focus, textarea:focus {
   background: rgba(59, 130, 246, 0.15);
 }
 
+.markdown-preview [data-inline-embed] {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+  color: #334155;
+  font-weight: 700;
+  padding: 0.1rem 0.5rem;
+}
+
+.dark .markdown-preview [data-inline-embed] {
+  background: rgba(148, 163, 184, 0.18);
+  color: #cbd5e1;
+}
+
 .cm-editor {
   height: 100%;
   font-size: 0.95rem;
@@ -527,7 +543,7 @@ input:focus, textarea:focus {
 
 .cm-live-preview-shell .cm-scroller {
   font-family: var(--font-sans);
-  line-height: 1.55;
+  line-height: 1.65;
   padding: 0;
 }
 
@@ -541,7 +557,7 @@ input:focus, textarea:focus {
 
 .cm-live-preview-shell .cm-line {
   padding: 0.08rem 0;
-  min-height: 1.55em;
+  min-height: 1.65em;
 }
 
 .cm-live-preview-shell .cm-activeLine,
@@ -629,6 +645,10 @@ input:focus, textarea:focus {
 }
 
 .cm-live-task-line {
+  color: var(--color-text-primary);
+}
+
+.cm-live-ordered-line {
   color: var(--color-text-primary);
 }
 

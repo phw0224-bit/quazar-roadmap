@@ -10,6 +10,14 @@ import markedFootnote from 'marked-footnote';
 import katex from 'katex';
 
 marked.use(markedFootnote());
+marked.use({
+  gfm: true,
+  breaks: true,
+});
+
+function parseMarkdown(source) {
+  return marked.parse(source);
+}
 
 /**
  * @description $$...$$ 블록 수식과 $...$ 인라인 수식을 KaTeX HTML로 변환한다.
@@ -61,6 +69,7 @@ const CALLOUT_TYPES = {
 
 const TOGGLE_REGEX = /^>\s*\[!(toggle(?:-[a-z0-9]+)?)\]\s*(.*)$/i;
 const CALLOUT_REGEX = /^>\s*\[!([a-z][a-z0-9-]*)\]\s*(.*)$/i;
+const INLINE_EMBED_REGEX = /!\[\[([^|\]]+)(?:\|([^\]]+))?\]\]/g;
 
 export function buildPageWikiLink(item) {
   const title = item?.title || item?.content || '제목 없음';
@@ -82,7 +91,7 @@ export function renderMarkdownPreviewHTML(markdown) {
       return;
     }
     // 수식 → 위키링크 → marked 순서로 처리
-    chunks.push(marked.parse(preprocessWikiLinks(preprocessMath(source))));
+    chunks.push(parseMarkdown(preprocessWikiLinks(preprocessMath(source))));
     buffer = [];
   };
 
@@ -103,7 +112,7 @@ export function renderMarkdownPreviewHTML(markdown) {
       }
       const bodyMarkdown = preprocessWikiLinks(preprocessMath(bodyLines.join('\n').trim()));
       const variant = marker === 'toggle' ? 'default' : marker.replace(/^toggle-/, '');
-      const bodyHTML = bodyMarkdown ? marked.parse(bodyMarkdown) : '<p></p>';
+      const bodyHTML = bodyMarkdown ? parseMarkdown(bodyMarkdown) : '<p></p>';
       chunks.push(
         `<details data-toggle-preview="" data-variant="${variant}" open><summary>${title}</summary>${bodyHTML}</details>`,
       );
@@ -125,7 +134,7 @@ export function renderMarkdownPreviewHTML(markdown) {
           index += 1;
         }
         const bodyMarkdown = preprocessWikiLinks(preprocessMath(bodyLines.join('\n').trim()));
-        const bodyHTML = bodyMarkdown ? marked.parse(bodyMarkdown) : '';
+        const bodyHTML = bodyMarkdown ? parseMarkdown(bodyMarkdown) : '';
         chunks.push(renderCalloutHTML(typeKey, calloutDef, titleText, bodyHTML));
         continue;
       }
@@ -158,7 +167,10 @@ export function toggleMarkdownTaskItem(markdown, targetIndex, checked) {
 }
 
 function preprocessWikiLinks(markdown) {
-  return markdown.replace(/\[\[([^|\]]+)(?:\|([^\]]+))?\]\]/g, (_match, left, right) => {
+  return markdown.replace(INLINE_EMBED_REGEX, (_match, left) => {
+    const title = escapeHTML(left.trim() || '제목 없음');
+    return `<span class="md-inline-embed" data-inline-embed="">📄 ${title}</span>`;
+  }).replace(/\[\[([^|\]]+)(?:\|([^\]]+))?\]\]/g, (_match, left, right) => {
     const hasRight = typeof right === 'string';
     const title = escapeHTML(hasRight ? left : left);
     const target = escapeHTML(hasRight ? right : left);

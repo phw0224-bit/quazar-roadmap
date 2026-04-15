@@ -202,6 +202,7 @@ test('live preview replaces ordered list prefixes on inactive lines', () => {
   const plan = getMarkdownLivePreviewPlan('1. 첫번째', -1);
 
   assert.ok(plan.replacements.some((item) => item.className === 'cm-live-ordered-prefix'));
+  assert.ok(plan.lineClasses.some((item) => item.className === 'cm-live-ordered-line'));
 });
 
 test('live preview renders inactive mermaid blocks as widgets', () => {
@@ -296,4 +297,3 @@ test('live preview renders second code block as widget when cursor is in first c
   assert.equal(plan.blockWidgets[0].className, 'cm-live-codeblock-widget');
   assert.match(plan.blockWidgets[0].html, /print/);
 });
-

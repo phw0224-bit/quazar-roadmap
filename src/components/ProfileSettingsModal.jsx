@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Github } from 'lucide-react';
 import ProfileAvatar from './ProfileAvatar';
 import {
   AVATAR_STYLE_OPTIONS,
@@ -12,9 +13,13 @@ export default function ProfileSettingsModal({
   isOpen,
   profileName,
   initialValue,
+  gitHubStatus,
+  gitHubLoading = false,
+  gitHubConnecting = false,
   saving = false,
   onClose,
   onSave,
+  onConnectGitHub,
 }) {
   const [draft, setDraft] = useState(() => normalizeProfileCustomization(initialValue || DEFAULT_PROFILE_CUSTOMIZATION));
 
@@ -41,6 +46,38 @@ export default function ProfileSettingsModal({
         </div>
 
         <div className="space-y-5">
+          <div className="rounded-2xl border border-gray-200 dark:border-border-subtle bg-gray-50 dark:bg-bg-base px-4 py-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white dark:bg-bg-elevated border border-gray-200 dark:border-border-subtle">
+                  <Github size={18} className="text-gray-700 dark:text-text-secondary" />
+                </div>
+                <div>
+                  <p className="text-sm font-black text-gray-900 dark:text-text-primary">GitHub 연결</p>
+                  <p className="text-xs text-gray-500 dark:text-text-tertiary">
+                    {gitHubLoading
+                      ? '연결 상태를 확인하는 중...'
+                      : gitHubStatus?.connected
+                        ? `Connected as @${gitHubStatus.githubLogin}`
+                        : '아이템에서 이슈를 만들려면 GitHub 계정을 연결해야 합니다.'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onConnectGitHub}
+                disabled={gitHubLoading || gitHubConnecting}
+                className="px-4 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-black hover:bg-black dark:hover:bg-gray-100 disabled:opacity-60 cursor-pointer"
+              >
+                {gitHubConnecting
+                  ? '연결 중...'
+                  : gitHubStatus?.connected
+                    ? 'GitHub 재연결'
+                    : 'GitHub 연결'}
+              </button>
+            </div>
+          </div>
+
           <div>
             <p className="text-sm font-black text-gray-700 dark:text-text-secondary mb-2">아바타 스타일</p>
             <div className="grid grid-cols-6 gap-2">

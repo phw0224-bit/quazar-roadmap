@@ -17,7 +17,7 @@ import {
   ChevronsRight, Maximize2, ChevronRight, Trash2,
   Clock, Users, Building2, Tag, Link2, Plus, X,
   MessageSquare, Search, ArrowUpRight, AlignCenter, AlignJustify,
-  Calendar, Flag, LayoutList, List
+  Calendar, Flag, LayoutList, List, Github, ExternalLink
 } from 'lucide-react';
 import CommentSection from './CommentSection';
 import ItemDescriptionSection from './ItemDescriptionSection';
@@ -27,6 +27,12 @@ import { TEAMS, STATUS_MAP, PRIORITY_MAP } from '../lib/constants';
 import { usePresenceContext } from '../hooks/usePresenceContext';
 import ItemViewers from './ItemViewers';
 import { ENTITY_TYPES, getEntityLabel } from '../lib/entityModel';
+import {
+  createGitHubIssue,
+  getGitHubRepos,
+  getGitHubStatus,
+  getItemGitHubIssues,
+} from '../api/githubAPI';
 
 function ItemDetailPanel({
   item, project = null, phase = project, entityContext = null, allItems = [], onClose, onUpdateItem, onUpdateProject, onUpdatePhase = onUpdateProject, isReadOnly,
@@ -36,6 +42,7 @@ function ItemDetailPanel({
   onShowConfirm, onShowToast,
   onAddChildPage,
   onShowPrompt,
+  onManageGitHubSettings,
   onDeleteItem,
   onDeleteProject, onDeletePhase = onDeleteProject,
 }) {
@@ -54,18 +61,95 @@ function ItemDetailPanel({
   const [showOutline, setShowOutline] = useState(false);
   const [showBacklinks, setShowBacklinks] = useState(false);
   const [currentEditorOffset, setCurrentEditorOffset] = useState(0);
+  const [githubStatus, setGitHubStatus] = useState({ connected: false });
+  const [githubRepos, setGitHubRepos] = useState([]);
+  const [githubIssues, setGitHubIssues] = useState([]);
+  const [selectedGitHubRepo, setSelectedGitHubRepo] = useState('');
+  const [isGitHubLoading, setIsGitHubLoading] = useState(false);
+  const [isGitHubSubmitting, setIsGitHubSubmitting] = useState(false);
+  const [gitHubError, setGitHubError] = useState('');
+  const [issuedTicket, setIssuedTicket] = useState({
+    key: item?.ticket_key || '',
+    number: item?.ticket_number ?? null,
+  });
   const editorViewRef = useRef(null);
+  const boardType = (phase?.board_type || 'main').toLowerCase();
+  const boardLabel = boardType === 'main' ? '전체 보드' : `${phase?.board_type || '팀'} 보드`;
+  const contextLabel = getEntityLabel(entityContext || {});
+  const isProjectLike = entityContext?.type === ENTITY_TYPES.PROJECT || item.page_type === 'project';
+  const isMemo = entityContext?.type === ENTITY_TYPES.MEMO;
+  const sectionLabel = entityContext?.collection === 'general'
+    ? `📚 ${contextLabel}`
+    : entityContext?.type === ENTITY_TYPES.MEMO
+      ? '📝 개인 메모장'
+      : `🧭 ${phase?.title}`;
+  const statusInfo = STATUS_MAP[item.status || 'none'];
+  const assigneeCount = (item.assignees || []).length;
+  const teamCount = (item.teams || []).length;
 
   useEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect */
     setAssigneeInput((item?.assignees || []).join(', '));
     setTitleInput(item?.title || item?.content || '');
     setIsEditingRelations(false);
     setRelationSearchQuery('');
     setIsEditingTitle(false);
     setIsEditingDescription(false);
-    /* eslint-enable react-hooks/set-state-in-effect */
+    setGitHubError('');
+    setIssuedTicket({
+      key: item?.ticket_key || '',
+      number: item?.ticket_number ?? null,
+    });
   }, [item]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadGitHubState = async () => {
+      if (!item?.id || isReadOnly || isMemo) {
+        if (active) {
+          setGitHubStatus({ connected: false });
+          setGitHubRepos([]);
+          setGitHubIssues([]);
+          setSelectedGitHubRepo('');
+        }
+        return;
+      }
+
+      setIsGitHubLoading(true);
+      setGitHubError('');
+      try {
+        const [status, issues] = await Promise.all([
+          getGitHubStatus(),
+          getItemGitHubIssues(item.id),
+        ]);
+
+        if (!active) return;
+
+        setGitHubStatus(status || { connected: false });
+        setGitHubIssues(issues || []);
+
+        if (status?.connected) {
+          const repos = await getGitHubRepos();
+          if (!active) return;
+          setGitHubRepos(repos);
+          setSelectedGitHubRepo((current) => current || repos[0]?.full_name || '');
+        } else {
+          setGitHubRepos([]);
+          setSelectedGitHubRepo('');
+        }
+      } catch (error) {
+        if (!active) return;
+        setGitHubError(error.message || 'GitHub 정보를 불러오지 못했습니다.');
+      } finally {
+        if (active) setIsGitHubLoading(false);
+      }
+    };
+
+    loadGitHubState();
+    return () => {
+      active = false;
+    };
+  }, [item?.id, isReadOnly, isMemo]);
 
 
   useEffect(() => {
@@ -169,19 +253,40 @@ function ItemDetailPanel({
     }
   };
 
-  const boardType = (phase?.board_type || 'main').toLowerCase();
-  const boardLabel = boardType === 'main' ? '전체 보드' : `${phase?.board_type || '팀'} 보드`;
-  const contextLabel = getEntityLabel(entityContext || {});
-  const isProjectLike = entityContext?.type === ENTITY_TYPES.PROJECT || item.page_type === 'project';
-  const isMemo = entityContext?.type === ENTITY_TYPES.MEMO;
-  const sectionLabel = entityContext?.collection === 'general'
-    ? `📚 ${contextLabel}`
-    : entityContext?.type === ENTITY_TYPES.MEMO
-      ? '📝 개인 메모장'
-      : `🧭 ${phase?.title}`;
-  const statusInfo = STATUS_MAP[item.status || 'none'];
-  const assigneeCount = (item.assignees || []).length;
-  const teamCount = (item.teams || []).length;
+  const handleCreateGitHubIssue = async () => {
+    if (!selectedGitHubRepo) {
+      onShowToast?.('레포를 먼저 선택해주세요.');
+      return;
+    }
+
+    setIsGitHubSubmitting(true);
+    setGitHubError('');
+    try {
+      const result = await createGitHubIssue(item.id, selectedGitHubRepo);
+      if (result?.ticket?.ticket_key) {
+        setIssuedTicket({
+          key: result.ticket.ticket_key,
+          number: result.ticket.ticket_number ?? null,
+        });
+      }
+      if (result?.issue) {
+        setGitHubIssues((current) => [result.issue, ...current]);
+      }
+      if (result?.itemStatus === 'in-progress' && (item?.status || 'none') === 'none') {
+        await onUpdateItem(phase.id, item.id, { status: 'in-progress' });
+      }
+      onShowToast?.(
+        result?.ticket?.ticket_key
+          ? `${result.ticket.ticket_key} 티켓으로 GitHub 이슈가 생성되었고 상태가 진행 중으로 변경되었습니다.`
+          : 'GitHub 이슈가 생성되었습니다.'
+      );
+    } catch (error) {
+      setGitHubError(error.message || 'GitHub 이슈 생성에 실패했습니다.');
+      onShowToast?.(error.message || 'GitHub 이슈 생성에 실패했습니다.');
+    } finally {
+      setIsGitHubSubmitting(false);
+    }
+  };
 
   // 브레드크럼 경로 계산 (Phase -> Parent1 -> Parent2 -> ... -> Current Item)
   const itemPath = useMemo(() => {
@@ -199,6 +304,8 @@ function ItemDetailPanel({
     }
     return path;
   }, [item, allItems]);
+  const ticketKey = issuedTicket.key || item?.ticket_key || '';
+  const hasExistingGitHubIssue = githubIssues.length > 0;
 
   if (!item) return null;
 
@@ -662,6 +769,123 @@ function ItemDetailPanel({
                     <option key={val} value={val}>{icon ? `${icon} ${label}` : label}</option>
                   ))}
                 </select>
+              </div>
+            </div>
+
+            <div className="flex items-start min-h-[48px] group">
+              <div className="w-48 flex items-center gap-3 text-gray-400 dark:text-text-tertiary shrink-0 pt-2.5">
+                <Github size={18} strokeWidth={2.5} />
+                <span className="text-[13px] font-black uppercase tracking-widest">GitHub</span>
+              </div>
+              <div className="flex-1 px-3 py-3 rounded-xl bg-white dark:bg-bg-hover border border-gray-100 dark:border-border-subtle flex flex-col gap-3">
+                {isGitHubLoading ? (
+                  <span className="text-[13px] font-bold text-gray-400 dark:text-text-tertiary">GitHub 정보를 불러오는 중...</span>
+                ) : (
+                  <>
+                    {githubStatus?.connected ? (
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[13px] font-bold text-gray-700 dark:text-text-secondary">
+                              Connected as @{githubStatus.githubLogin}
+                            </span>
+                            {ticketKey && (
+                              <span className="px-2.5 py-1 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[11px] font-black uppercase tracking-widest">
+                                {ticketKey}
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            onClick={onManageGitHubSettings}
+                            className="px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest border border-gray-200 dark:border-border-subtle text-gray-600 dark:text-text-secondary hover:border-gray-400 dark:hover:border-border-strong cursor-pointer"
+                          >
+                            프로필에서 관리
+                          </button>
+                        </div>
+
+                        <span className="text-[12px] font-bold text-gray-500 dark:text-text-tertiary">
+                          이슈 생성 시 티켓이 없으면 자동으로 발급한 뒤 [{ticketKey || 'QZR-*'}] 형식으로 GitHub 이슈를 생성합니다.
+                        </span>
+                        {hasExistingGitHubIssue && (
+                          <span className="text-[12px] font-bold text-amber-600 dark:text-amber-400">
+                            이 아이템에는 이미 GitHub 이슈가 연결되어 있어서 추가 생성할 수 없습니다.
+                          </span>
+                        )}
+
+                        <div className="flex gap-2 flex-wrap">
+                          <select
+                            value={selectedGitHubRepo}
+                            onChange={(e) => setSelectedGitHubRepo(e.target.value)}
+                            className="min-w-[240px] flex-1 bg-gray-50 dark:bg-bg-base border border-gray-200 dark:border-border-subtle rounded-xl px-3 py-2 text-sm font-bold text-gray-800 dark:text-text-primary dark:color-scheme-dark"
+                          >
+                            {githubRepos.length === 0 ? (
+                              <option value="">접근 가능한 레포가 없습니다</option>
+                            ) : (
+                              githubRepos.map((repo) => (
+                                <option key={repo.id} value={repo.full_name}>
+                                  {repo.full_name}
+                                </option>
+                              ))
+                            )}
+                          </select>
+                          <button
+                            onClick={handleCreateGitHubIssue}
+                            disabled={!selectedGitHubRepo || isGitHubSubmitting || hasExistingGitHubIssue}
+                            className="px-4 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[12px] font-black uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                          >
+                            {isGitHubSubmitting ? '티켓 발급 후 생성 중...' : '이슈 생성'}
+                          </button>
+                        </div>
+
+                        {githubIssues.length > 0 && (
+                          <div className="flex flex-col gap-2">
+                            {githubIssues.map((issue) => (
+                              <a
+                                key={issue.id || `${issue.repo_full_name}-${issue.issue_number}`}
+                                href={issue.issue_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 dark:border-border-subtle px-3 py-2 text-sm text-gray-700 dark:text-text-secondary hover:border-blue-300 dark:hover:border-blue-700"
+                              >
+                                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                  <span className="font-bold">
+                                    {issue.repo_full_name}#{issue.issue_number}
+                                  </span>
+                                  {(issue.ticket_key || ticketKey) && (
+                                    <span className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-bg-base text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-text-secondary">
+                                      {issue.ticket_key || ticketKey}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="flex items-center gap-1 text-gray-400 dark:text-text-tertiary">
+                                  <ExternalLink size={14} />
+                                </span>
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <span className="text-[13px] font-bold text-gray-400 dark:text-text-tertiary">
+                          GitHub 계정을 연결해야 이슈를 생성할 수 있습니다.
+                        </span>
+                          <button
+                            onClick={onManageGitHubSettings}
+                            className="px-4 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[12px] font-black uppercase tracking-widest cursor-pointer"
+                          >
+                            프로필에서 연결
+                          </button>
+                      </div>
+                    )}
+
+                    {gitHubError && (
+                      <div className="text-[12px] font-bold text-red-500 dark:text-red-400">
+                        {gitHubError}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           </div>

@@ -204,6 +204,10 @@ export function getMarkdownLivePreviewPlan(text, activeLineIndex = -1, cursorPos
         label: `${orderedMatch[1]}. `,
         className: 'cm-live-ordered-prefix',
       });
+      lineClasses.push({
+        lineStart,
+        className: 'cm-live-ordered-line',
+      });
     }
 
     // ![[embed]] 먼저 처리하고, 일반 [[wiki]] 처리

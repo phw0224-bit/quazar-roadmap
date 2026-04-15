@@ -37,6 +37,7 @@ import { PresenceContext } from '../hooks/usePresenceContext';
 import PresenceAvatars from './PresenceAvatars';
 import { useLayoutState } from '../hooks/useLayoutState';
 import API from '../api/kanbanAPI';
+import { getGitHubStatus, startGitHubConnect } from '../api/githubAPI';
 import ProfileAvatar from './ProfileAvatar';
 import ProfileSettingsModal from './ProfileSettingsModal';
 import ProjectColumn from './ProjectColumn';
@@ -93,6 +94,9 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [profileModalSeed, setProfileModalSeed] = useState(0);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [gitHubStatus, setGitHubStatus] = useState({ connected: false });
+  const [isGitHubStatusLoading, setIsGitHubStatusLoading] = useState(false);
+  const [isGitHubConnecting, setIsGitHubConnecting] = useState(false);
   const { onlineUsers, updateEditing } = usePresence({
     user,
     itemId: detailItemId,
@@ -135,6 +139,35 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   }, [user?.id]);
 
   useEffect(() => {
+    if (!user?.id) {
+      setGitHubStatus({ connected: false });
+      setIsGitHubStatusLoading(false);
+      return;
+    }
+
+    let active = true;
+    const loadGitHubStatus = async () => {
+      setIsGitHubStatusLoading(true);
+      try {
+        const status = await getGitHubStatus();
+        if (!active) return;
+        setGitHubStatus(status || { connected: false });
+      } catch (error) {
+        if (!active) return;
+        setGitHubStatus({ connected: false });
+        console.warn('GitHub 연결 상태 로드 실패:', error.message);
+      } finally {
+        if (active) setIsGitHubStatusLoading(false);
+      }
+    };
+
+    loadGitHubStatus();
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
     const handler = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
@@ -163,6 +196,16 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   const handleOpenProfileModal = () => {
     setProfileModalSeed((prev) => prev + 1);
     setIsProfileModalOpen(true);
+  };
+
+  const handleConnectGitHub = async () => {
+    try {
+      setIsGitHubConnecting(true);
+      await startGitHubConnect();
+    } catch (error) {
+      showToast(error.message || 'GitHub 연결을 시작하지 못했습니다.', 'error');
+      setIsGitHubConnecting(false);
+    }
   };
 
   useEffect(() => {
@@ -619,7 +662,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
       activeItemId={detailItemId}
       onNavigate={(view) => setUrlState({ view, itemId: null })}
       onOpenItem={(itemId) => setUrlState({ itemId })}
-      onAddChildPage={addChildPage}
+      onAddChildPage={(projectId, parentItemId, title) => addChildPage(projectId, parentItemId, title, user?.id)}
       onShowPrompt={showPrompt}
       onShowReleaseNotes={onShowReleaseNotes}
       onShowConfirm={showConfirm}
@@ -846,7 +889,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                               '문서 제목을 입력하세요',
                               (title) => {
                                 if (title) {
-                                  addGeneralDocument(boardName.toLowerCase(), title.trim());
+                                  addGeneralDocument(boardName.toLowerCase(), title.trim(), undefined, undefined, user?.id);
                                   showToast(`'${title}' 문서가 생성되었습니다.`);
                                   setPrompt(null);
                                 }
@@ -954,7 +997,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                                             '문서 제목을 입력하세요',
                                             (title) => {
                                               if (title) {
-                                                addGeneralDocument(boardName.toLowerCase(), title.trim(), 'document');
+                                                addGeneralDocument(boardName.toLowerCase(), title.trim(), 'document', undefined, user?.id);
                                                 showToast(`'${title}' 문서가 생성되었습니다.`);
                                                 setPrompt(null);
                                               }
@@ -974,7 +1017,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                                             '폴더 이름을 입력하세요',
                                             (title) => {
                                               if (title) {
-                                                addGeneralDocument(boardName.toLowerCase(), title.trim(), 'folder');
+                                                addGeneralDocument(boardName.toLowerCase(), title.trim(), 'folder', undefined, user?.id);
                                                 showToast(`'${title}' 폴더가 생성되었습니다.`);
                                                 setPrompt(null);
                                               }
@@ -1048,7 +1091,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                                           '문서 제목을 입력하세요',
                                           (title) => {
                                             if (title) {
-                                              addGeneralDocument(boardName.toLowerCase(), title.trim(), 'document', folderId);
+                                              addGeneralDocument(boardName.toLowerCase(), title.trim(), 'document', folderId, user?.id);
                                               showToast(`'${title}' 문서가 생성되었습니다.`);
                                               setPrompt(null);
                                             }
@@ -1171,9 +1214,13 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
               isOpen={isProfileModalOpen}
               profileName={user?.user_metadata?.name || user?.email?.split('@')[0] || '익명'}
               initialValue={profileCustomization}
+              gitHubStatus={gitHubStatus}
+              gitHubLoading={isGitHubStatusLoading}
+              gitHubConnecting={isGitHubConnecting}
               saving={isSavingProfile}
               onClose={() => setIsProfileModalOpen(false)}
               onSave={handleSaveProfileCustomization}
+              onConnectGitHub={handleConnectGitHub}
             />
           )}
         </div>
@@ -1223,8 +1270,9 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                   onOpenDetail={handleOpenDetail}
                   onShowConfirm={showConfirm}
                   onShowToast={showToast}
-                  onAddChildPage={addChildPage}
+                  onAddChildPage={(projectId, parentItemId, title) => addChildPage(projectId, parentItemId, title, user?.id)}
                   onShowPrompt={showPrompt}
+                  onManageGitHubSettings={handleOpenProfileModal}
                   isReadOnly={isReadOnly}
                 />
               </Suspense>
