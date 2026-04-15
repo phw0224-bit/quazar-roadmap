@@ -22,17 +22,17 @@
   --color-brand-accent: #4f6b88;
   --color-brand-dark: #1a1a1a;
   
-  /* Functional Palette (Dark Mode First) */
-  --color-bg-base: #191919;
-  --color-bg-elevated: #212121;
-  --color-bg-hover: #2a2a2a;
-  --color-border-subtle: #2f2f2f;
-  --color-border-strong: #373737;
+  /* Functional Palette (Light Default) */
+  --color-bg-base: #ffffff;
+  --color-bg-elevated: #f8fafc;
+  --color-bg-hover: #f1f5f9;
+  --color-border-subtle: #e2e8f0;
+  --color-border-strong: #cbd5e1;
   
   /* Text Palette */
-  --color-text-primary: #e3e3e3;
-  --color-text-secondary: #9b9b9b;
-  --color-text-tertiary: #5a5a5a;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-tertiary: #94a3b8;
 }
 
 /* Typography System */
@@ -101,6 +101,14 @@ html {
 
 html.dark {
   color-scheme: dark;
+  --color-bg-base: #191919;
+  --color-bg-elevated: #212121;
+  --color-bg-hover: #2a2a2a;
+  --color-border-subtle: #2f2f2f;
+  --color-border-strong: #373737;
+  --color-text-primary: #e3e3e3;
+  --color-text-secondary: #9b9b9b;
+  --color-text-tertiary: #5a5a5a;
 }
 
 body {
@@ -1240,16 +1248,14 @@ select option:checked {
   color: white;
 }
 
-@media (prefers-color-scheme: dark) {
-  select option {
-    background-color: #1e293b;
-    color: #f1f5f9;
-  }
+html.dark select option {
+  background-color: #1e293b;
+  color: #f1f5f9;
+}
 
-  select option:checked {
-    background-color: #3b82f6;
-    color: white;
-  }
+html.dark select option:checked {
+  background-color: #3b82f6;
+  color: white;
 }
 
 .tiptap-co

@@ -48,6 +48,9 @@ export default function KanbanCard({
   const priorityBorderColor = PRIORITY_MAP[item.priority || 0]?.borderColor;
   const ticketKey = item.ticket_key || '';
   const hasTicket = Boolean(ticketKey || item.is_ticket);
+  const labels = Array.isArray(item.tags) ? item.tags.filter(Boolean) : [];
+  const visibleLabels = labels.slice(0, 2);
+  const hiddenLabelCount = Math.max(labels.length - visibleLabels.length, 0);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -155,12 +158,29 @@ export default function KanbanCard({
           {title}
         </h3>
 
-        {(dateRange || statusLabel || hasTicket) && (
+        {(dateRange || statusLabel || hasTicket || visibleLabels.length > 0) && (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] leading-4">
             {hasTicket && (
               <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
                 <Ticket size={11} strokeWidth={2.25} />
                 <span>{ticketKey || 'TICKET'}</span>
+              </span>
+            )}
+            {visibleLabels.map((label) => (
+              <span
+                key={label}
+                className="inline-flex items-center rounded-md bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
+                title={label}
+              >
+                #{label}
+              </span>
+            ))}
+            {hiddenLabelCount > 0 && (
+              <span
+                className="inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600 dark:bg-bg-hover dark:text-text-secondary"
+                title={`라벨 ${hiddenLabelCount}개 더 있음`}
+              >
+                +{hiddenLabelCount}
               </span>
             )}
             {dateRange && (

@@ -13,7 +13,7 @@
  */
 import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { useTheme } from 'next-themes';
-import { Search, PanelLeft, CheckCircle2, ChevronRight, ChevronDown } from 'lucide-react';
+import { CheckCircle2, ChevronRight, ChevronDown } from 'lucide-react';
 import {
   DndContext,
   closestCorners,
@@ -42,7 +42,6 @@ import {
   startGitHubAppInstall,
   startGitHubConnect,
 } from '../api/githubAPI';
-import ProfileAvatar from './ProfileAvatar';
 import ProfileSettingsModal from './ProfileSettingsModal';
 import ProjectColumn from './ProjectColumn';
 import KanbanCard from './KanbanCard';
@@ -76,8 +75,8 @@ function ViewLoadingFallback({ label, fullHeight = true }) {
   );
 }
 
-export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
-  const { toggleSidebar, hoverMode, isOpen } = useLayoutState();
+export default function KanbanBoard({ onShowReleaseNotes }) {
+  const { isOpen, sidebarWidth, collapsedWidth } = useLayoutState();
   const {
     projects, sections, loading, addProject, addItem, updateItem, deleteItem,
     moveItem, updateProject, deleteProject, completeProject, moveProject, addComment, updateComment, deleteComment,
@@ -114,7 +113,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   const [peopleError, setPeopleError] = useState(null);
   const [personalMemos, setPersonalMemos] = useState([]);
   const [personalMemosLoading, setPersonalMemosLoading] = useState(false);
-  const { theme, setTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
@@ -683,15 +682,18 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
       onShowConfirm={showConfirm}
       isReadOnly={isReadOnly}
       user={user}
-      theme={theme}
+      theme={resolvedTheme ?? theme}
       mounted={mounted}
-      onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+      onToggleTheme={() => setTheme((resolvedTheme ?? theme) === 'dark' ? 'light' : 'dark')}
       onLogout={logout}
       onSetBoardType={setBoardType}
       generalDocs={generalDocs}
       onShowToast={showToast}
       onMoveSidebarItem={moveSidebarItem}
       onMoveSidebarProject={moveSidebarProject}
+      onOpenProfileSettings={handleOpenProfileModal}
+      profileCustomization={profileCustomization}
+      onOpenSearch={() => setShowSearch(true)}
     >
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="w-full h-full bg-white dark:bg-bg-base font-sans flex overflow-hidden transition-colors duration-200">
@@ -701,126 +703,29 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
             className={`flex-1 flex flex-col min-w-0 ${isResizing ? 'select-none pointer-events-none' : 'transition-all duration-300 ease-notion'} ${detailItemId && !isDetailFullscreen ? 'overflow-hidden' : ''}`}
             style={{ marginRight: detailItemId && !isDetailFullscreen ? `${panelWidth}vw` : '0' }}
           >
-          {/* Notion Style Header */}
-          <header className={`pl-8 py-5 flex justify-between items-center bg-white dark:bg-bg-base border-b border-gray-100 dark:border-border-subtle transition-all duration-300 ease-notion ${detailItemId && !isDetailFullscreen ? 'pr-4' : 'pr-10'}`}>
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-3">
-                {!hoverMode && (
-                  <button
-                    onClick={toggleSidebar}
-                    className="p-2 -ml-2 mr-1 rounded-lg text-gray-400 hover:text-gray-900 dark:text-text-tertiary dark:hover:text-text-primary hover:bg-gray-100 dark:hover:bg-bg-hover transition-colors cursor-pointer flex-shrink-0"
-                    title="사이드바 토글"
-                  >
-                    <PanelLeft size={20} strokeWidth={2.5} />
-                  </button>
-                )}
-                <div className="text-3xl filter drop-shadow-sm">📂</div>
-                <h1 className="text-2xl font-black text-gray-900 dark:text-text-primary tracking-tight leading-none">
-                  {activeView === 'roadmap' ? '전사 로드맵' : activeView === 'board' ? '팀 보드' : activeView === 'timeline' ? '타임라인' : activeView === 'personal' ? '개인 메모장' : '인원 관리'}
-                </h1>
-              </div>
-              
-              <nav className="flex items-center gap-1 p-1 rounded-xl bg-gray-50 dark:bg-bg-elevated border border-gray-100 dark:border-border-subtle transition-colors duration-200">
-                <button
-                  onClick={() => setUrlState({ view: 'board' })}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${
-                    activeView === 'board'
-                      ? 'bg-white dark:bg-bg-hover text-gray-900 dark:text-text-primary shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.05]'
-                      : 'text-gray-400 dark:text-text-tertiary hover:text-gray-600 dark:hover:text-text-secondary'
-                  }`}
-                >
-                  보드
-                </button>
-                <button
-                  onClick={() => setUrlState({ view: 'timeline' })}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${
-                    activeView === 'timeline'
-                      ? 'bg-white dark:bg-bg-hover text-gray-900 dark:text-text-primary shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.05]'
-                      : 'text-gray-400 dark:text-text-tertiary hover:text-gray-600 dark:hover:text-text-secondary'
-                  }`}
-                >
-                  타임라인
-                </button>
-                {user && (
-                  <button
-                    onClick={() => setUrlState({ view: 'personal' })}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${
-                      activeView === 'personal'
-                        ? 'bg-white dark:bg-bg-hover text-gray-900 dark:text-text-primary shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.05]'
-                        : 'text-gray-400 dark:text-text-tertiary hover:text-gray-600 dark:hover:text-text-secondary'
-                    }`}
-                    title="개인 메모장 (로그인 필수)"
-                  >
-                    📝 메모
-                  </button>
-                )}
-                <button
-                  onClick={() => setUrlState({ view: 'people' })}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${
-                    activeView === 'people'
-                      ? 'bg-white dark:bg-bg-hover text-gray-900 dark:text-text-primary shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.05]'
-                      : 'text-gray-400 dark:text-text-tertiary hover:text-gray-600 dark:hover:text-text-secondary'
-                  }`}
-                >
-                  인원관리
-                </button>
-              </nav>
+          {/* Minimal Header */}
+          <header className={`pl-5 py-2.5 flex justify-between items-center bg-white dark:bg-bg-base border-b border-gray-100 dark:border-border-subtle transition-all duration-300 ease-notion ${detailItemId && !isDetailFullscreen ? 'pr-4' : 'pr-5'}`}>
+            <div className="min-w-0">
+              <h1 className="text-base font-semibold text-gray-900 dark:text-text-primary tracking-tight truncate">
+                {activeView === 'roadmap' ? '전사 로드맵' : activeView === 'board' ? '팀 보드' : activeView === 'timeline' ? '타임라인' : activeView === 'personal' ? '개인 메모장' : '인원 관리'}
+              </h1>
             </div>
-
-            <div className="flex items-center gap-4">
-              {/* 접속자 아바타 */}
-              {!isReadOnly && <PresenceAvatars />}
-              {/* 검색 버튼 */}
-              <button
-                onClick={() => setShowSearch(true)}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 dark:bg-bg-elevated text-gray-400 dark:text-text-tertiary hover:text-gray-700 dark:hover:text-text-secondary border border-gray-100 dark:border-border-subtle transition-all cursor-pointer text-sm"
-                title="전체 검색 (Ctrl+K)"
-              >
-                <Search size={15} strokeWidth={2.5} />
-                <span className="text-xs font-medium hidden sm:inline">검색</span>
-                <kbd className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-bg-hover text-gray-400 dark:text-text-tertiary font-mono">⌘K</kbd>
-              </button>
-              {user ? (
-                <button
-                  type="button"
-                  onClick={handleOpenProfileModal}
-                  className="flex items-center gap-3 bg-gray-50 dark:bg-bg-elevated px-4 py-2 rounded-xl border border-gray-100 dark:border-border-subtle shadow-sm transition-colors duration-200 cursor-pointer hover:border-gray-300 dark:hover:border-border-strong"
-                  title="프로필 꾸미기"
-                >
-                  <div className="flex flex-col items-end">
-                    <span className="text-sm font-bold text-gray-800 dark:text-text-primary leading-tight">
-                      {user?.user_metadata?.name || user?.email?.split('@')[0]}
-                    </span>
-                    {profileCustomization.statusMessage && (
-                      <span className="text-[11px] text-gray-400 dark:text-text-tertiary max-w-[160px] truncate">
-                        {profileCustomization.statusMessage}
-                      </span>
-                    )}
-                  </div>
-                  <ProfileAvatar
-                    name={user?.user_metadata?.name || user?.email || 'U'}
-                    customization={profileCustomization}
-                    size="md"
-                  />
-                </button>
-              ) : (
-                <button onClick={onShowLogin} className="px-6 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-sm font-black uppercase tracking-widest hover:bg-black dark:hover:bg-gray-100 transition-all shadow-md hover:shadow-lg active:scale-95">Login to Edit</button>
+            <div className="flex items-center gap-2 min-w-0">
+              {(activeView === 'board' || activeView === 'roadmap') && (
+                <FilterBar
+                  inline
+                  filters={filters}
+                  sort={sort}
+                  hasActiveFilters={hasActiveFilters}
+                  onAddFilter={addFilter}
+                  onRemoveFilter={removeFilter}
+                  onClearFilters={resetFilters}
+                  onSetSort={setSort}
+                />
               )}
+              {!isReadOnly && <PresenceAvatars />}
             </div>
           </header>
-
-          {/* Filter Bar */}
-          {(activeView === 'board' || activeView === 'roadmap') && (
-            <FilterBar
-              filters={filters}
-              sort={sort}
-              hasActiveFilters={hasActiveFilters}
-              onAddFilter={addFilter}
-              onRemoveFilter={removeFilter}
-              onClearFilters={resetFilters}
-              onSetSort={setSort}
-            />
-          )}
 
           {/* Board Scroll Area */}
           {activeView === 'timeline' ? (
@@ -1249,12 +1154,15 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
               isResizing ? '' : 'transition-all duration-500 ease-notion'
             } ${
               isDetailFullscreen
-                ? (!hoverMode && isOpen
-                    ? 'left-56 border-l border-gray-100 dark:border-border-subtle shadow-[-10px_0_40px_rgba(0,0,0,0.06)]'
-                    : 'left-0 w-screen border-l-0 shadow-none')
+                ? 'border-l border-gray-100 dark:border-border-subtle shadow-[-10px_0_40px_rgba(0,0,0,0.06)]'
                 : 'shadow-[-10px_0_40px_rgba(0,0,0,0.06)] border-l border-gray-100 dark:border-border-subtle'
             }`}
-            style={isDetailFullscreen ? undefined : { width: `${panelWidth}vw`, minWidth: '450px' }}
+            style={isDetailFullscreen
+              ? {
+                  left: `${isOpen ? sidebarWidth : collapsedWidth}px`,
+                  width: `calc(100vw - ${isOpen ? sidebarWidth : collapsedWidth}px)`,
+                }
+              : { width: `${panelWidth}vw`, minWidth: '450px' }}
           >
             {/* Resize Handle (Using the border as the handle) */}
             {!isDetailFullscreen && (
