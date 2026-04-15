@@ -521,12 +521,12 @@ function ItemDetailPanel({
                 <Clock size={18} strokeWidth={2.5} />
                 <span className="text-[13px] font-black uppercase tracking-widest">현재 상태</span>
               </div>
-              <div className="flex-1 px-3 py-2 rounded-xl hover:bg-white dark:hover:bg-bg-hover hover:shadow-sm hover:ring-1 hover:ring-gray-100 dark:hover:ring-border-subtle transition-all relative">
+              <div className="flex-1 px-3 py-2 rounded-xl hover:shadow-sm hover:ring-1 hover:ring-gray-100 dark:hover:ring-border-subtle transition-all relative">
                 <div className="flex items-center gap-3">
                   <div className={`w-3 h-3 rounded-full ${item.status === 'done' ? 'bg-emerald-500' : item.status === 'in-progress' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
                   <select
                     disabled={isReadOnly}
-                    className="bg-transparent dark:bg-transparent border-none p-0 text-sm font-black text-gray-800 dark:text-text-primary focus:ring-0 cursor-pointer appearance-none w-full relative z-10"
+                    className="bg-transparent dark:bg-transparent border-none outline-none p-0 text-sm font-black text-gray-800 dark:text-text-primary focus:ring-0 cursor-pointer appearance-none w-full relative z-10"
                     value={item.status || 'none'}
                     onChange={(e) => {
                       const newStatus = e.target.value;
