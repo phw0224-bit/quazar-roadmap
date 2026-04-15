@@ -72,7 +72,7 @@ function ViewLoadingFallback({ label, fullHeight = true }) {
 }
 
 export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
-  const { toggleSidebar } = useLayoutState();
+  const { toggleSidebar, hoverMode } = useLayoutState();
   const {
     projects, sections, loading, addProject, addItem, updateItem, deleteItem,
     moveItem, updateProject, deleteProject, completeProject, moveProject, addComment, updateComment, deleteComment,
@@ -647,13 +647,15 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
           <header className={`pl-8 py-5 flex justify-between items-center bg-white dark:bg-bg-base border-b border-gray-100 dark:border-border-subtle transition-all duration-300 ease-notion ${detailItemId && !isDetailFullscreen ? 'pr-4' : 'pr-10'}`}>
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-3">
-                <button
-                  onClick={toggleSidebar}
-                  className="p-2 -ml-2 mr-1 rounded-lg text-gray-400 hover:text-gray-900 dark:text-text-tertiary dark:hover:text-text-primary hover:bg-gray-100 dark:hover:bg-bg-hover transition-colors cursor-pointer flex-shrink-0"
-                  title="사이드바 토글"
-                >
-                  <PanelLeft size={20} strokeWidth={2.5} />
-                </button>
+                {!hoverMode && (
+                  <button
+                    onClick={toggleSidebar}
+                    className="p-2 -ml-2 mr-1 rounded-lg text-gray-400 hover:text-gray-900 dark:text-text-tertiary dark:hover:text-text-primary hover:bg-gray-100 dark:hover:bg-bg-hover transition-colors cursor-pointer flex-shrink-0"
+                    title="사이드바 토글"
+                  >
+                    <PanelLeft size={20} strokeWidth={2.5} />
+                  </button>
+                )}
                 <div className="text-3xl filter drop-shadow-sm">📂</div>
                 <h1 className="text-2xl font-black text-gray-900 dark:text-text-primary tracking-tight leading-none">
                   {activeView === 'roadmap' ? '전사 로드맵' : activeView === 'board' ? '팀 보드' : activeView === 'timeline' ? '타임라인' : activeView === 'personal' ? '개인 메모장' : '인원 관리'}

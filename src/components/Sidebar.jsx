@@ -1,5 +1,5 @@
 import { useState, useEffect, createElement, useMemo, useCallback } from 'react';
-import { ChevronRight, LayoutGrid, Clock, Users, PanelLeft, MousePointer2, Ellipsis, BellDot, Moon, Sun, LogOut, Map } from 'lucide-react';
+import { ChevronRight, LayoutGrid, Clock, Users, MousePointer2, Ellipsis, BellDot, Moon, Sun, LogOut, Map } from 'lucide-react';
 import {
   DndContext,
   PointerSensor,
@@ -343,9 +343,7 @@ export default function Sidebar({
                     onHoverModeToggle?.();
                   }}
                 >
-                  {hoverMode ? (
-                    <PanelLeft size={14} strokeWidth={1.9} className="flex-shrink-0" />
-                  ) : (
+                  {!hoverMode && (
                     <MousePointer2 size={14} strokeWidth={1.9} className="flex-shrink-0" />
                   )}
                   <span>{hoverMode ? '클릭 모드로 전환' : '호버 모드로 전환'}</span>
