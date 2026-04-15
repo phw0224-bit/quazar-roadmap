@@ -73,7 +73,7 @@ export default function AppLayout({
       )}
 
       {/* Main content */}
-      <div className="flex-1 overflow-hidden relative z-0">
+      <div className="flex-1 overflow-hidden relative">
         {children}
       </div>
     </div>

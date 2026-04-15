@@ -72,7 +72,7 @@ function ViewLoadingFallback({ label, fullHeight = true }) {
 }
 
 export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
-  const { toggleSidebar, hoverMode } = useLayoutState();
+  const { toggleSidebar, hoverMode, isOpen } = useLayoutState();
   const {
     projects, sections, loading, addProject, addItem, updateItem, deleteItem,
     moveItem, updateProject, deleteProject, completeProject, moveProject, addComment, updateComment, deleteComment,
@@ -1185,7 +1185,9 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
               isResizing ? '' : 'transition-all duration-500 ease-notion'
             } ${
               isDetailFullscreen
-                ? 'w-screen border-l-0 shadow-none'
+                ? (!hoverMode && isOpen
+                    ? 'left-56 border-l border-gray-100 dark:border-border-subtle shadow-[-10px_0_40px_rgba(0,0,0,0.06)]'
+                    : 'left-0 w-screen border-l-0 shadow-none')
                 : 'shadow-[-10px_0_40px_rgba(0,0,0,0.06)] border-l border-gray-100 dark:border-border-subtle'
             }`}
             style={isDetailFullscreen ? undefined : { width: `${panelWidth}vw`, minWidth: '450px' }}
