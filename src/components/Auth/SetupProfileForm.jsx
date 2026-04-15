@@ -53,7 +53,7 @@ export default function SetupProfileForm({ onComplete }) {
             <div className="md:col-span-2 flex flex-col gap-2">
               <label className="text-[11px] font-black text-gray-400 dark:text-text-tertiary uppercase tracking-[0.3em] ml-1">Real Name</label>
               <div className="relative flex items-center group">
-                <User size={18} className="absolute left-4 text-gray-300 group-focus-within:text-blue-500 transition-colors" />
+                <User size={18} className="absolute left-4 text-gray-300 group-focus-within:text-brand-500 transition-colors" />
                 <input
                   type="text"
                   required

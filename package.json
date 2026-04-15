@@ -10,8 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview --port 1234",
     "server": "node server/index.js",
-    "dev:all": "concurrently \"yarn dev\" \"yarn server\"",
-    "prod:all": "yarn build && concurrently \"yarn preview\" \"yarn server\""
+    "dev:all": "concurrently --names \"WEB,SRV\" --prefix-colors \"cyan,yellow\" --kill-others-on-fail \"yarn dev\" \"yarn server\"",
+    "prod:all": "yarn build && concurrently --names \"WEB,SRV\" --prefix-colors \"cyan,yellow\" --kill-others-on-fail \"yarn preview\" \"yarn server\""
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",
@@ -82,6 +82,7 @@
     "jsdom": "^29.0.1",
     "postcss": "^8.5.8",
     "tailwindcss": "^4.2.2",
-    "vite": "^8.0.1"
+    "vite": "^8.0.1",
+    "vite-plugin-pwa": "^1.2.0"
   }
 }

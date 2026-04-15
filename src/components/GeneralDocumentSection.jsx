@@ -90,7 +90,7 @@ function GeneralDocumentSection({
           {/* 폴더 내 문서 추가 버튼 (폴더만) */}
           {!isReadOnly && doc.page_type === 'folder' && (
             <button
-              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity px-1 text-gray-400 dark:text-text-tertiary hover:text-blue-500 dark:hover:text-blue-400 flex items-center gap-1"
+              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity px-1 text-gray-400 dark:text-text-tertiary hover:text-brand-500 dark:hover:text-brand-400 flex items-center gap-1"
               onClick={(e) => {
                 e.stopPropagation();
                 onAddDocumentToFolder?.(doc.id);
@@ -106,7 +106,7 @@ function GeneralDocumentSection({
           {/* 이동 버튼 (문서만) */}
           {!isReadOnly && doc.page_type !== 'folder' && (
             <button
-              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity px-1 text-gray-400 dark:text-text-tertiary hover:text-blue-500 dark:hover:text-blue-400"
+              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity px-1 text-gray-400 dark:text-text-tertiary hover:text-brand-500 dark:hover:text-brand-400"
               onClick={(e) => {
                 e.stopPropagation();
                 onMoveToFolder?.(doc.id);

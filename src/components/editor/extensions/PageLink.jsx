@@ -27,14 +27,14 @@ function PageLinkView({ node, editor }) {
           flex items-center gap-2 px-3 py-2 rounded-xl
           border border-gray-100 dark:border-border-subtle
           bg-gray-50/50 dark:bg-bg-elevated/30
-          hover:bg-blue-50 dark:hover:bg-blue-900/20
-          hover:border-blue-200 dark:hover:border-blue-800/40
+          hover:bg-brand-50 dark:hover:bg-brand-800/20
+          hover:border-brand-200 dark:hover:border-brand-700/40
           transition-all duration-200 group w-full text-left cursor-pointer
           shadow-sm hover:shadow-md
         "
       >
         <span className="text-base shrink-0">📄</span>
-        <span className="text-[14px] font-bold text-gray-800 dark:text-text-primary group-hover:text-blue-600 dark:group-hover:text-blue-300 truncate">
+        <span className="text-[14px] font-bold text-gray-800 dark:text-text-primary group-hover:text-brand-600 dark:group-hover:text-brand-400 truncate">
           {title || '제목 없음'}
         </span>
         <span className="ml-auto text-[11px] font-black text-gray-300 dark:text-text-tertiary uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">

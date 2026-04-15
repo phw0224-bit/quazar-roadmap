@@ -48,7 +48,7 @@ function DropdownItem({ onClick, children, active }) {
       onClick={onClick}
       className={`w-full text-left px-3 py-2 text-sm transition-colors cursor-pointer ${
         active
-          ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 font-medium'
+          ? 'bg-brand-50 dark:bg-brand-800/25 text-brand-600 dark:text-brand-400 font-medium'
           : 'text-gray-700 dark:text-text-secondary hover:bg-gray-50 dark:hover:bg-bg-hover'
       }`}
     >
@@ -60,6 +60,7 @@ function DropdownItem({ onClick, children, active }) {
 export default function FilterBar({
   filters, sort, hasActiveFilters,
   onAddFilter, onRemoveFilter, onClearFilters, onSetSort,
+  inline = false,
 }) {
   const [addingField, setAddingField] = useState(null);
   const [assigneeInput, setAssigneeInput] = useState('');
@@ -85,16 +86,19 @@ export default function FilterBar({
   const currentSort = sort ? `${SORT_OPTIONS.find(s => s.field === sort.field)?.label ?? sort.field} ${sort.dir === 'asc' ? '↑' : '↓'}` : null;
 
   return (
-    <div className="flex items-center gap-2 flex-wrap px-10 py-2.5 border-b border-gray-100 dark:border-border-subtle bg-white dark:bg-bg-base min-h-[48px]">
+    <div className={inline
+      ? 'flex items-center gap-1.5 flex-wrap'
+      : 'flex items-center gap-1.5 flex-wrap px-6 py-1.5 border-b border-gray-100 dark:border-border-subtle bg-white dark:bg-bg-base min-h-[40px]'}
+    >
 
       {/* 필터 추가 버튼 */}
       <Dropdown
         trigger={
           <button
             type="button"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 dark:text-text-secondary hover:bg-gray-100 dark:hover:bg-bg-hover rounded-lg transition-colors border border-dashed border-gray-300 dark:border-border-strong cursor-pointer whitespace-nowrap"
+            className="flex items-center gap-1 px-2.5 py-1 text-xs text-gray-500 dark:text-text-secondary hover:bg-gray-100 dark:hover:bg-bg-hover rounded-md transition-colors border border-dashed border-gray-300 dark:border-border-strong cursor-pointer whitespace-nowrap"
           >
-            <Filter size={13} />
+            <Filter size={12} />
             <span>필터 추가</span>
           </button>
         }
@@ -144,14 +148,14 @@ export default function FilterBar({
                       if (e.key === 'Escape') setAddingField(null);
                     }}
                     placeholder="이름 입력 후 Enter"
-                    className="w-full text-sm border border-gray-200 dark:border-border-subtle rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 bg-white dark:bg-bg-base text-gray-900 dark:text-text-primary placeholder-gray-400"
+                    className="w-full text-sm border border-gray-200 dark:border-border-subtle rounded-lg px-2.5 py-1.5 outline-none focus:border-brand-400 dark:focus:border-brand-500 bg-white dark:bg-bg-base text-gray-900 dark:text-text-primary placeholder-gray-400 dark:placeholder-[color:var(--color-text-tertiary)]"
                   />
                 </div>
               )}
               <button
                 type="button"
                 onClick={() => setAddingField(null)}
-                className="w-full text-left px-3 py-1 text-xs text-gray-400 dark:text-text-tertiary hover:text-gray-600 transition-colors cursor-pointer"
+                className="w-full text-left px-3 py-1 text-xs text-gray-400 dark:text-text-tertiary hover:text-gray-600 dark:hover:text-text-secondary transition-colors cursor-pointer"
               >
                 닫기
               </button>
@@ -167,36 +171,36 @@ export default function FilterBar({
         return (
           <div
             key={`${filter.field}-${filter.value}-${i}`}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-sm bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-lg border border-blue-200 dark:border-blue-800 whitespace-nowrap"
+            className="flex items-center gap-1 px-2 py-0.5 text-xs bg-brand-50 dark:bg-brand-800/25 text-brand-600 dark:text-brand-400 rounded-md border border-brand-200 dark:border-brand-700 whitespace-nowrap"
           >
-            <span className="text-blue-400 dark:text-blue-500 text-xs font-medium">{fieldDef?.label}</span>
+            <span className="text-brand-400 dark:text-brand-500 text-xs font-medium">{fieldDef?.label}</span>
             <span className="font-medium">{optLabel}</span>
             <button
               type="button"
               onClick={() => onRemoveFilter(filter.field, filter.value)}
-              className="ml-0.5 hover:text-blue-900 dark:hover:text-blue-200 transition-colors cursor-pointer"
+              className="ml-0.5 hover:text-brand-700 dark:hover:text-brand-200 transition-colors cursor-pointer"
             >
-              <X size={12} />
+              <X size={11} />
             </button>
           </div>
         );
       })}
 
       {/* 구분선 (필터 칩이 있을 때) */}
-      {filters.length > 0 && <div className="w-px h-4 bg-gray-200 dark:bg-border-subtle" />}
+      {filters.length > 0 && <div className="w-px h-3.5 bg-gray-200 dark:bg-border-subtle" />}
 
       {/* 정렬 드롭다운 */}
       <Dropdown
         trigger={
           <button
             type="button"
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors border cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-1 px-2.5 py-1 text-xs rounded-md transition-colors border cursor-pointer whitespace-nowrap ${
               sort
                 ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800'
                 : 'text-gray-500 dark:text-text-secondary hover:bg-gray-100 dark:hover:bg-bg-hover border-gray-200 dark:border-border-subtle'
             }`}
           >
-            <ArrowUpDown size={13} />
+            <ArrowUpDown size={12} />
             <span>{currentSort ?? '정렬'}</span>
           </button>
         }
@@ -231,9 +235,9 @@ export default function FilterBar({
         <button
           type="button"
           onClick={onClearFilters}
-          className="flex items-center gap-1 px-2.5 py-1.5 text-sm text-gray-400 dark:text-text-tertiary hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+          className="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 dark:text-text-tertiary hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-md transition-colors cursor-pointer whitespace-nowrap"
         >
-          <X size={13} />
+          <X size={12} />
           <span>초기화</span>
         </button>
       )}

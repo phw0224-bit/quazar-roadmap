@@ -91,7 +91,7 @@ function PersonalMemoBoard({
                   }
                 })
               }
-              className="px-6 py-3 bg-blue-500 dark:bg-blue-600 text-white rounded-xl text-sm font-black uppercase tracking-widest hover:bg-blue-600 dark:hover:bg-blue-700 transition-all shadow-md flex items-center gap-2 cursor-pointer"
+              className="px-6 py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-sm font-black uppercase tracking-widest hover:bg-black dark:hover:bg-gray-100 transition-all shadow-md flex items-center gap-2 cursor-pointer"
             >
               <Plus size={18} strokeWidth={3} />
               새 메모 추가
@@ -118,7 +118,7 @@ function PersonalMemoBoard({
                 text-sm
                 text-gray-900 dark:text-text-primary
                 placeholder:text-gray-400 dark:placeholder:text-text-tertiary
-                focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600
+                focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:focus:ring-brand-400/30
                 transition-all
               "
             />
@@ -137,7 +137,7 @@ function PersonalMemoBoard({
                 rounded-lg
                 text-sm font-medium
                 text-gray-900 dark:text-text-primary
-                focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600
+                focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:focus:ring-brand-400/30
                 cursor-pointer
                 transition-all
                 appearance-none
@@ -175,7 +175,7 @@ function PersonalMemoBoard({
                       }
                     })
                   }
-                  className="px-8 py-3 bg-blue-500 dark:bg-blue-600 text-white rounded-xl font-black uppercase tracking-widest hover:bg-blue-600 dark:hover:bg-blue-700 transition-all shadow-md flex items-center gap-2"
+                  className="px-8 py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-black uppercase tracking-widest hover:bg-black dark:hover:bg-gray-100 transition-all shadow-md flex items-center gap-2"
                 >
                   <Plus size={18} strokeWidth={3} />
                   첫 메모 만들기

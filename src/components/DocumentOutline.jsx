@@ -25,7 +25,7 @@ function HeadingNode({ node, activeOffset, onHeadingClick, depth = 0 }) {
           w-full text-left flex items-center gap-2 py-1.5 px-2 rounded-lg text-sm
           transition-colors group
           ${isActive 
-            ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-900 dark:text-blue-200 font-semibold' 
+            ? 'bg-brand-100 dark:bg-brand-800/30 text-brand-700 dark:text-brand-300 font-semibold'
             : 'hover:bg-gray-100 dark:hover:bg-bg-hover text-gray-700 dark:text-text-secondary'
           }
         `}

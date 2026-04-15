@@ -35,11 +35,11 @@ export default function LoginForm({ onLogin }) {
           <div className="flex flex-col gap-2">
             <label className="text-[11px] font-black text-gray-400 dark:text-text-tertiary uppercase tracking-[0.3em] ml-1">Email Address</label>
             <div className="relative flex items-center group">
-              <Mail size={18} className="absolute left-4 text-gray-300 group-focus-within:text-blue-500 transition-colors" />
+              <Mail size={18} className="absolute left-4 text-gray-300 group-focus-within:text-brand-500 transition-colors" />
               <input
                 type="email"
                 required
-                className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-bg-base border-2 border-transparent dark:border-border-subtle rounded-2xl text-base font-bold text-gray-900 dark:text-text-primary focus:outline-none focus:ring-8 focus:ring-blue-500/5 focus:border-blue-500/30 focus:bg-white dark:focus:bg-bg-base transition-all placeholder:text-gray-300 dark:placeholder:text-text-tertiary"
+                className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-bg-base border-2 border-transparent dark:border-border-subtle rounded-2xl text-base font-bold text-gray-900 dark:text-text-primary focus:outline-none focus:ring-4 focus:ring-brand-500/10 focus:border-brand-400/40 focus:bg-white dark:focus:bg-bg-base transition-all placeholder:text-gray-300 dark:placeholder:text-text-tertiary"
                 placeholder="name@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -50,11 +50,11 @@ export default function LoginForm({ onLogin }) {
           <div className="flex flex-col gap-2">
             <label className="text-[11px] font-black text-gray-400 dark:text-text-tertiary uppercase tracking-[0.3em] ml-1">Password</label>
             <div className="relative flex items-center group">
-              <Lock size={18} className="absolute left-4 text-gray-300 group-focus-within:text-blue-500 transition-colors" />
+              <Lock size={18} className="absolute left-4 text-gray-300 group-focus-within:text-brand-500 transition-colors" />
               <input
                 type="password"
                 required
-                className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-bg-base border-2 border-transparent dark:border-border-subtle rounded-2xl text-base font-bold text-gray-900 dark:text-text-primary focus:outline-none focus:ring-8 focus:ring-blue-500/5 focus:border-blue-500/30 focus:bg-white dark:focus:bg-bg-base transition-all placeholder:text-gray-300 dark:placeholder:text-text-tertiary"
+                className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-bg-base border-2 border-transparent dark:border-border-subtle rounded-2xl text-base font-bold text-gray-900 dark:text-text-primary focus:outline-none focus:ring-4 focus:ring-brand-500/10 focus:border-brand-400/40 focus:bg-white dark:focus:bg-bg-base transition-all placeholder:text-gray-300 dark:placeholder:text-text-tertiary"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

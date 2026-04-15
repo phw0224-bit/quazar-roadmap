@@ -85,8 +85,15 @@ function ItemDetailPanel({
       ? '📝 개인 메모장'
       : `🧭 ${phase?.title}`;
   const statusInfo = STATUS_MAP[item.status || 'none'];
+  const statusDotColor = item.status === 'done'
+    ? 'bg-emerald-500'
+    : item.status === 'in-progress'
+    ? 'bg-blue-500'
+    : 'bg-gray-400';
   const assigneeCount = (item.assignees || []).length;
   const teamCount = (item.teams || []).length;
+  const headerIconButtonClass = 'p-1.5 rounded-lg text-gray-400 hover:text-gray-900 dark:text-text-tertiary dark:hover:text-text-primary hover:bg-gray-100 dark:hover:bg-bg-hover transition-colors cursor-pointer';
+  const headerToggleButtonClass = 'p-1.5 rounded-lg transition-colors cursor-pointer';
 
   useEffect(() => {
     setAssigneeInput((item?.assignees || []).join(', '));
@@ -318,6 +325,11 @@ function ItemDetailPanel({
   }, [item, allItems]);
   const ticketKey = issuedTicket.key || item?.ticket_key || '';
   const hasExistingGitHubIssue = githubIssues.length > 0;
+  const needsGitHubAppInstall = Boolean(
+    githubStatus?.connected
+      && githubStatus?.app?.configured
+      && !githubStatus?.app?.installed
+  );
 
   if (!item) return null;
 
@@ -326,40 +338,39 @@ function ItemDetailPanel({
       {/* Top Header */}
       <div className="bg-white/80 dark:bg-bg-base/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-border-subtle">
         <ItemViewers itemId={item.id} />
-        <div className="px-8 py-4 flex justify-between items-start gap-4">
-          <div className="flex items-start gap-4 min-w-0">
-            <div className="flex items-center gap-1.5">
-              <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-bg-hover rounded-xl text-gray-400 hover:text-gray-900 dark:hover:text-text-primary transition-all duration-200 cursor-pointer">
-              <X size={20} strokeWidth={2.5} />
-             </button>
-             <button
-               onClick={onToggleFullscreen}
-               className="p-2 hover:bg-gray-100 dark:hover:bg-bg-hover rounded-xl text-gray-400 hover:text-gray-900 dark:hover:text-text-primary transition-all duration-200 cursor-pointer"
-               aria-label={isFullscreen ? '사이드바로 전환' : '전체화면으로 전환'}
-               title={isFullscreen ? '사이드바로 전환' : '전체화면으로 전환'}
-             >
-              {isFullscreen ? <ChevronsRight size={20} strokeWidth={2.5} /> : <Maximize2 size={20} strokeWidth={2.5} />}
-             </button>
+        <div className="px-6 py-2.5 flex items-center gap-3">
+          <div className="flex items-center gap-1 shrink-0">
+            <button onClick={onClose} className={headerIconButtonClass}>
+              <X size={17} strokeWidth={2.4} />
+            </button>
+            <button
+              onClick={onToggleFullscreen}
+              className={headerIconButtonClass}
+              aria-label={isFullscreen ? '사이드바로 전환' : '전체화면으로 전환'}
+              title={isFullscreen ? '사이드바로 전환' : '전체화면으로 전환'}
+            >
+              {isFullscreen ? <ChevronsRight size={17} strokeWidth={2.4} /> : <Maximize2 size={17} strokeWidth={2.4} />}
+            </button>
             <button
               onClick={() => setIsWideView(v => !v)}
-              className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${isWideView ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
+              className={`${headerToggleButtonClass} ${isWideView ? 'bg-brand-50 dark:bg-brand-800/20 text-brand-500 dark:text-brand-400' : 'text-gray-400 dark:text-text-tertiary hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
               title={isWideView ? '기본 너비로 보기' : '넓게 보기'}
             >
-              {isWideView ? <AlignCenter size={20} strokeWidth={2.5} /> : <AlignJustify size={20} strokeWidth={2.5} />}
+              {isWideView ? <AlignCenter size={17} strokeWidth={2.4} /> : <AlignJustify size={17} strokeWidth={2.4} />}
             </button>
             <button
               onClick={() => setShowOutline(v => !v)}
-              className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${showOutline ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
+              className={`${headerToggleButtonClass} ${showOutline ? 'bg-brand-50 dark:bg-brand-800/20 text-brand-500 dark:text-brand-400' : 'text-gray-400 dark:text-text-tertiary hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
               title={showOutline ? '목차 숨기기' : '목차 표시'}
             >
-              <List size={20} strokeWidth={2.5} />
+              <List size={17} strokeWidth={2.4} />
             </button>
             <button
               onClick={() => setShowBacklinks(v => !v)}
-              className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${showBacklinks ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
+              className={`${headerToggleButtonClass} ${showBacklinks ? 'bg-brand-50 dark:bg-brand-800/20 text-brand-500 dark:text-brand-400' : 'text-gray-400 dark:text-text-tertiary hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
               title={showBacklinks ? '백링크 숨기기' : '백링크 표시'}
             >
-              <Link2 size={20} strokeWidth={2.5} />
+              <Link2 size={17} strokeWidth={2.4} />
             </button>
             {!isReadOnly && (
               <button
@@ -379,63 +390,60 @@ function ItemDetailPanel({
                     onClose();
                   }, 'danger');
                 }}
-                className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl text-gray-400 hover:text-red-500 transition-all duration-200 cursor-pointer"
+                className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
                 title="삭제"
               >
-                <Trash2 size={20} strokeWidth={2.5} />
+                <Trash2 size={17} strokeWidth={2.4} />
               </button>
             )}
           </div>
 
-            <div className="min-w-0 flex flex-col gap-2.5">
-              <nav className="flex items-center gap-2 text-[13px] font-black uppercase tracking-widest min-w-0">
-                <button
-                  onClick={() => onBreadcrumbNavigate?.('board', { boardType })}
-                  className="bg-gray-100 dark:bg-bg-hover px-2.5 py-1 rounded-lg text-gray-500 dark:text-text-secondary shrink-0 hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-all border border-transparent hover:border-gray-200 dark:hover:border-border-strong"
-                >
-                  📂 {boardLabel}
-                </button>
-                <ChevronRight size={12} strokeWidth={3} className="text-gray-300 dark:text-text-tertiary" />
-                <button
-                  onClick={() => onBreadcrumbNavigate?.('project', { projectId: phase?.id, boardType })}
-                  disabled={!isProjectLike && entityContext?.collection !== 'project'}
-                  className="bg-gray-100 dark:bg-bg-hover px-2.5 py-1 rounded-lg text-gray-500 dark:text-text-secondary shrink-0 hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-all border border-transparent hover:border-gray-200 dark:hover:border-border-strong"
-                >
-                  {sectionLabel}
-                </button>
-                
-                {/* 계층형 부모 아이템 경로 표시 */}
-                {itemPath.map((p) => (
-                  <div key={p.id} className="flex items-center gap-2 shrink-0">
-                    <ChevronRight size={12} strokeWidth={3} className="text-gray-300 dark:text-text-tertiary" />
-                    <button
-                      onClick={() => onOpenDetail?.(p.id)}
-                      className="bg-gray-100 dark:bg-bg-hover px-2.5 py-1 rounded-lg text-gray-500 dark:text-text-secondary shrink-0 hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-all border border-transparent hover:border-gray-200 dark:hover:border-border-strong"
-                    >
-                      📄 {p.title || p.content}
-                    </button>
-                  </div>
-                ))}
-
-                <ChevronRight size={12} strokeWidth={3} className="text-gray-300 dark:text-text-tertiary" />
-                <span className="text-gray-900 dark:text-text-primary truncate font-black">{item.title || item.content}</span>
-              </nav>
-
-              {!isMemo && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest shadow-sm border border-white/20 dark:border-black/10 transition-colors ${statusInfo.color}`}>
-                    상태: {statusInfo.label}
-                  </span>
-                  <span className="px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest bg-gray-50 dark:bg-bg-hover text-gray-500 dark:text-text-secondary border border-gray-200 dark:border-border-subtle shadow-sm tabular-nums">
-                    담당자 {assigneeCount}
-                  </span>
-                  <span className="px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest bg-gray-50 dark:bg-bg-hover text-gray-500 dark:text-text-secondary border border-gray-200 dark:border-border-subtle shadow-sm tabular-nums">
-                    팀 {teamCount}
-                  </span>
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <nav className="flex items-center gap-1.5 text-xs font-semibold min-w-0 overflow-hidden whitespace-nowrap">
+              <button
+                onClick={() => onBreadcrumbNavigate?.('board', { boardType })}
+                className="bg-gray-100 dark:bg-bg-hover px-2 py-0.5 rounded-md text-gray-500 dark:text-text-secondary shrink-0 hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-colors border border-transparent hover:border-gray-200 dark:hover:border-border-strong"
+              >
+                📂 {boardLabel}
+              </button>
+              <ChevronRight size={11} strokeWidth={2.6} className="text-gray-300 dark:text-text-tertiary shrink-0" />
+              <button
+                onClick={() => onBreadcrumbNavigate?.('project', { projectId: phase?.id, boardType })}
+                disabled={!isProjectLike && entityContext?.collection !== 'project'}
+                className="bg-gray-100 dark:bg-bg-hover px-2 py-0.5 rounded-md text-gray-500 dark:text-text-secondary shrink-0 hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-colors border border-transparent hover:border-gray-200 dark:hover:border-border-strong"
+              >
+                {sectionLabel}
+              </button>
+              {itemPath.map((p) => (
+                <div key={p.id} className="flex items-center gap-1.5 shrink-0">
+                  <ChevronRight size={11} strokeWidth={2.6} className="text-gray-300 dark:text-text-tertiary" />
+                  <button
+                    onClick={() => onOpenDetail?.(p.id)}
+                    className="bg-gray-100 dark:bg-bg-hover px-2 py-0.5 rounded-md text-gray-500 dark:text-text-secondary hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-colors border border-transparent hover:border-gray-200 dark:hover:border-border-strong"
+                  >
+                    📄 {p.title || p.content}
+                  </button>
                 </div>
-              )}
-            </div>
+              ))}
+              <ChevronRight size={11} strokeWidth={2.6} className="text-gray-300 dark:text-text-tertiary shrink-0" />
+              <span className="text-gray-900 dark:text-text-primary truncate font-semibold min-w-0">{item.title || item.content}</span>
+            </nav>
           </div>
+
+          {!isMemo && (
+            <div className="hidden md:flex items-center gap-1.5 shrink-0">
+              <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-semibold border border-white/20 dark:border-black/10 transition-colors ${statusInfo.color}`}>
+                <span className={`w-2 h-2 rounded-full shrink-0 ${statusDotColor}`}></span>
+                {statusInfo.label}
+              </span>
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-50 dark:bg-bg-hover text-gray-500 dark:text-text-secondary border border-gray-200 dark:border-border-subtle tabular-nums">
+                담당자 {assigneeCount}
+              </span>
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-50 dark:bg-bg-hover text-gray-500 dark:text-text-secondary border border-gray-200 dark:border-border-subtle tabular-nums">
+                팀 {teamCount}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -469,7 +477,7 @@ function ItemDetailPanel({
           
           {/* Title */}
           <div className="flex flex-col gap-4">
-            <span className="text-[11px] font-black text-blue-500 uppercase tracking-[0.3em] ml-1">
+            <span className="text-[11px] font-black text-text-tertiary uppercase tracking-[0.3em] ml-1">
               {isMemo ? '노트' : 'Work Item Title'}
             </span>
             {!isEditingTitle ? (
@@ -482,7 +490,7 @@ function ItemDetailPanel({
             ) : (
               <input 
                 autoFocus
-                className="text-display text-gray-900 dark:text-text-primary bg-gray-50 dark:bg-bg-hover rounded-2xl p-2 -ml-2 w-full border-none focus:ring-4 focus:ring-blue-500/10"
+                className="text-display text-gray-900 dark:text-text-primary bg-gray-50 dark:bg-bg-hover rounded-2xl p-2 -ml-2 w-full border-none focus:ring-4 focus:ring-brand-500/10"
                 value={titleInput}
                 onChange={e => setTitleInput(e.target.value)}
                 onBlur={() => {
@@ -515,12 +523,12 @@ function ItemDetailPanel({
                 <Clock size={18} strokeWidth={2.5} />
                 <span className="text-[13px] font-black uppercase tracking-widest">현재 상태</span>
               </div>
-              <div className="flex-1 px-3 py-2 rounded-xl hover:bg-white dark:hover:bg-bg-hover hover:shadow-sm hover:ring-1 hover:ring-gray-100 dark:hover:ring-border-subtle transition-all relative">
+              <div className="flex-1 px-3 py-2 rounded-xl hover:shadow-sm hover:ring-1 hover:ring-gray-100 dark:hover:ring-border-subtle transition-all relative">
                 <div className="flex items-center gap-3">
                   <div className={`w-3 h-3 rounded-full ${item.status === 'done' ? 'bg-emerald-500' : item.status === 'in-progress' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
                   <select
                     disabled={isReadOnly}
-                    className="bg-white dark:bg-bg-elevated border-none p-0 text-sm font-black text-gray-800 dark:text-text-primary focus:ring-0 cursor-pointer appearance-none w-full relative z-10 dark:color-scheme-dark"
+                    className="bg-transparent dark:bg-transparent border-none outline-none p-0 text-sm font-black text-gray-800 dark:text-text-primary focus:ring-0 cursor-pointer appearance-none w-full relative z-10"
                     value={item.status || 'none'}
                     onChange={(e) => {
                       const newStatus = e.target.value;
@@ -543,7 +551,7 @@ function ItemDetailPanel({
                 <span className="text-[13px] font-black uppercase tracking-widest">담당 인원</span>
               </div>
               <div 
-                className={`flex-1 px-3 py-2 rounded-xl transition-all min-h-[40px] flex items-center ${!isReadOnly ? 'hover:bg-white dark:hover:bg-bg-hover hover:shadow-sm hover:ring-1 hover:ring-gray-100 dark:hover:ring-border-subtle cursor-pointer' : ''} ${isEditingAssignees ? 'bg-white dark:bg-bg-hover ring-2 ring-blue-500/20 border-blue-500/30 shadow-md' : ''}`}
+                className={`flex-1 px-3 py-2 rounded-xl transition-all min-h-[40px] flex items-center ${!isReadOnly ? 'hover:bg-white dark:hover:bg-bg-hover hover:shadow-sm hover:ring-1 hover:ring-gray-100 dark:hover:ring-border-subtle cursor-pointer' : ''} ${isEditingAssignees ? 'bg-white dark:bg-bg-hover ring-2 ring-brand-500/15 border-brand-400/30 shadow-md' : ''}`}
                 onClick={() => !isReadOnly && setIsEditingAssignees(true)}
               >
                 {!isEditingAssignees ? (
@@ -596,7 +604,7 @@ function ItemDetailPanel({
                 <span className="text-[13px] font-black uppercase tracking-widest">태그</span>
               </div>
               <div
-                className={`flex-1 px-3 py-2 rounded-xl transition-all min-h-[40px] flex flex-wrap gap-2 items-center ${!isReadOnly ? 'hover:bg-white dark:hover:bg-bg-hover hover:shadow-sm hover:ring-1 hover:ring-gray-100 dark:hover:ring-border-subtle cursor-pointer' : ''} ${isEditingTags ? 'bg-white dark:bg-bg-hover ring-2 ring-blue-500/20 border-blue-500/30 shadow-md' : ''}`}
+                className={`flex-1 px-3 py-2 rounded-xl transition-all min-h-[40px] flex flex-wrap gap-2 items-center ${!isReadOnly ? 'hover:bg-white dark:hover:bg-bg-hover hover:shadow-sm hover:ring-1 hover:ring-gray-100 dark:hover:ring-border-subtle cursor-pointer' : ''} ${isEditingTags ? 'bg-white dark:bg-bg-hover ring-2 ring-brand-500/15 border-brand-400/30 shadow-md' : ''}`}
                 onClick={() => !isReadOnly && setIsEditingTags(true)}
               >
                 {(item.tags || []).map(tag => (
@@ -621,7 +629,7 @@ function ItemDetailPanel({
                               className={`px-3 py-1.5 rounded-lg text-[11px] font-black tracking-wide border transition-all ${
                                 isSelected
                                   ? 'bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-gray-900 dark:border-white'
-                                  : 'bg-white dark:bg-bg-base text-gray-700 dark:text-text-secondary border-gray-200 dark:border-border-subtle hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-300'
+                                  : 'bg-white dark:bg-bg-base text-gray-700 dark:text-text-secondary border-gray-200 dark:border-border-subtle hover:border-brand-300 hover:text-brand-600 dark:hover:text-brand-400'
                               } disabled:cursor-default`}
                               title={tag.description}
                             >
@@ -653,7 +661,7 @@ function ItemDetailPanel({
                       />
                     </div>
                   ) : (
-                    <span className="text-[11px] font-black text-blue-500 uppercase tracking-widest">+ 태그 추가</span>
+                    <span className="text-[11px] font-black text-brand-500 dark:text-brand-400 uppercase tracking-widest">+ 태그 추가</span>
                   )
                 )}
                  {(!item.tags || item.tags.length === 0) && !isEditingTags && !isReadOnly && <span className="text-[13px] font-bold text-gray-300 dark:text-text-tertiary italic ml-1">비어 있음</span>}
@@ -667,7 +675,7 @@ function ItemDetailPanel({
                 <span className="text-[13px] font-black uppercase tracking-widest">연관 업무</span>
               </div>
               <div 
-                className={`flex-1 px-3 py-2 rounded-xl transition-all min-h-[40px] flex flex-col gap-2 justify-center ${!isReadOnly ? 'hover:bg-white dark:hover:bg-bg-hover hover:shadow-sm hover:ring-1 hover:ring-gray-100 dark:hover:ring-border-subtle' : ''} ${isEditingRelations ? 'bg-white dark:bg-bg-hover ring-2 ring-blue-500/20 border-blue-500/30 shadow-md' : ''}`}
+                className={`flex-1 px-3 py-2 rounded-xl transition-all min-h-[40px] flex flex-col gap-2 justify-center ${!isReadOnly ? 'hover:bg-white dark:hover:bg-bg-hover hover:shadow-sm hover:ring-1 hover:ring-gray-100 dark:hover:ring-border-subtle' : ''} ${isEditingRelations ? 'bg-white dark:bg-bg-hover ring-2 ring-brand-500/15 border-brand-400/30 shadow-md' : ''}`}
                 onClick={() => { if (!isReadOnly && !isEditingRelations) setIsEditingRelations(true); }}
               >
                 <div className="flex flex-wrap gap-2 items-center">
@@ -678,7 +686,7 @@ function ItemDetailPanel({
                       <span 
                         key={relatedId} 
                         onClick={(e) => { e.stopPropagation(); onOpenDetail?.(relatedId); }}
-                        className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800/40 px-3 py-1.5 rounded-xl text-[13px] font-black shadow-sm group/rel cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all hover:scale-105 active:scale-95"
+                        className="flex items-center gap-2 bg-brand-50 dark:bg-brand-800/20 text-brand-700 dark:text-brand-300 border border-brand-100 dark:border-brand-700/40 px-3 py-1.5 rounded-xl text-[13px] font-black shadow-sm group/rel cursor-pointer hover:bg-brand-100 dark:hover:bg-brand-800/30 transition-all hover:scale-105 active:scale-95"
                       >
                         <ArrowUpRight size={12} strokeWidth={3} />
                         {relatedItem.title || relatedItem.content}
@@ -694,7 +702,7 @@ function ItemDetailPanel({
                     );
                   })}
                   {!isReadOnly && !isEditingRelations && (
-                    <span className="text-[11px] font-black text-blue-500 uppercase tracking-widest cursor-pointer">+ 업무 연결</span>
+                    <span className="text-[11px] font-black text-brand-500 dark:text-brand-400 uppercase tracking-widest cursor-pointer">+ 업무 연결</span>
                   )}
                    {(!item.related_items || item.related_items.length === 0) && !isEditingRelations && !isReadOnly && (
                      <span className="text-[13px] font-bold text-gray-300 dark:text-text-tertiary italic ml-1">비어 있음</span>
@@ -709,7 +717,7 @@ function ItemDetailPanel({
                       <input 
                         autoFocus
                         placeholder="연결할 업무를 검색하세요..."
-                        className="w-full bg-white dark:bg-bg-base border border-gray-200 dark:border-border-subtle pl-10 pr-4 py-2.5 rounded-xl text-sm font-bold text-gray-900 dark:text-text-primary focus:ring-4 focus:ring-blue-500/10 outline-none shadow-sm transition-all"
+                        className="w-full bg-white dark:bg-bg-base border border-gray-200 dark:border-border-subtle pl-10 pr-4 py-2.5 rounded-xl text-sm font-bold text-gray-900 dark:text-text-primary focus:ring-4 focus:ring-brand-500/10 outline-none shadow-sm transition-all"
                         value={relationSearchQuery}
                         onChange={e => setRelationSearchQuery(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Escape') setIsEditingRelations(false); }}
@@ -723,10 +731,10 @@ function ItemDetailPanel({
                           <div 
                             key={searchItem.id}
                             onClick={() => handleAddRelation(searchItem.id)}
-                            className="p-3 rounded-xl text-sm font-bold text-gray-700 dark:text-text-secondary hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-300 cursor-pointer transition-colors flex items-center justify-between group/searchitem"
+                            className="p-3 rounded-xl text-sm font-bold text-gray-700 dark:text-text-secondary hover:bg-brand-50 dark:hover:bg-brand-800/20 hover:text-brand-600 dark:hover:text-brand-400 cursor-pointer transition-colors flex items-center justify-between group/searchitem"
                           >
                             <div className="flex items-center gap-3">
-                              <span className="px-2 py-0.5 bg-gray-100 dark:bg-bg-hover text-[11px] font-black text-gray-400 uppercase rounded-md group-hover/searchitem:bg-blue-100 dark:group-hover/searchitem:bg-blue-900/30 group-hover/searchitem:text-blue-500 transition-colors">
+                              <span className="px-2 py-0.5 bg-gray-100 dark:bg-bg-hover text-[11px] font-black text-gray-400 uppercase rounded-md group-hover/searchitem:bg-brand-100 dark:group-hover/searchitem:bg-brand-800/30 group-hover/searchitem:text-brand-500 transition-colors">
                                 {searchItem.teams?.[0] || '전체'}
                               </span>
                               {searchItem.title || searchItem.content}
@@ -851,6 +859,11 @@ function ItemDetailPanel({
                         <span className="text-[12px] font-bold text-gray-500 dark:text-text-tertiary">
                           이슈 생성 시 티켓이 없으면 자동으로 발급한 뒤 [{ticketKey || 'QZR-*'}] 형식으로 GitHub 이슈를 생성합니다.
                         </span>
+                        {needsGitHubAppInstall && (
+                          <span className="text-[12px] font-bold text-amber-600 dark:text-amber-400">
+                            GitHub App이 아직 설치되지 않아 이슈를 생성할 수 없습니다. 프로필에서 App 설치를 먼저 진행해주세요.
+                          </span>
+                        )}
                         {hasExistingGitHubIssue && (
                           <span className="text-[12px] font-bold text-amber-600 dark:text-amber-400">
                             이 아이템에는 이미 GitHub 이슈가 연결되어 있어서 추가 생성할 수 없습니다.
@@ -875,7 +888,7 @@ function ItemDetailPanel({
                           </select>
                           <button
                             onClick={handleCreateGitHubIssue}
-                            disabled={!selectedGitHubRepo || isGitHubSubmitting || hasExistingGitHubIssue}
+                            disabled={!selectedGitHubRepo || isGitHubSubmitting || hasExistingGitHubIssue || needsGitHubAppInstall}
                             className="px-4 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[12px] font-black uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                           >
                             {isGitHubSubmitting ? '티켓 발급 후 생성 중...' : '이슈 생성'}
@@ -890,7 +903,7 @@ function ItemDetailPanel({
                                 href={issue.issue_url}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 dark:border-border-subtle px-3 py-2 text-sm text-gray-700 dark:text-text-secondary hover:border-blue-300 dark:hover:border-blue-700"
+                                className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 dark:border-border-subtle px-3 py-2 text-sm text-gray-700 dark:text-text-secondary hover:border-brand-200 dark:hover:border-brand-600"
                               >
                                 <div className="flex items-center gap-2 flex-wrap min-w-0">
                                   <span className="font-bold">
@@ -970,11 +983,11 @@ function ItemDetailPanel({
                      <div
                        key={childItem.id}
                        onClick={() => onOpenDetail?.(childItem.id)}
-                       className="group flex items-center justify-between p-3 rounded-2xl border border-gray-100 dark:border-border-subtle hover:border-blue-200 dark:hover:border-blue-800/50 hover:shadow-md bg-white dark:bg-bg-elevated cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99]"
+                       className="group flex items-center justify-between p-3 rounded-2xl border border-gray-100 dark:border-border-subtle hover:border-brand-200 dark:hover:border-brand-700/50 hover:shadow-md bg-white dark:bg-bg-elevated cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99]"
                      >
                        <div className="flex items-center gap-3 min-w-0">
                          <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${childItem.status === 'done' ? 'bg-emerald-500' : childItem.status === 'in-progress' ? 'bg-blue-500' : 'bg-gray-300'}`} />
-                         <span className="text-sm font-bold text-gray-800 dark:text-text-primary truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                         <span className="text-sm font-bold text-gray-800 dark:text-text-primary truncate group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
                            {childItem.title || childItem.content}
                          </span>
                        </div>
@@ -998,7 +1011,7 @@ function ItemDetailPanel({
                          ) : (
                            <span className="text-[11px] font-bold text-gray-400 dark:text-text-tertiary mr-2">미배정</span>
                          )}
-                         <ChevronRight size={14} className="text-gray-300 dark:text-text-tertiary group-hover:text-blue-500 transition-colors" />
+                         <ChevronRight size={14} className="text-gray-300 dark:text-text-tertiary group-hover:text-brand-500 transition-colors" />
                        </div>
                      </div>
                    );

@@ -21,7 +21,7 @@
 | `usePresenceContext.jsx` | `usePresence` 결과를 하위 컴포넌트에 공유하는 Context 래퍼 | react |
 | `usePageTree.js` | projects+sections를 재귀 트리 구조로 변환. `page_type='page'`만 추려 사이드바 트리 생성 | - |
 | `usePeopleData.js` | 피플 보드 전용 데이터 (팀원별 assigned items). 현재는 직접 사용보다 보조 훅 성격 | kanbanAPI |
-| `useLayoutState.jsx` | 사이드바 열림/닫힘/hover 상태. Context로 제공, localStorage 영속 | - |
+| `useLayoutState.jsx` | 사이드바 열림/닫힘/너비 상태. Context로 제공, localStorage 영속 | - |
 
 ## 패턴 & 규칙
 

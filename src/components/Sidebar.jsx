@@ -1,5 +1,5 @@
 import { useState, useEffect, createElement, useMemo, useCallback } from 'react';
-import { ChevronRight, LayoutGrid, Clock, Users, MousePointer2, Ellipsis, BellDot, Moon, Sun, LogOut, Map } from 'lucide-react';
+import { ChevronRight, LayoutGrid, Clock, Users, Ellipsis, BellDot, Moon, Sun, LogOut, Map, Settings, Search, StickyNote, PanelLeftClose } from 'lucide-react';
 import {
   DndContext,
   PointerSensor,
@@ -10,6 +10,7 @@ import {
   DragOverlay
 } from '@dnd-kit/core';
 import { usePageTree } from '../hooks/usePageTree';
+import ProfileAvatar from './ProfileAvatar';
 import SidebarTree from './SidebarTree';
 import { getDropTypeFromRelativeY, getRelativeY } from './sidebarDropZones';
 
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
   { view: 'roadmap', label: '전사 로드맵', icon: Map },
   { view: 'board', label: '팀 보드', icon: LayoutGrid },
   { view: 'timeline', label: '타임라인', icon: Clock },
+  { view: 'personal', label: '개인 메모', icon: StickyNote },
   { view: 'people', label: '피플 보드', icon: Users },
 ];
 
@@ -51,13 +53,15 @@ export default function Sidebar({
   mounted,
   onToggleTheme,
   onLogout,
-  hoverMode,
-  onHoverModeToggle,
+  onToggleSidebar,
   onSetBoardType,  // 보드 선택 시 호출
   generalDocs = [],  // 신규: 독립 폴더/문서
   onShowToast,
   onMoveSidebarItem,
   onMoveSidebarProject,
+  onOpenProfileSettings,
+  profileCustomization,
+  onOpenSearch,
 }) {
   const [expandedIds, setExpandedIds] = useState(() => {
     try {
@@ -93,6 +97,7 @@ export default function Sidebar({
   }, [showMoreMenu]);
 
   const pageTree = usePageTree(projects, sections, generalDocs);
+  const profileName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Quazar';
   const allItems = useMemo(() => projects.flatMap((p) => p.items || []), [projects]);
   const projectIdSet = useMemo(() => new Set(projects.map((p) => p.id)), [projects]);
   const projectItemIdSet = useMemo(() => new Set(allItems.map((i) => i.id)), [allItems]);
@@ -297,13 +302,31 @@ export default function Sidebar({
         {/* Header */}
         <div className="flex-shrink-0 flex items-center justify-between px-3 py-3 border-b border-[color:var(--color-border-subtle)]">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-lg leading-none select-none" aria-hidden="true">Q</span>
-            <span className="text-sm font-semibold text-[color:var(--color-text-primary)] truncate">
-              Quazar
-            </span>
+            {user ? (
+              <ProfileAvatar
+                name={profileName}
+                customization={profileCustomization}
+                size="sm"
+                showMood={false}
+              />
+            ) : (
+              <span className="text-lg leading-none select-none" aria-hidden="true">Q</span>
+            )}
+            <span className="text-sm font-semibold text-[color:var(--color-text-primary)] truncate">{profileName}</span>
           </div>
 
-          <div className="relative flex items-center">
+          <div className="relative flex items-center gap-1">
+            <button
+              type="button"
+              className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-md
+                text-[color:var(--color-text-tertiary)] hover:text-[color:var(--color-text-primary)]
+                hover:bg-[color:var(--color-bg-hover)] transition-colors duration-100 cursor-pointer"
+              onClick={onToggleSidebar}
+              onPointerDown={stopProp}
+              title="사이드바 접기 (Ctrl/Cmd+B)"
+            >
+              <PanelLeftClose size={14} strokeWidth={2} />
+            </button>
             <button
               className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-md
                 text-[color:var(--color-text-tertiary)] hover:text-[color:var(--color-text-primary)]
@@ -329,24 +352,22 @@ export default function Sidebar({
                   className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] font-medium text-[color:var(--color-text-secondary)] hover:bg-[color:var(--color-bg-hover)] hover:text-[color:var(--color-text-primary)] transition-colors cursor-pointer"
                   onClick={() => {
                     setShowMoreMenu(false);
-                    onShowReleaseNotes?.();
+                    onOpenSearch?.();
                   }}
                 >
-                  <BellDot size={14} strokeWidth={1.9} className="flex-shrink-0" />
-                  <span>업데이트 내역</span>
+                  <Search size={14} strokeWidth={1.9} className="flex-shrink-0" />
+                  <span>검색 열기</span>
                 </button>
                 <button
                   type="button"
                   className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] font-medium text-[color:var(--color-text-secondary)] hover:bg-[color:var(--color-bg-hover)] hover:text-[color:var(--color-text-primary)] transition-colors cursor-pointer"
                   onClick={() => {
                     setShowMoreMenu(false);
-                    onHoverModeToggle?.();
+                    onShowReleaseNotes?.();
                   }}
                 >
-                  {!hoverMode && (
-                    <MousePointer2 size={14} strokeWidth={1.9} className="flex-shrink-0" />
-                  )}
-                  <span>{hoverMode ? '클릭 모드로 전환' : '호버 모드로 전환'}</span>
+                  <BellDot size={14} strokeWidth={1.9} className="flex-shrink-0" />
+                  <span>업데이트 내역</span>
                 </button>
                 {mounted && (
                   <button
@@ -518,6 +539,40 @@ export default function Sidebar({
               </div>
             );
           })}
+        </div>
+
+        <div className="flex-shrink-0 border-t border-[color:var(--color-border-subtle)] px-2 py-2">
+          {user ? (
+            <div className="space-y-1">
+              <button
+                type="button"
+                className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-left hover:bg-[color:var(--color-bg-hover)] transition-colors cursor-pointer"
+                onClick={onOpenProfileSettings}
+                title="프로필 설정"
+              >
+                <ProfileAvatar
+                  name={user?.user_metadata?.name || user?.email || 'U'}
+                  customization={profileCustomization}
+                  size="sm"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[12px] font-semibold text-[color:var(--color-text-primary)] truncate">
+                    {user?.user_metadata?.name || user?.email?.split('@')[0]}
+                  </div>
+                  {profileCustomization?.statusMessage && (
+                    <div className="text-[11px] text-[color:var(--color-text-tertiary)] truncate">
+                      {profileCustomization.statusMessage}
+                    </div>
+                  )}
+                </div>
+                <Settings size={14} className="text-[color:var(--color-text-tertiary)] flex-shrink-0" />
+              </button>
+            </div>
+          ) : (
+            <div className="px-2 py-1 text-[11px] text-[color:var(--color-text-tertiary)]">
+              게스트 모드
+            </div>
+          )}
         </div>
       </div>
     </DndContext>

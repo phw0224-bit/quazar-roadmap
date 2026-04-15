@@ -45,6 +45,14 @@ export async function startGitHubConnect() {
   window.location.href = data.url;
 }
 
+export async function startGitHubAppInstall() {
+  const data = await serverRequest('/api/github/app/install/start', { method: 'GET' });
+  if (!data?.url) {
+    throw new Error('GitHub App 설치 URL을 받지 못했습니다.');
+  }
+  window.location.href = data.url;
+}
+
 export async function getGitHubRepos() {
   const data = await serverRequest('/api/github/repos', { method: 'GET' });
   return data?.repos || [];
