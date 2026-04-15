@@ -24,6 +24,7 @@ import ItemDescriptionSection from './ItemDescriptionSection';
 import DocumentOutline from './DocumentOutline';
 import BacklinksPanel from './BacklinksPanel';
 import { TEAMS, STATUS_MAP, PRIORITY_MAP } from '../lib/constants';
+import { TAG_CATALOG } from '../lib/tagCatalog';
 import { usePresenceContext } from '../hooks/usePresenceContext';
 import ItemViewers from './ItemViewers';
 import { ENTITY_TYPES, getEntityLabel } from '../lib/entityModel';
@@ -200,17 +201,28 @@ function ItemDetailPanel({
   };
 
   const handleAddTag = async () => {
-    if (!newTagInput.trim()) {
+    const tagName = newTagInput.trim();
+    if (!tagName) {
       setIsEditingTags(false);
       return;
     }
     const currentTags = item.tags || [];
-    if (!currentTags.includes(newTagInput.trim())) {
-      await onUpdateItem(phase.id, item.id, { tags: [...currentTags, newTagInput.trim()] });
-      onShowToast?.(`태그 #${newTagInput.trim()} 추가됨`);
+    if (!currentTags.includes(tagName)) {
+      await onUpdateItem(phase.id, item.id, { tags: [...currentTags, tagName] });
+      onShowToast?.(`태그 #${tagName} 추가됨`);
     }
     setNewTagInput('');
     setIsEditingTags(false);
+  };
+
+  const handleSelectPresetTag = async (tagName) => {
+    const currentTags = item.tags || [];
+    if (currentTags.includes(tagName)) {
+      return;
+    }
+
+    await onUpdateItem(phase.id, item.id, { tags: [...currentTags, tagName] });
+    onShowToast?.(`태그 #${tagName} 추가됨`);
   };
 
   const handleRemoveTag = async (tag) => {
@@ -583,7 +595,7 @@ function ItemDetailPanel({
                 <Tag size={18} strokeWidth={2.5} />
                 <span className="text-[13px] font-black uppercase tracking-widest">태그</span>
               </div>
-              <div 
+              <div
                 className={`flex-1 px-3 py-2 rounded-xl transition-all min-h-[40px] flex flex-wrap gap-2 items-center ${!isReadOnly ? 'hover:bg-white dark:hover:bg-bg-hover hover:shadow-sm hover:ring-1 hover:ring-gray-100 dark:hover:ring-border-subtle cursor-pointer' : ''} ${isEditingTags ? 'bg-white dark:bg-bg-hover ring-2 ring-blue-500/20 border-blue-500/30 shadow-md' : ''}`}
                 onClick={() => !isReadOnly && setIsEditingTags(true)}
               >
@@ -595,18 +607,51 @@ function ItemDetailPanel({
                 ))}
                 {!isReadOnly && (
                   isEditingTags ? (
-                    <input 
-                      autoFocus
-                      placeholder="태그 입력..."
-                      className="bg-transparent border-none p-0 font-mono text-[13px] font-black text-gray-900 dark:text-text-primary focus:ring-0 w-32 uppercase"
-                      value={newTagInput}
-                      onChange={e => setNewTagInput(e.target.value)}
-                      onBlur={handleAddTag}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') handleAddTag();
-                        if (e.key === 'Escape') setIsEditingTags(false);
-                      }}
-                    />
+                    <div className="w-full flex flex-col gap-3" onClick={stopProp}>
+                      <div className="flex flex-wrap gap-2">
+                        {TAG_CATALOG.map((tag) => {
+                          const isSelected = (item.tags || []).includes(tag.name);
+                          return (
+                            <button
+                              key={tag.name}
+                              type="button"
+                              disabled={isSelected}
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => handleSelectPresetTag(tag.name)}
+                              className={`px-3 py-1.5 rounded-lg text-[11px] font-black tracking-wide border transition-all ${
+                                isSelected
+                                  ? 'bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-gray-900 dark:border-white'
+                                  : 'bg-white dark:bg-bg-base text-gray-700 dark:text-text-secondary border-gray-200 dark:border-border-subtle hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-300'
+                              } disabled:cursor-default`}
+                              title={tag.description}
+                            >
+                              #{tag.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="grid gap-1.5 text-[12px] text-gray-500 dark:text-text-tertiary">
+                        {TAG_CATALOG.map((tag) => (
+                          <div key={`${tag.name}-description`} className="leading-relaxed">
+                            <span className="font-black text-gray-700 dark:text-text-secondary">#{tag.name}</span>
+                            {' '}
+                            {tag.description}
+                          </div>
+                        ))}
+                      </div>
+                      <input
+                        autoFocus
+                        placeholder="직접 태그 입력..."
+                        className="bg-transparent border-none p-0 font-mono text-[13px] font-black text-gray-900 dark:text-text-primary focus:ring-0 w-full"
+                        value={newTagInput}
+                        onChange={e => setNewTagInput(e.target.value)}
+                        onBlur={handleAddTag}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleAddTag();
+                          if (e.key === 'Escape') setIsEditingTags(false);
+                        }}
+                      />
+                    </div>
                   ) : (
                     <span className="text-[11px] font-black text-blue-500 uppercase tracking-widest">+ 태그 추가</span>
                   )

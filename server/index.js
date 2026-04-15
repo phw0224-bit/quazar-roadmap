@@ -6,6 +6,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
+import { TAG_CATALOG_BY_NAME } from '../src/lib/tagCatalog.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -425,6 +426,60 @@ function createHttpError(status, message) {
   return error;
 }
 
+function normalizeGitHubLabels(tags) {
+  if (!Array.isArray(tags)) return [];
+
+  return [...new Set(
+    tags
+      .map((tag) => String(tag || '').trim())
+      .filter(Boolean)
+  )];
+}
+
+async function ensureGitHubLabel(repoFullName, labelName, token) {
+  const preset = TAG_CATALOG_BY_NAME.get(labelName);
+
+  try {
+    await fetchGitHubJson(`https://api.github.com/repos/${repoFullName}/labels`, token, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: labelName,
+        color: preset?.color || '64748b',
+        description: preset?.description || null,
+      }),
+    });
+  } catch (error) {
+    if (error.status === 422) {
+      return;
+    }
+    throw error;
+  }
+}
+
+async function syncGitHubIssueLabels(repoFullName, issueNumber, labels, token) {
+  const normalizedLabels = normalizeGitHubLabels(labels);
+  if (normalizedLabels.length === 0) {
+    return [];
+  }
+
+  for (const labelName of normalizedLabels) {
+    await ensureGitHubLabel(repoFullName, labelName, token);
+  }
+
+  const syncedLabels = await fetchGitHubJson(
+    `https://api.github.com/repos/${repoFullName}/issues/${issueNumber}/labels`,
+    token,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ labels: normalizedLabels }),
+    }
+  );
+
+  return Array.isArray(syncedLabels) ? syncedLabels : [];
+}
+
 app.get('/api/github/connect/start', async (req, res) => {
   try {
     if (!requireServerConfig(res)) return;
@@ -651,6 +706,25 @@ app.post('/api/github/issues', async (req, res) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, body }),
     });
+    const labelNames = normalizeGitHubLabels(item.tags);
+    let appliedLabels = [];
+
+    if (labelNames.length > 0) {
+      try {
+        appliedLabels = await syncGitHubIssueLabels(
+          repoFullName,
+          issue.number,
+          labelNames,
+          connection.access_token
+        );
+      } catch (labelError) {
+        console.warn('GitHub issue label sync warning:', {
+          repoFullName,
+          issueNumber: issue.number,
+          message: labelError.message,
+        });
+      }
+    }
 
     const record = {
       item_id: itemId,
@@ -678,6 +752,7 @@ app.post('/api/github/issues', async (req, res) => {
         ...data,
         ticket_key: ticket.ticket_key,
         ticket_number: ticket.ticket_number,
+        labels: appliedLabels,
       },
       ticket,
       itemStatus,
