@@ -45,7 +45,7 @@ export default function ReleaseNotesModal({ releases, initialId, onClose }) {
                         {r.version}
                       </span>
                       {isLatest && (
-                        <span className="rounded-full bg-blue-100 dark:bg-blue-900/40 px-1.5 py-0.5 text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                        <span className="rounded-full bg-brand-100 dark:bg-brand-800/40 px-1.5 py-0.5 text-[10px] font-bold text-brand-600 dark:text-brand-400">
                           최신
                         </span>
                       )}

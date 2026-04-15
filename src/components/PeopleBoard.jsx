@@ -152,7 +152,7 @@ export default function PeopleBoard({
               return (
                 <article
                   key={member.id}
-                  className="group rounded-[32px] border border-gray-100 dark:border-border-subtle bg-white dark:bg-bg-elevated p-6 flex flex-col gap-6 shadow-sm hover:shadow-2xl hover:border-blue-200 dark:hover:border-blue-900/30 transition-all duration-300 ease-notion"
+                  className="group rounded-[32px] border border-gray-100 dark:border-border-subtle bg-white dark:bg-bg-elevated p-6 flex flex-col gap-6 shadow-sm hover:shadow-2xl hover:border-brand-200 dark:hover:border-brand-800/40 transition-all duration-300 ease-notion"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <button
@@ -206,11 +206,11 @@ export default function PeopleBoard({
                                 return (
                                   <span
                                     key={proj}
-                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-black bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800/40"
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-black bg-brand-50 dark:bg-brand-800/20 text-brand-700 dark:text-brand-300 border border-brand-100 dark:border-brand-700/40"
                                   >
                                     <Briefcase size={10} />
                                     {proj}
-                                    <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-black ${isAll ? 'bg-blue-500 dark:bg-blue-600 text-white' : 'bg-blue-100 dark:bg-blue-800/40 text-blue-600 dark:text-blue-200'}`}>
+                                    <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-black ${isAll ? 'bg-brand-500 dark:bg-brand-600 text-white' : 'bg-brand-100 dark:bg-brand-800/40 text-brand-600 dark:text-brand-300'}`}>
                                       {isAll ? 'ALL' : count}
                                     </span>
                                   </span>
@@ -238,7 +238,7 @@ export default function PeopleBoard({
                               {remainCount > 0 && (
                                 <button
                                   onClick={() => toggleMember(member.id)}
-                                  className="text-left text-[11px] font-black text-gray-400 dark:text-text-tertiary hover:text-blue-500 dark:hover:text-blue-400 transition-colors duration-150 pl-3.5"
+                                  className="text-left text-[11px] font-black text-gray-400 dark:text-text-tertiary hover:text-brand-500 dark:hover:text-brand-400 transition-colors duration-150 pl-3.5"
                                 >
                                   + {remainCount}개 더
                                 </button>
@@ -299,7 +299,7 @@ export default function PeopleBoard({
                                   <button
                                     key={`${member.id}-${categoryName}-${task.id}`}
                                     onClick={() => onOpenItem(task.id)}
-                                    className="w-full text-left rounded-xl border border-gray-100 dark:border-border-subtle bg-white dark:bg-bg-elevated px-4 py-3 hover:bg-white dark:hover:bg-bg-hover hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-500/50 hover:scale-[1.02] transition-all duration-200 cursor-pointer group/task"
+                                    className="w-full text-left rounded-xl border border-gray-100 dark:border-border-subtle bg-white dark:bg-bg-elevated px-4 py-3 hover:bg-white dark:hover:bg-bg-hover hover:shadow-lg hover:border-brand-200 dark:hover:border-brand-500/50 hover:scale-[1.02] transition-all duration-200 cursor-pointer group/task"
                                   >
                                     <div className="flex items-center justify-between mb-2">
                                       <div className={`w-2 h-2 rounded-full ${task.status === 'done' ? 'bg-emerald-500' : task.status === 'in-progress' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
@@ -375,7 +375,7 @@ export default function PeopleBoard({
                       disabled={disabled || loadingSummary || reactingType === type}
                       className={`rounded-xl border px-2 py-2 flex flex-col items-center gap-1 transition-colors ${
                         mine
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/25'
+                          ? 'border-brand-400 bg-brand-50 dark:bg-brand-800/25'
                           : 'border-gray-200 dark:border-border-subtle'
                       } ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-bg-hover'}`}
                       title={meta.label}

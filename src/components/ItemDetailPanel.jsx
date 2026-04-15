@@ -323,6 +323,11 @@ function ItemDetailPanel({
   }, [item, allItems]);
   const ticketKey = issuedTicket.key || item?.ticket_key || '';
   const hasExistingGitHubIssue = githubIssues.length > 0;
+  const needsGitHubAppInstall = Boolean(
+    githubStatus?.connected
+      && githubStatus?.app?.configured
+      && !githubStatus?.app?.installed
+  );
 
   if (!item) return null;
 
@@ -857,6 +862,11 @@ function ItemDetailPanel({
                         <span className="text-[12px] font-bold text-gray-500 dark:text-text-tertiary">
                           이슈 생성 시 티켓이 없으면 자동으로 발급한 뒤 [{ticketKey || 'QZR-*'}] 형식으로 GitHub 이슈를 생성합니다.
                         </span>
+                        {needsGitHubAppInstall && (
+                          <span className="text-[12px] font-bold text-amber-600 dark:text-amber-400">
+                            GitHub App이 아직 설치되지 않아 이슈를 생성할 수 없습니다. 프로필에서 App 설치를 먼저 진행해주세요.
+                          </span>
+                        )}
                         {hasExistingGitHubIssue && (
                           <span className="text-[12px] font-bold text-amber-600 dark:text-amber-400">
                             이 아이템에는 이미 GitHub 이슈가 연결되어 있어서 추가 생성할 수 없습니다.
@@ -881,7 +891,7 @@ function ItemDetailPanel({
                           </select>
                           <button
                             onClick={handleCreateGitHubIssue}
-                            disabled={!selectedGitHubRepo || isGitHubSubmitting || hasExistingGitHubIssue}
+                            disabled={!selectedGitHubRepo || isGitHubSubmitting || hasExistingGitHubIssue || needsGitHubAppInstall}
                             className="px-4 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[12px] font-black uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                           >
                             {isGitHubSubmitting ? '티켓 발급 후 생성 중...' : '이슈 생성'}

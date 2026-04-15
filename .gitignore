@@ -35,3 +35,7 @@ yarn.lock/
 docs/superpowers/*
 public/uploads/*
 .omx/
+.codex
+.impeccable.md
+.mcp.json
+.claude\settings.local.json

@@ -133,7 +133,7 @@ export default function SearchModal({ projects = [], phases = projects, addition
                   key={item.id}
                   className={`w-full text-left px-4 py-3 flex flex-col gap-1 border-b border-gray-50 dark:border-border-subtle/50 last:border-0 transition-colors cursor-pointer ${
                     idx === selectedIdx
-                      ? 'bg-blue-50 dark:bg-blue-900/20'
+                      ? 'bg-brand-50 dark:bg-brand-800/20'
                       : 'hover:bg-gray-50 dark:hover:bg-bg-hover'
                   }`}
                   onMouseEnter={() => setSelectedIdx(idx)}

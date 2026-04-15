@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { ChevronRight, Plus, GripVertical } from 'lucide-react';
+import { ChevronRight, Plus, GripVertical, Ticket } from 'lucide-react';
 import { useSortable, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -58,6 +58,8 @@ const SortableTreeItem = memo(function SortableTreeItem({
 
   const label = node.title || node.content || '제목 없음';
   const icon = isProject ? '📋' : node.page_type === 'folder' ? '📁' : '📄';
+  const ticketKey = node.ticket_key || '';
+  const hasTicket = Boolean(ticketKey || node.is_ticket);
   const isOver = dragOverInfo?.id === node.id;
   const canAddChild = !isReadOnly && Boolean(isProject || node.project_id);
 
@@ -111,6 +113,16 @@ const SortableTreeItem = memo(function SortableTreeItem({
         >
           {label}
         </span>
+
+        {hasTicket && (
+          <span
+            className="inline-flex max-w-[120px] items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800/60 dark:text-slate-200"
+            title={ticketKey || 'GitHub ticket'}
+          >
+            <Ticket size={10} strokeWidth={2.25} />
+            <span className="truncate">{ticketKey || 'TICKET'}</span>
+          </span>
+        )}
 
         {/* + button */}
         {canAddChild && (

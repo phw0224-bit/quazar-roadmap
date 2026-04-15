@@ -16,10 +16,12 @@ export default function ProfileSettingsModal({
   gitHubStatus,
   gitHubLoading = false,
   gitHubConnecting = false,
+  gitHubAppInstalling = false,
   saving = false,
   onClose,
   onSave,
   onConnectGitHub,
+  onInstallGitHubApp,
 }) {
   const [draft, setDraft] = useState(() => normalizeProfileCustomization(initialValue || DEFAULT_PROFILE_CUSTOMIZATION));
 
@@ -35,7 +37,7 @@ export default function ProfileSettingsModal({
       <div className="relative w-full max-w-2xl rounded-[32px] border border-gray-100 dark:border-border-subtle bg-white dark:bg-bg-elevated shadow-[0_30px_80px_rgba(0,0,0,0.4)] p-8 animate-scale-in">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <p className="text-[11px] font-black text-blue-500 uppercase tracking-[0.24em]">Customize</p>
+            <p className="text-[11px] font-black text-text-tertiary uppercase tracking-[0.24em]">프로필 설정</p>
             <h3 className="text-2xl font-black text-gray-900 dark:text-text-primary tracking-tight">내 프로필 꾸미기</h3>
           </div>
           <ProfileAvatar
@@ -58,23 +60,43 @@ export default function ProfileSettingsModal({
                     {gitHubLoading
                       ? '연결 상태를 확인하는 중...'
                       : gitHubStatus?.connected
-                        ? `Connected as @${gitHubStatus.githubLogin}`
+                        ? gitHubStatus?.app?.configured
+                          ? gitHubStatus?.app?.installed
+                            ? `Connected as @${gitHubStatus.githubLogin} · App 설치 완료`
+                            : `Connected as @${gitHubStatus.githubLogin} · App 설치 필요`
+                          : `Connected as @${gitHubStatus.githubLogin}`
                         : '아이템에서 이슈를 만들려면 GitHub 계정을 연결해야 합니다.'}
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={onConnectGitHub}
-                disabled={gitHubLoading || gitHubConnecting}
-                className="px-4 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-black hover:bg-black dark:hover:bg-gray-100 disabled:opacity-60 cursor-pointer"
-              >
-                {gitHubConnecting
-                  ? '연결 중...'
-                  : gitHubStatus?.connected
-                    ? 'GitHub 재연결'
-                    : 'GitHub 연결'}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onConnectGitHub}
+                  disabled={gitHubLoading || gitHubConnecting}
+                  className="px-4 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-black hover:bg-black dark:hover:bg-gray-100 disabled:opacity-60 cursor-pointer"
+                >
+                  {gitHubConnecting
+                    ? '연결 중...'
+                    : gitHubStatus?.connected
+                      ? 'GitHub 재연결'
+                      : 'GitHub 연결'}
+                </button>
+                {gitHubStatus?.connected && gitHubStatus?.app?.configured && (
+                  <button
+                    type="button"
+                    onClick={onInstallGitHubApp}
+                    disabled={gitHubLoading || gitHubAppInstalling}
+                    className="px-4 py-2 rounded-xl border border-gray-300 dark:border-border-subtle text-gray-700 dark:text-text-secondary text-sm font-black hover:border-gray-400 dark:hover:border-border-strong disabled:opacity-60 cursor-pointer"
+                  >
+                    {gitHubAppInstalling
+                      ? '설치 이동 중...'
+                      : gitHubStatus?.app?.installed
+                        ? 'GitHub App 재설치'
+                        : 'GitHub App 설치'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -88,7 +110,7 @@ export default function ProfileSettingsModal({
                   onClick={() => updateDraft('avatarStyle', option.value)}
                   className={`rounded-xl border p-2 flex justify-center transition-all cursor-pointer ${
                     draft.avatarStyle === option.value
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/25'
+                      ? 'border-brand-400 bg-brand-50 dark:bg-brand-800/25'
                       : 'border-gray-200 dark:border-border-subtle hover:border-gray-300 dark:hover:border-border-strong'
                   }`}
                   title={option.label}
@@ -114,7 +136,7 @@ export default function ProfileSettingsModal({
                   onClick={() => updateDraft('themeColor', option.value)}
                   className={`h-10 rounded-xl border-2 transition-all cursor-pointer ${option.chip} ${
                     draft.themeColor === option.value
-                      ? 'border-white ring-2 ring-blue-400'
+                      ? 'border-white ring-2 ring-brand-400'
                       : 'border-transparent opacity-85 hover:opacity-100'
                   }`}
                   title={option.value}
@@ -131,7 +153,7 @@ export default function ProfileSettingsModal({
                 onClick={() => updateDraft('moodEmoji', '')}
                 className={`h-9 rounded-lg border text-[11px] font-bold cursor-pointer ${
                   !draft.moodEmoji
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/25 text-blue-600 dark:text-blue-300'
+                    ? 'border-brand-400 bg-brand-50 dark:bg-brand-800/25 text-brand-600 dark:text-brand-400'
                     : 'border-gray-200 dark:border-border-subtle text-gray-500 dark:text-text-tertiary hover:text-gray-700 dark:hover:text-text-secondary'
                 }`}
               >
@@ -144,7 +166,7 @@ export default function ProfileSettingsModal({
                   onClick={() => updateDraft('moodEmoji', emoji)}
                   className={`h-9 rounded-lg border text-lg cursor-pointer ${
                     draft.moodEmoji === emoji
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/25'
+                      ? 'border-brand-400 bg-brand-50 dark:bg-brand-800/25'
                       : 'border-gray-200 dark:border-border-subtle hover:border-gray-300 dark:hover:border-border-strong'
                   }`}
                 >
@@ -164,7 +186,7 @@ export default function ProfileSettingsModal({
               maxLength={40}
               value={draft.statusMessage}
               onChange={(e) => updateDraft('statusMessage', e.target.value)}
-              className="w-full rounded-xl border border-gray-200 dark:border-border-subtle bg-gray-50 dark:bg-bg-base px-4 py-2.5 text-sm text-gray-900 dark:text-text-primary focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              className="w-full rounded-xl border border-gray-200 dark:border-border-subtle bg-gray-50 dark:bg-bg-base px-4 py-2.5 text-sm text-gray-900 dark:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/25"
               placeholder="예) 오늘은 집중모드 ON"
             />
           </div>

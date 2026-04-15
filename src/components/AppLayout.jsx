@@ -53,7 +53,7 @@ export default function AppLayout({
       {/* Hover trigger zone & floating sidebar */}
       {hoverMode && (
         <div
-          className={`absolute left-0 top-0 h-full z-40 transition-all ${isHovering ? 'w-56' : 'w-4'}`}
+          className={`absolute left-0 top-0 h-full z-40 transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${isHovering ? 'w-56' : 'w-4'}`}
           onMouseEnter={() => setIsHovering(true)}
           onMouseLeave={() => setIsHovering(false)}
         >

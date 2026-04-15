@@ -77,7 +77,7 @@ export default function BacklinksPanel({ itemId, onOpenDetail, allItems }) {
               <Icon
                 size={13}
                 className="flex-shrink-0 text-gray-400 dark:text-text-tertiary
-                  group-hover:text-blue-400 transition-colors"
+                  group-hover:text-brand-400 transition-colors"
               />
               <span className="flex-1 truncate group-hover:text-gray-900 dark:group-hover:text-text-primary">
                 {title}

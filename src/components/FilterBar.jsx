@@ -48,7 +48,7 @@ function DropdownItem({ onClick, children, active }) {
       onClick={onClick}
       className={`w-full text-left px-3 py-2 text-sm transition-colors cursor-pointer ${
         active
-          ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 font-medium'
+          ? 'bg-brand-50 dark:bg-brand-800/25 text-brand-600 dark:text-brand-400 font-medium'
           : 'text-gray-700 dark:text-text-secondary hover:bg-gray-50 dark:hover:bg-bg-hover'
       }`}
     >
@@ -144,7 +144,7 @@ export default function FilterBar({
                       if (e.key === 'Escape') setAddingField(null);
                     }}
                     placeholder="이름 입력 후 Enter"
-                    className="w-full text-sm border border-gray-200 dark:border-border-subtle rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 bg-white dark:bg-bg-base text-gray-900 dark:text-text-primary placeholder-gray-400"
+                    className="w-full text-sm border border-gray-200 dark:border-border-subtle rounded-lg px-2.5 py-1.5 outline-none focus:border-brand-400 dark:focus:border-brand-500 bg-white dark:bg-bg-base text-gray-900 dark:text-text-primary placeholder-gray-400"
                   />
                 </div>
               )}
@@ -167,14 +167,14 @@ export default function FilterBar({
         return (
           <div
             key={`${filter.field}-${filter.value}-${i}`}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-sm bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-lg border border-blue-200 dark:border-blue-800 whitespace-nowrap"
+            className="flex items-center gap-1.5 px-2.5 py-1 text-sm bg-brand-50 dark:bg-brand-800/25 text-brand-600 dark:text-brand-400 rounded-lg border border-brand-200 dark:border-brand-700 whitespace-nowrap"
           >
-            <span className="text-blue-400 dark:text-blue-500 text-xs font-medium">{fieldDef?.label}</span>
+            <span className="text-brand-400 dark:text-brand-500 text-xs font-medium">{fieldDef?.label}</span>
             <span className="font-medium">{optLabel}</span>
             <button
               type="button"
               onClick={() => onRemoveFilter(filter.field, filter.value)}
-              className="ml-0.5 hover:text-blue-900 dark:hover:text-blue-200 transition-colors cursor-pointer"
+              className="ml-0.5 hover:text-brand-700 dark:hover:text-brand-200 transition-colors cursor-pointer"
             >
               <X size={12} />
             </button>

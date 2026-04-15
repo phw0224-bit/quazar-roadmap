@@ -82,7 +82,7 @@ export default function Comment({
         
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 ml-auto">
           <button
-            className="p-2 hover:bg-white dark:hover:bg-bg-hover rounded-lg text-gray-400 dark:text-text-tertiary hover:text-blue-600 dark:hover:text-blue-400 transition-all cursor-pointer shadow-sm border border-transparent hover:border-gray-100 dark:hover:border-border-subtle"
+            className="p-2 hover:bg-white dark:hover:bg-bg-hover rounded-lg text-gray-400 dark:text-text-tertiary hover:text-brand-500 dark:hover:text-brand-400 transition-all cursor-pointer shadow-sm border border-transparent hover:border-gray-100 dark:hover:border-border-subtle"
             onClick={(e) => {
               e.stopPropagation();
               setIsEditing(true);

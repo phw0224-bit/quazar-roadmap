@@ -37,7 +37,11 @@ import { PresenceContext } from '../hooks/usePresenceContext';
 import PresenceAvatars from './PresenceAvatars';
 import { useLayoutState } from '../hooks/useLayoutState';
 import API from '../api/kanbanAPI';
-import { getGitHubStatus, startGitHubConnect } from '../api/githubAPI';
+import {
+  getGitHubStatus,
+  startGitHubAppInstall,
+  startGitHubConnect,
+} from '../api/githubAPI';
 import ProfileAvatar from './ProfileAvatar';
 import ProfileSettingsModal from './ProfileSettingsModal';
 import ProjectColumn from './ProjectColumn';
@@ -97,6 +101,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
   const [gitHubStatus, setGitHubStatus] = useState({ connected: false });
   const [isGitHubStatusLoading, setIsGitHubStatusLoading] = useState(false);
   const [isGitHubConnecting, setIsGitHubConnecting] = useState(false);
+  const [isGitHubAppInstalling, setIsGitHubAppInstalling] = useState(false);
   const { onlineUsers, updateEditing } = usePresence({
     user,
     itemId: detailItemId,
@@ -205,6 +210,16 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
     } catch (error) {
       showToast(error.message || 'GitHub 연결을 시작하지 못했습니다.', 'error');
       setIsGitHubConnecting(false);
+    }
+  };
+
+  const handleInstallGitHubApp = async () => {
+    try {
+      setIsGitHubAppInstalling(true);
+      await startGitHubAppInstall();
+    } catch (error) {
+      showToast(error.message || 'GitHub App 설치를 시작하지 못했습니다.', 'error');
+      setIsGitHubAppInstalling(false);
     }
   };
 
@@ -879,7 +894,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                           }}
                           className="px-5 py-2.5 bg-gray-50 dark:bg-bg-elevated text-gray-500 dark:text-text-secondary rounded-xl text-sm font-bold hover:bg-gray-100 dark:hover:bg-bg-hover border border-dashed border-gray-300 dark:border-border-strong transition-all flex items-center gap-2 group/add cursor-pointer hover:shadow-md"
                         >
-                          <span className="text-xl group-hover/add:text-blue-500 transition-colors">+</span>
+                          <span className="text-xl group-hover/add:text-brand-500 transition-colors">+</span>
                           새 프로젝트 추가
                         </button>
                         <button
@@ -932,7 +947,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                               {user && (
                                 <button
                                   onClick={() => showPrompt(`${boardDisplayName} 첫 프로젝트 만들기`, '첫 번째 프로젝트의 이름을 입력하세요', (title) => { if (title) { addProject(title, boardName.toLowerCase()); showToast(`'${title}' 프로젝트가 생성되었습니다.`); setPrompt(null); } })}
-                                  className="text-sm font-black text-blue-500 bg-white dark:bg-bg-elevated px-8 py-3.5 rounded-2xl shadow-lg border border-blue-100 dark:border-blue-900/30 hover:bg-blue-50 dark:hover:bg-bg-hover transition-all flex items-center gap-2 hover:scale-105 active:scale-95 cursor-pointer uppercase tracking-widest"
+                                  className="text-sm font-black text-brand-500 dark:text-brand-400 bg-white dark:bg-bg-elevated px-8 py-3.5 rounded-2xl shadow-lg border border-brand-100 dark:border-brand-800/30 hover:bg-brand-50 dark:hover:bg-bg-hover transition-all flex items-center gap-2 hover:scale-105 active:scale-95 cursor-pointer uppercase tracking-widest"
                                 >
                                   + 첫 번째 프로젝트 추가하기
                                 </button>
@@ -981,7 +996,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                                       className={`transition-transform duration-200 ${expandedGeneralDocBoards.has(boardName) ? 'rotate-90' : ''}`}
                                     />
                                     <span>📄 일반 문서</span>
-                                    <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-xs font-bold tabular-nums">
+                                    <span className="px-2 py-0.5 bg-brand-100 dark:bg-brand-800/30 text-brand-600 dark:text-brand-400 rounded-full text-xs font-bold tabular-nums">
                                       {boardGeneralDocs.length}
                                     </span>
                                   </button>
@@ -990,7 +1005,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                                   {!isReadOnly && (
                                     <div className="flex gap-2">
                                       <button
-                                        className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 dark:text-text-primary hover:bg-blue-50 dark:hover:bg-blue-900/10 rounded transition-colors"
+                                        className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 dark:text-text-primary hover:bg-brand-50 dark:hover:bg-brand-800/10 rounded transition-colors"
                                         onClick={() => {
                                           showPrompt(
                                             '새 문서 추가',
@@ -1217,10 +1232,12 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
               gitHubStatus={gitHubStatus}
               gitHubLoading={isGitHubStatusLoading}
               gitHubConnecting={isGitHubConnecting}
+              gitHubAppInstalling={isGitHubAppInstalling}
               saving={isSavingProfile}
               onClose={() => setIsProfileModalOpen(false)}
               onSave={handleSaveProfileCustomization}
               onConnectGitHub={handleConnectGitHub}
+              onInstallGitHubApp={handleInstallGitHubApp}
             />
           )}
         </div>
@@ -1245,7 +1262,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                 className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize z-50 group transition-all duration-300"
                 onMouseDown={startResizing}
               >
-                <div className="absolute inset-y-0 left-0 w-[2px] bg-gray-100 dark:bg-border-subtle group-hover:bg-blue-500/50 group-active:bg-blue-600 transition-colors"></div>
+                <div className="absolute inset-y-0 left-0 w-[2px] bg-gray-100 dark:bg-border-subtle group-hover:bg-brand-400/50 group-active:bg-brand-500 transition-colors"></div>
               </div>
             )}
             
@@ -1347,7 +1364,7 @@ export default function KanbanBoard({ onShowLogin, onShowReleaseNotes }) {
                       selectFolder.onSelect(folder.id);
                       setSelectFolder(null);
                     }}
-                    className="w-full text-left px-4 py-3 rounded-lg bg-gray-50 dark:bg-bg-hover hover:bg-gray-100 dark:hover:bg-bg-elevated border border-gray-200 dark:border-border-subtle hover:border-blue-300 dark:hover:border-blue-700 transition-all flex items-center gap-2"
+                    className="w-full text-left px-4 py-3 rounded-lg bg-gray-50 dark:bg-bg-hover hover:bg-gray-100 dark:hover:bg-bg-elevated border border-gray-200 dark:border-border-subtle hover:border-brand-200 dark:hover:border-brand-600 transition-all flex items-center gap-2"
                   >
                     <span className="text-lg">📁</span>
                     <span className="font-medium text-gray-700 dark:text-text-primary">{folder.title}</span>

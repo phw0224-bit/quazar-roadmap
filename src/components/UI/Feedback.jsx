@@ -71,7 +71,7 @@ export function InputModal({ title, placeholder, defaultValue = '', confirmText 
       <div className="relative bg-white dark:bg-bg-elevated w-full max-w-[420px] rounded-[40px] shadow-[0_30px_80px_rgba(0,0,0,0.4)] p-10 flex flex-col gap-8 animate-scale-in border border-gray-100 dark:border-border-subtle transition-colors duration-200">
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-2">
-            <span className="text-[11px] font-black text-blue-500 uppercase tracking-[0.3em] ml-1">Action Required</span>
+            <span className="text-[11px] font-black text-text-tertiary uppercase tracking-[0.3em] ml-1">입력 필요</span>
             <h3 className="text-2xl font-black text-gray-900 dark:text-text-primary tracking-tight">{title}</h3>
           </div>
           <input

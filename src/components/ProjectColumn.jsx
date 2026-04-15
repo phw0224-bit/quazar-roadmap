@@ -153,7 +153,7 @@ export default function ProjectColumn({
       id={`project-${project.id}`}
       ref={setNodeRef} style={style}
       className={`flex flex-col min-w-[340px] max-w-[340px] h-full transition-all duration-300 ease-notion rounded-3xl border ${projectTint.column}
-      ${isDragging ? 'shadow-2xl ring-2 ring-blue-500 border-blue-500 bg-white dark:bg-bg-elevated scale-[1.02] z-[1000]' : ''}`}
+      ${isDragging ? 'shadow-2xl ring-2 ring-brand-500 border-brand-400 bg-white dark:bg-bg-elevated scale-[1.02] z-[1000]' : ''}`}
     >
       {/* Column Header */}
       <div
@@ -167,7 +167,7 @@ export default function ProjectColumn({
           <div className="flex items-center gap-3 overflow-hidden" onClick={stopProp} onPointerDown={stopProp}>
             <button
               type="button"
-              className="truncate text-left text-lg font-black tracking-tight text-gray-900 transition-colors hover:text-blue-600 dark:text-text-primary dark:hover:text-blue-400"
+              className="truncate text-left text-lg font-black tracking-tight text-gray-900 transition-colors hover:text-brand-600 dark:text-text-primary dark:hover:text-brand-400"
               onClick={() => onOpenDetail?.(project.id)}
             >
               {project.title}
@@ -266,7 +266,7 @@ export default function ProjectColumn({
           <div
             className={`flex items-center gap-2.5 min-h-[38px] px-3 py-1.5 rounded-xl border border-white/40 dark:border-border-subtle bg-white/30 dark:bg-bg-base/50 transition-all duration-200 ${
               !isReadOnly ? 'hover:bg-white/60 dark:hover:bg-bg-hover cursor-pointer hover:shadow-sm' : ''
-            } ${isEditingAssignees ? 'bg-white dark:bg-bg-hover ring-2 ring-blue-500/20 border-blue-500/30 shadow-md' : ''}`}
+            } ${isEditingAssignees ? 'bg-white dark:bg-bg-hover ring-2 ring-brand-500/15 border-brand-400/30 shadow-md' : ''}`}
             onClick={() => !isReadOnly && setIsEditingAssignees(true)}
           >
             <User size={14} strokeWidth={2.5} className="text-gray-400 dark:text-text-tertiary shrink-0" />
@@ -321,7 +321,7 @@ export default function ProjectColumn({
 
         {hasMore && (
           <button
-            className="w-full py-2.5 flex items-center justify-center gap-1.5 text-xs font-black text-gray-400 dark:text-text-tertiary hover:text-blue-500 dark:hover:text-blue-400 hover:bg-white/60 dark:hover:bg-bg-hover rounded-xl transition-all duration-200 cursor-pointer uppercase tracking-widest"
+            className="w-full py-2.5 flex items-center justify-center gap-1.5 text-xs font-black text-gray-400 dark:text-text-tertiary hover:text-brand-500 dark:hover:text-brand-400 hover:bg-white/60 dark:hover:bg-bg-hover rounded-xl transition-all duration-200 cursor-pointer uppercase tracking-widest"
             onPointerDown={stopProp}
             onClick={() => setIsExpanded(prev => !prev)}
           >
@@ -335,16 +335,16 @@ export default function ProjectColumn({
           <div className="mt-1" onPointerDown={stopProp}>
             {!showAddItem ? (
               <button
-                className="w-full py-3.5 flex items-center justify-center gap-2 text-sm text-gray-400 dark:text-text-tertiary font-black hover:bg-white/60 dark:hover:bg-bg-hover rounded-2xl transition-all duration-200 px-4 cursor-pointer group/add border border-dashed border-gray-300 dark:border-border-strong hover:border-blue-400 dark:hover:border-blue-500/50 hover:shadow-sm"
+                className="w-full py-3.5 flex items-center justify-center gap-2 text-sm text-gray-400 dark:text-text-tertiary font-black hover:bg-white/60 dark:hover:bg-bg-hover rounded-2xl transition-all duration-200 px-4 cursor-pointer group/add border border-dashed border-gray-300 dark:border-border-strong hover:border-brand-300 dark:hover:border-brand-500/50 hover:shadow-sm"
                 onClick={() => setShowAddItem(true)}
               >
-                <Plus size={18} strokeWidth={3} className="group-hover/add:text-blue-500 transition-colors" />
+                <Plus size={18} strokeWidth={3} className="group-hover/add:text-brand-500 transition-colors" />
                 <span className="group-hover/add:text-gray-900 dark:group-hover/add:text-text-primary transition-colors uppercase tracking-widest">새 업무 추가</span>
               </button>
             ) : (
               <div className="bg-white dark:bg-bg-elevated border border-gray-200 dark:border-border-subtle rounded-2xl shadow-2xl p-5 flex flex-col gap-4 animate-in fade-in zoom-in duration-300 ease-notion">
                 <div className="flex flex-col gap-2">
-                  <span className="text-[11px] font-black text-blue-500 uppercase tracking-[0.2em] ml-1">New Task</span>
+                  <span className="text-[11px] font-black text-text-tertiary uppercase tracking-[0.2em] ml-1">New Task</span>
                   <input
                     autoFocus
                     placeholder="어떤 업무를 추가할까요?"
