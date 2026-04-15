@@ -82,7 +82,7 @@ export default function MarkdownPreview({ content, onOpenLink, containerRef, onT
         localRef.current = node;
         assignRef(containerRef, node);
       }}
-      className="detail-markdown markdown-preview prose max-w-none dark:prose-invert rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-border-subtle dark:bg-bg-elevated"
+      className="detail-markdown markdown-preview rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-border-subtle dark:bg-bg-elevated"
       onClick={(event) => {
         const anchor = event.target.closest('[data-wiki-link]');
         if (anchor) {

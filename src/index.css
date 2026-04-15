@@ -327,6 +327,68 @@ input:focus, textarea:focus {
   @apply dark:border-border-subtle;
 }
 
+.markdown-preview {
+  color: var(--color-text-primary);
+  line-height: 1.65;
+}
+
+.markdown-preview :where(h1, h2, h3, h4, h5, h6) {
+  margin: 1.1rem 0 0.55rem;
+  line-height: 1.28;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.markdown-preview h1 { font-size: 1.5rem; }
+.markdown-preview h2 { font-size: 1.3rem; }
+.markdown-preview h3 { font-size: 1.15rem; }
+
+.markdown-preview :where(p, ul, ol, blockquote, table, pre, hr) {
+  margin: 0.7rem 0;
+}
+
+.markdown-preview :where(ul, ol) {
+  padding-left: 1.25rem;
+}
+
+.markdown-preview :where(li + li) {
+  margin-top: 0.25rem;
+}
+
+.markdown-preview :where(code):not(pre code) {
+  border-radius: 0.45rem;
+  background: rgba(148, 163, 184, 0.14);
+  color: #f8d58a;
+  padding: 0.08rem 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+.markdown-preview :where(code)::before,
+.markdown-preview :where(code)::after {
+  content: none !important;
+}
+
+.markdown-preview :where(strong) {
+  font-weight: 800;
+}
+
+.markdown-preview :where(em) {
+  font-style: italic;
+}
+
+.markdown-preview :where(a) {
+  color: #93c5fd;
+}
+
+.markdown-preview :where(blockquote):not(.md-callout *) {
+  margin: 0.8rem 0;
+  border-left: 3px solid rgba(96, 165, 250, 0.45);
+  padding: 0.55rem 0.85rem;
+  border-radius: 0.4rem;
+  background: rgba(59, 130, 246, 0.08);
+}
+
 .markdown-preview details[data-toggle-preview] {
   margin: 0.75rem 0;
   border: 1px solid rgba(229, 231, 235, 1);

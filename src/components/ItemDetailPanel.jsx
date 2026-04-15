@@ -14,7 +14,7 @@
  */
 import { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  ChevronsRight, Maximize2, Minimize2, ChevronRight, Trash2,
+  ChevronsRight, Maximize2, ChevronRight, Trash2,
   Clock, Users, Building2, Tag, Link2, Plus, X,
   MessageSquare, Search, ArrowUpRight, AlignCenter, AlignJustify,
   Calendar, Flag, LayoutList, List
@@ -211,16 +211,16 @@ function ItemDetailPanel({
           <div className="flex items-start gap-4 min-w-0">
             <div className="flex items-center gap-1.5">
               <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-bg-hover rounded-xl text-gray-400 hover:text-gray-900 dark:hover:text-text-primary transition-all duration-200 cursor-pointer">
-              <ChevronsRight size={20} strokeWidth={2.5} />
-            </button>
-            <button
-              onClick={onToggleFullscreen}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-bg-hover rounded-xl text-gray-400 hover:text-gray-900 dark:hover:text-text-primary transition-all duration-200 cursor-pointer"
-              aria-label={isFullscreen ? '사이드바로 전환' : '전체화면으로 전환'}
-              title={isFullscreen ? '사이드바로 전환' : '전체화면으로 전환'}
-            >
-              {isFullscreen ? <Minimize2 size={20} strokeWidth={2.5} /> : <Maximize2 size={20} strokeWidth={2.5} />}
-            </button>
+              <X size={20} strokeWidth={2.5} />
+             </button>
+             <button
+               onClick={onToggleFullscreen}
+               className="p-2 hover:bg-gray-100 dark:hover:bg-bg-hover rounded-xl text-gray-400 hover:text-gray-900 dark:hover:text-text-primary transition-all duration-200 cursor-pointer"
+               aria-label={isFullscreen ? '사이드바로 전환' : '전체화면으로 전환'}
+               title={isFullscreen ? '사이드바로 전환' : '전체화면으로 전환'}
+             >
+              {isFullscreen ? <ChevronsRight size={20} strokeWidth={2.5} /> : <Maximize2 size={20} strokeWidth={2.5} />}
+             </button>
             <button
               onClick={() => setIsWideView(v => !v)}
               className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${isWideView ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}

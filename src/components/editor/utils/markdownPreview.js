@@ -101,7 +101,7 @@ export function renderMarkdownPreviewHTML(markdown) {
         bodyLines.push(lines[index].replace(/^>\s?/, ''));
         index += 1;
       }
-      const bodyMarkdown = preprocessWikiLinks(bodyLines.join('\n').trim());
+      const bodyMarkdown = preprocessWikiLinks(preprocessMath(bodyLines.join('\n').trim()));
       const variant = marker === 'toggle' ? 'default' : marker.replace(/^toggle-/, '');
       const bodyHTML = bodyMarkdown ? marked.parse(bodyMarkdown) : '<p></p>';
       chunks.push(
@@ -124,7 +124,7 @@ export function renderMarkdownPreviewHTML(markdown) {
           bodyLines.push(lines[index].replace(/^>\s?/, ''));
           index += 1;
         }
-        const bodyMarkdown = preprocessWikiLinks(bodyLines.join('\n').trim());
+        const bodyMarkdown = preprocessWikiLinks(preprocessMath(bodyLines.join('\n').trim()));
         const bodyHTML = bodyMarkdown ? marked.parse(bodyMarkdown) : '';
         chunks.push(renderCalloutHTML(typeKey, calloutDef, titleText, bodyHTML));
         continue;
