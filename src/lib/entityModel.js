@@ -20,7 +20,7 @@ export const ENTITY_TYPES = {
 export function resolveEntityType(item) {
   if (!item) return ENTITY_TYPES.TASK;
   if (item.page_type === 'project') return ENTITY_TYPES.PROJECT;
-  if (item.is_private) return ENTITY_TYPES.MEMO;
+  if (item.entity_type === ENTITY_TYPES.MEMO || item.is_private) return ENTITY_TYPES.MEMO;
   if (item.page_type === 'folder') return ENTITY_TYPES.FOLDER;
   if (item.page_type === 'page') return ENTITY_TYPES.DOCUMENT;
   return ENTITY_TYPES.TASK;

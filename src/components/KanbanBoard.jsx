@@ -37,6 +37,7 @@ import { PresenceContext } from '../hooks/usePresenceContext';
 import PresenceAvatars from './PresenceAvatars';
 import { useLayoutState } from '../hooks/useLayoutState.js';
 import API from '../api/kanbanAPI';
+import { supabase } from '../lib/supabase';
 import {
   getGitHubStatus,
   startGitHubAppInstall,
@@ -241,6 +242,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
   useEffect(() => {
     if (!user?.id) {
       setPersonalMemos([]);
+      setPersonalMemosLoading(false);
       return;
     }
 
@@ -258,8 +260,19 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
       }
     };
 
+    const memoChannel = supabase.channel(`personal-memos-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'personal_memos', filter: `owner_id=eq.${user.id}` },
+        () => fetchPersonalMemos()
+      )
+      .subscribe();
+
     fetchPersonalMemos();
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(memoChannel);
+    };
   }, [user?.id]);
 
   useEffect(() => {
@@ -619,7 +632,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
       return;
     }
     try {
-      const newMemo = await API.createPersonalMemo(title, content, user.id);
+      const newMemo = await API.createPersonalMemo(title, content);
       setPersonalMemos(prev => [...prev, newMemo]);
       showToast(`'${title}' 메모가 생성되었습니다.`, 'success');
     } catch (err) {
@@ -633,9 +646,9 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
       return;
     }
     try {
-      await API.updatePersonalMemo(memoId, updates, user.id);
+      const updatedMemo = await API.updatePersonalMemo(memoId, updates);
       setPersonalMemos(prev =>
-        prev.map(m => m.id === memoId ? { ...m, ...updates } : m)
+        prev.map(m => m.id === memoId ? (updatedMemo || { ...m, ...updates }) : m)
       );
     } catch (err) {
       showToast('메모 업데이트 실패: ' + err.message, 'error');
@@ -648,7 +661,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
       return;
     }
     try {
-      await API.deletePersonalMemo(memoId, user.id);
+      await API.deletePersonalMemo(memoId);
       setPersonalMemos(prev => prev.filter(m => m.id !== memoId));
       showToast('메모가 삭제되었습니다.', 'success');
     } catch (err) {
@@ -830,7 +843,6 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                   {/* 보드 타이틀 바로 아래 설명 영역 */}
                   {(team_boards?.[boardName.toLowerCase()]?.description || !isReadOnly) && (
                     <BoardDescription
-                      boardType={boardName.toLowerCase()}
                       description={team_boards?.[boardName.toLowerCase()]?.description ?? ''}
                       isReadOnly={isReadOnly}
                       onSave={(updates) => updateTeamBoard(boardName.toLowerCase(), updates)}
@@ -1207,7 +1219,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                   item={detailItem}
                   project={detailProject}
                   entityContext={detailEntityContext}
-                  allItems={[...projectItems, ...generalDocs]}
+                  allItems={[...projectItems, ...generalDocs, ...personalMemos]}
                   onClose={closeDetailPanel}
                   isFullscreen={isDetailFullscreen}
                   onToggleFullscreen={() => setUrlState({ fullscreen: !isDetailFullscreen })}
@@ -1325,10 +1337,9 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
   );
 }
 
-function BoardDescription({ boardType, description, isReadOnly, onSave, onOpenDetail, generalDocs, pinnedDocIds = [] }) {
+function BoardDescription({ description, isReadOnly, onSave, onOpenDetail, generalDocs, pinnedDocIds = [] }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(description);
-  const [showMoreDocs, setShowMoreDocs] = useState(false);
 
   useEffect(() => {
     setDraft(description);
@@ -1338,10 +1349,6 @@ function BoardDescription({ boardType, description, isReadOnly, onSave, onOpenDe
 
   const docs = generalDocs.filter(d => d.page_type !== 'folder');
   const pinnedDocs = docs.filter(d => pinnedDocIds.includes(d.id));
-  const unpinnedDocs = docs.filter(d => !pinnedDocIds.includes(d.id));
-  const maxVisibleDocs = 3;
-  const shouldShowMore = unpinnedDocs.length > maxVisibleDocs;
-  const visibleUnpinnedDocs = showMoreDocs ? unpinnedDocs : unpinnedDocs.slice(0, maxVisibleDocs);
 
   return (
     <div className="mt-2 mb-6 px-4">

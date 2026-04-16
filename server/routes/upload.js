@@ -3,6 +3,8 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { requireAuthenticatedUser } from '../lib/auth.js';
+import { supabaseAdminClient } from '../lib/supabase.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,13 +55,56 @@ function isAllowedFileType(mimetype, filename) {
 
 const router = Router();
 
+async function resolveUploadAccess(itemId, userId) {
+  if (!supabaseAdminClient) {
+    throw new Error('Supabase admin client is not configured');
+  }
+
+  const { data: memo, error: memoError } = await supabaseAdminClient
+    .from('personal_memos')
+    .select('id, owner_id')
+    .eq('id', itemId)
+    .maybeSingle();
+  if (memoError) throw memoError;
+
+  if (memo) {
+    if (memo.owner_id !== userId) {
+      return { allowed: false, status: 403, error: '권한이 없습니다.' };
+    }
+    return { allowed: true };
+  }
+
+  const [
+    { data: item, error: itemError },
+    { data: roadmapItem, error: roadmapItemError },
+  ] = await Promise.all([
+    supabaseAdminClient.from('items').select('id').eq('id', itemId).maybeSingle(),
+    supabaseAdminClient.from('roadmap_items').select('id').eq('id', itemId).maybeSingle(),
+  ]);
+  if (itemError) throw itemError;
+  if (roadmapItemError) throw roadmapItemError;
+
+  if (item || roadmapItem) {
+    return { allowed: true };
+  }
+
+  return { allowed: false, status: 404, error: '아이템을 찾을 수 없습니다.' };
+}
+
 router.post('/upload/:itemId', upload.single('file'), async (req, res) => {
   try {
+    const user = await requireAuthenticatedUser(req, res);
+    if (!user) return;
+
     if (!req.file) {
       return res.status(400).json({ error: '파일이 제공되지 않았습니다.' });
     }
 
     const { itemId } = req.params;
+    const access = await resolveUploadAccess(itemId, user.id);
+    if (!access.allowed) {
+      return res.status(access.status).json({ error: access.error });
+    }
     const file = req.file;
     const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
 
@@ -103,7 +148,14 @@ router.post('/upload/:itemId', upload.single('file'), async (req, res) => {
 
 router.delete('/uploads/:itemId/:filename', async (req, res) => {
   try {
+    const user = await requireAuthenticatedUser(req, res);
+    if (!user) return;
+
     const { itemId, filename } = req.params;
+    const access = await resolveUploadAccess(itemId, user.id);
+    if (!access.allowed) {
+      return res.status(access.status).json({ error: access.error });
+    }
     const filepath = path.join(UPLOAD_DIR, itemId, filename);
 
     if (!fs.existsSync(filepath)) {
@@ -126,7 +178,14 @@ router.delete('/uploads/:itemId/:filename', async (req, res) => {
 
 router.delete('/uploads/:itemId', async (req, res) => {
   try {
+    const user = await requireAuthenticatedUser(req, res);
+    if (!user) return;
+
     const { itemId } = req.params;
+    const access = await resolveUploadAccess(itemId, user.id);
+    if (!access.allowed) {
+      return res.status(access.status).json({ error: access.error });
+    }
     const itemDir = path.join(UPLOAD_DIR, itemId);
 
     if (!fs.existsSync(itemDir)) {

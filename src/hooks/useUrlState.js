@@ -2,7 +2,7 @@
  * @fileoverview URL 파라미터 ↔ 앱 상태 양방향 동기화. React Router 없이 URL 기반 라우팅 구현.
  *
  * 지원 파라미터:
- * - view: 'board'|'timeline'|'people' (기본값: 'board')
+ * - view: 'board'|'timeline'|'people'|'personal'|'roadmap' (기본값: 'board')
  * - item: 선택된 아이템 UUID (ItemDetailPanel 열림)
  * - fullscreen: '1' (ItemDetailPanel 전체화면)
  * - scrollTo: 'section:{id}' 또는 'project:{id}' (스크롤 대상)
@@ -43,7 +43,7 @@ function parseSort(str) {
   return field ? { field, dir: dir === 'desc' ? 'desc' : 'asc' } : null;
 }
 
-const VALID_VIEWS = ['board', 'timeline', 'people', 'roadmap'];
+const VALID_VIEWS = ['board', 'timeline', 'people', 'personal', 'roadmap'];
 
 function parseUrlState() {
   const params = new URLSearchParams(window.location.search);

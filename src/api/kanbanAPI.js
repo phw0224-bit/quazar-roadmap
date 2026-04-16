@@ -23,6 +23,35 @@ const normalizeNameKey = (value) => (value || '').trim().toLowerCase();
 
 const itemsTable = (boardType) => boardType === 'main' ? 'roadmap_items' : 'items';
 const projectsTable = (boardType) => boardType === 'main' ? 'roadmap_projects' : 'projects';
+const personalMemosTable = 'personal_memos';
+
+const requireAuthenticatedUserId = async () => {
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+  if (error) throw error;
+  if (!user?.id) throw new Error('User not authenticated');
+  return user.id;
+};
+
+const normalizePersonalMemo = (memo) => ({
+  ...memo,
+  board_type: 'personal',
+  content: memo?.content || '',
+  description: memo?.description || '',
+  status: 'none',
+  priority: 0,
+  page_type: null,
+  project_id: null,
+  related_items: [],
+  assignees: [],
+  teams: [],
+  tags: [],
+  comments: [],
+  creator_profile: null,
+  entity_type: 'memo',
+});
 
 const supabaseAPI = {
   /**
@@ -928,26 +957,35 @@ export async function getBacklinks(itemId) {
   const [
     { data: directMatchesTeam, error: directError },
     { data: directMatchesMain, error: directErrorMain },
+    { data: directMatchesMemos, error: directErrorMemos },
   ] = await Promise.all([
     supabase.from('items').select('id, title, content, page_type, project_id').ilike('description', `%|${itemId}]]%`),
     supabase.from('roadmap_items').select('id, title, content, page_type, project_id').ilike('description', `%|${itemId}]]%`),
+    supabase.from(personalMemosTable).select('id, title, content, description').ilike('description', `%|${itemId}]]%`),
   ]);
   if (directError) throw directError;
   if (directErrorMain) throw directErrorMain;
+  if (directErrorMemos) throw directErrorMemos;
 
   const backlinkMap = new Map(
-    [...(directMatchesTeam || []), ...(directMatchesMain || [])].map((item) => [item.id, item])
+    [
+      ...(directMatchesTeam || []),
+      ...(directMatchesMain || []),
+      ...(directMatchesMemos || []).map(normalizePersonalMemo),
+    ].map((item) => [item.id, item])
   );
 
   // targetItem: 두 테이블에서 검색
   const [
     { data: targetItemTeam },
     { data: targetItemMain },
+    { data: targetItemMemo },
   ] = await Promise.all([
     supabase.from('items').select('title, content').eq('id', itemId).maybeSingle(),
     supabase.from('roadmap_items').select('title, content').eq('id', itemId).maybeSingle(),
+    supabase.from(personalMemosTable).select('title, content').eq('id', itemId).maybeSingle(),
   ]);
-  const targetItem = targetItemMain || targetItemTeam;
+  const targetItem = targetItemMain || targetItemTeam || targetItemMemo;
 
   const titleCandidates = [targetItem?.title, targetItem?.content]
     .map((value) => `${value || ''}`.trim())
@@ -957,13 +995,20 @@ export async function getBacklinks(itemId) {
     const [
       { data: titleMatchesTeam, error: titleError },
       { data: titleMatchesMain, error: titleErrorMain },
+      { data: titleMatchesMemos, error: titleErrorMemos },
     ] = await Promise.all([
       supabase.from('items').select('id, title, content, page_type, project_id').ilike('description', `%[[${title}]]%`),
       supabase.from('roadmap_items').select('id, title, content, page_type, project_id').ilike('description', `%[[${title}]]%`),
+      supabase.from(personalMemosTable).select('id, title, content, description').ilike('description', `%[[${title}]]%`),
     ]);
     if (titleError) throw titleError;
     if (titleErrorMain) throw titleErrorMain;
-    [...(titleMatchesTeam || []), ...(titleMatchesMain || [])].forEach((item) => backlinkMap.set(item.id, item));
+    if (titleErrorMemos) throw titleErrorMemos;
+    [
+      ...(titleMatchesTeam || []),
+      ...(titleMatchesMain || []),
+      ...(titleMatchesMemos || []).map(normalizePersonalMemo),
+    ].forEach((item) => backlinkMap.set(item.id, item));
   }
 
   backlinkMap.delete(itemId);
@@ -977,18 +1022,13 @@ export async function getBacklinks(itemId) {
  */
 export async function getPersonalMemos(userId) {
   const { data, error } = await supabase
-    .from('roadmap_items')
+    .from(personalMemosTable)
     .select('*')
-    .eq('is_private', true)
     .eq('owner_id', userId)
     .order('order_index', { ascending: true });
 
   if (error) throw error;
-  return (data || []).map(item => ({
-    ...item,
-    related_items: Array.isArray(item.related_items) ? item.related_items : [],
-    comments: [],
-  }));
+  return (data || []).map(normalizePersonalMemo);
 }
 
 /**
@@ -999,11 +1039,11 @@ export async function getPersonalMemos(userId) {
  * @returns {Promise<Object>} 생성된 메모 아이템
  */
 export async function createPersonalMemo(title, content = '', createdBy) {
+  const ownerId = createdBy || await requireAuthenticatedUserId();
   const { data: existingItems, error: orderError } = await supabase
-    .from('roadmap_items')
+    .from(personalMemosTable)
     .select('order_index')
-    .eq('is_private', true)
-    .eq('owner_id', createdBy)
+    .eq('owner_id', ownerId)
     .order('order_index', { ascending: false })
     .limit(1);
 
@@ -1011,28 +1051,19 @@ export async function createPersonalMemo(title, content = '', createdBy) {
   const nextOrder = existingItems?.[0] ? existingItems[0].order_index + 1 : 0;
 
   const { data, error } = await supabase
-    .from('roadmap_items')
+    .from(personalMemosTable)
     .insert([{
-      project_id: null,
       title,
       content,
       description: '',
-      is_private: true,
-      owner_id: createdBy,
-      created_by: createdBy,
+      owner_id: ownerId,
       order_index: nextOrder,
-      status: 'none',
-      priority: 0,
-      page_type: null,
-      assignees: [],
-      teams: [],
-      tags: [],
-      related_items: []
+      updated_at: new Date().toISOString(),
     }])
     .select();
 
   if (error) throw error;
-  return data?.[0];
+  return data?.[0] ? normalizePersonalMemo(data[0]) : null;
 }
 
 /**
@@ -1042,27 +1073,20 @@ export async function createPersonalMemo(title, content = '', createdBy) {
  * @param {string} userId - 소유자 UUID (권한 확인용)
  * @returns {Promise<Object>} 업데이트된 메모
  */
-export async function updatePersonalMemo(memoId, updates, userId) {
-  // 권한 확인: 소유자만 수정 가능
-  const { data: memo, error: checkError } = await supabase
-    .from('roadmap_items')
-    .select('owner_id')
-    .eq('id', memoId)
-    .eq('is_private', true)
-    .single();
-
-  if (checkError || !memo || memo.owner_id !== userId) {
-    throw new Error('권한이 없습니다');
-  }
+export async function updatePersonalMemo(memoId, updates) {
+  await requireAuthenticatedUserId();
 
   const { data, error } = await supabase
-    .from('roadmap_items')
-    .update(updates)
+    .from(personalMemosTable)
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', memoId)
     .select();
 
   if (error) throw error;
-  return data?.[0];
+  return data?.[0] ? normalizePersonalMemo(data[0]) : null;
 }
 
 /**
@@ -1071,21 +1095,11 @@ export async function updatePersonalMemo(memoId, updates, userId) {
  * @param {string} userId - 소유자 UUID (권한 확인용)
  * @returns {Promise<void>}
  */
-export async function deletePersonalMemo(memoId, userId) {
-  // 권한 확인: 소유자만 삭제 가능
-  const { data: memo, error: checkError } = await supabase
-    .from('roadmap_items')
-    .select('owner_id')
-    .eq('id', memoId)
-    .eq('is_private', true)
-    .single();
-
-  if (checkError || !memo || memo.owner_id !== userId) {
-    throw new Error('권한이 없습니다');
-  }
+export async function deletePersonalMemo(memoId) {
+  await requireAuthenticatedUserId();
 
   const { error } = await supabase
-    .from('roadmap_items')
+    .from(personalMemosTable)
     .delete()
     .eq('id', memoId);
 

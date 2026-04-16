@@ -1,9 +1,10 @@
 # server/
 
-> Express 5 백엔드. 파일 업로드와 AI 요약 두 가지 기능만 담당. Supabase 직접 접근은 하지 않음 (AI 요약은 프론트가 결과를 받아 Supabase에 저장).
+> Express 5 백엔드. 파일 업로드와 AI 요약을 담당하며, 업로드 권한 확인을 위해 Supabase auth/admin 클라이언트를 사용한다.
 
 ## 책임
 - multipart/form-data 파일 수신 및 디스크 저장
+- 업로드/삭제 요청 인증 및 개인 메모 소유권 검증
 - Ollama AI 요약 프록시 (HTML → Ollama → JSON)
 
 ## 주요 파일
@@ -17,9 +18,9 @@
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
 | GET | `/health` | 서버 상태 확인 |
-| POST | `/upload/:itemId` | 파일 업로드. `multipart/form-data`, `file` 필드 |
-| DELETE | `/uploads/:itemId/:filename` | 단일 파일 삭제 |
-| DELETE | `/uploads/:itemId` | 아이템의 모든 파일 삭제 |
+| POST | `/upload/:itemId` | 인증 사용자만 파일 업로드. 개인 메모는 소유자만 가능 |
+| DELETE | `/uploads/:itemId/:filename` | 인증 사용자만 단일 파일 삭제. 개인 메모는 소유자만 가능 |
+| DELETE | `/uploads/:itemId` | 인증 사용자만 아이템의 모든 파일 삭제. 개인 메모는 소유자만 가능 |
 | POST | `/api/summarize` | AI 요약. `{ content: htmlString }` |
 
 ## 파일 업로드 제약
@@ -48,4 +49,4 @@ yarn server          # 단독 실행
 yarn dev:all         # 프론트와 함께 실행 (권장)
 ```
 
-환경변수 불필요 (Supabase 직접 접근 없음).
+업로드 권한 확인을 위해 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`가 필요하다.

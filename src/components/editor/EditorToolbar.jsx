@@ -1,9 +1,7 @@
 import {
   Bold,
-  Columns3,
   CheckSquare,
   Code,
-  Eraser,
   FilePlus2,
   Heading1,
   Heading2,
@@ -15,18 +13,9 @@ import {
   MessageSquareQuote,
   Minus,
   Quote,
-  Rows3,
   Table2,
   ChevronRightSquare,
-  Trash2,
 } from 'lucide-react';
-import {
-  addMarkdownTableColumn,
-  addMarkdownTableRow,
-  clearMarkdownTableCell,
-  deleteMarkdownTableColumn,
-  deleteMarkdownTableRow,
-} from './utils/tableEditing';
 
 const TOOLBAR_COMMAND_IDS = [
   'h1',
@@ -88,10 +77,6 @@ function EditorToolbar({
   commandMap,
   runCommandById,
   insertBold,
-  tableContext,
-  applyTableChange,
-  isSurfaceHovered,
-  isEditorFocused,
   onLinkExistingPage,
   onAddChildPage,
   itemId,
@@ -125,43 +110,6 @@ function EditorToolbar({
           <Bold size={15} />
         </ToolbarButton>
       </div>
-
-      {tableContext && (
-        <div
-          className={`pointer-events-none absolute left-2 right-2 top-full z-20 mt-2 flex flex-wrap items-center gap-1 rounded-xl border border-gray-200 bg-white px-2 py-2 shadow-lg transition-all duration-150 dark:border-border-subtle dark:bg-bg-base dark:shadow-black/20 ${
-            isSurfaceHovered || isEditorFocused ? 'pointer-events-auto opacity-100 translate-y-0' : '-translate-y-1 opacity-0'
-          }`}
-        >
-          <span className="px-1.5 text-[10px] font-black uppercase tracking-[0.22em] text-gray-400 dark:text-text-tertiary">
-            Table R
-            {tableContext.activeEditableRowIndex + 1}
-            {' '}
-            C
-            {tableContext.activeColumnIndex + 1}
-          </span>
-          <ToolbarButton title="행 추가" onClick={() => applyTableChange(addMarkdownTableRow)}>
-            <Rows3 size={15} />
-          </ToolbarButton>
-          <ToolbarButton title="열 추가" onClick={() => applyTableChange(addMarkdownTableColumn)}>
-            <Columns3 size={15} />
-          </ToolbarButton>
-          <ToolbarButton title="셀 비우기" onClick={() => applyTableChange(clearMarkdownTableCell)}>
-            <Eraser size={15} />
-          </ToolbarButton>
-          <ToolbarButton title="행 삭제" onClick={() => applyTableChange(deleteMarkdownTableRow)}>
-            <span className="inline-flex items-center gap-1">
-              <Rows3 size={15} />
-              <Trash2 size={11} />
-            </span>
-          </ToolbarButton>
-          <ToolbarButton title="열 삭제" onClick={() => applyTableChange(deleteMarkdownTableColumn)}>
-            <span className="inline-flex items-center gap-1">
-              <Columns3 size={15} />
-              <Trash2 size={11} />
-            </span>
-          </ToolbarButton>
-        </div>
-      )}
 
       <input
         ref={fileInputRef}

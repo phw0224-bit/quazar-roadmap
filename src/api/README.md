@@ -12,7 +12,7 @@
 
 | 파일 | 역할 | 주요 의존성 |
 |------|------|------------|
-| `kanbanAPI.js` | **핵심.** boards/items/comments/sections/projects 전체 CRUD. `order_index`, `timeline_order_index`, 완료 프로젝트 보정 포함 | supabase |
+| `kanbanAPI.js` | **핵심.** boards/items/comments/sections/projects 전체 CRUD와 일반 문서/개인 메모 API. 개인 메모는 `personal_memos` 테이블을 사용 | supabase |
 | `fileAPI.js` | 파일 업로드/삭제 (POST/DELETE to Express :3001). 클라이언트 측 MIME 검증 | axios |
 | `summarizeAPI.js` | AI 요약 (POST /api/summarize). HTML → Ollama JSON 요약 | fetch |
 
@@ -48,3 +48,4 @@ return data;
 **관련 규칙:**
 - `completeProject()`는 완료 시 원래 위치(`pre_completion_*`)를 저장하고, 복귀 시 복원한다.
 - `moveItem()`은 칸반 보드뿐 아니라 Sidebar 트리 이동도 지원하도록 `targetParentId`를 받을 수 있다.
+- `getPersonalMemos()` 계열은 더 이상 `roadmap_items.is_private`에 의존하지 않고 전용 `personal_memos` 저장소를 사용한다.

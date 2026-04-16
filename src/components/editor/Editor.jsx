@@ -27,7 +27,6 @@ import {
   rankWikiLinkItems,
 } from './utils/editorCommands';
 import {
-  getMarkdownTableContext,
   moveMarkdownTableSelection,
 } from './utils/tableEditing';
 import {
@@ -39,6 +38,7 @@ import {
   createLivePreviewExtension,
   toggleHeadingFold,
 } from './codemirror/livePreviewExtension';
+import { supabase } from '../../lib/supabase';
 import { createTableSelectionExtension } from './codemirror/tableSelectionExtension';
 import { createTemplatePlaceholderExtension } from './codemirror/templatePlaceholderExtension';
 
@@ -79,8 +79,6 @@ function Editor({
   const wrapperRef = useRef(null);
   const fileInputRef = useRef(null);
   const isApplyingExternalValue = useRef(false);
-  const [isSurfaceHovered, setIsSurfaceHovered] = useState(false);
-  const [isEditorFocused, setIsEditorFocused] = useState(false);
   const commandMap = useMemo(
     () => Object.fromEntries(EDITOR_COMMANDS.map((command) => [command.id, command])),
     [],
@@ -90,7 +88,6 @@ function Editor({
   const slashStateRef = useRef(null);
   const [selectedSlashIndex, setSelectedSlashIndex] = useState(0);
   const filteredSlashCommandsRef = useRef([]);
-  const [tableContext, setTableContext] = useState(null);
 
   useEffect(() => {
     slashStateRef.current = slashState;
@@ -193,20 +190,6 @@ function Editor({
     });
   }, [closeSlashMenu, editable]);
 
-  const syncTableContext = useCallback((view) => {
-    if (!editable || !view) {
-      setTableContext(null);
-      return;
-    }
-
-    const selection = view.state.selection.main;
-    if (!selection.empty) {
-      setTableContext(null);
-      return;
-    }
-
-    setTableContext(getMarkdownTableContext(view.state.doc.toString(), selection.head));
-  }, [editable]);
 
   const handleInsertPageLink = useCallback(() => {
     if (!onLinkExistingPage || !editorViewRef.current) return;
@@ -399,7 +382,6 @@ function Editor({
                 selectFrom: move.cursor,
                 selectTo: move.cursor,
               });
-              syncTableContext(view);
               return true;
             }
           }
@@ -408,7 +390,7 @@ function Editor({
         return false;
       },
     }),
-  ], [closeSlashMenu, editable, editorViewRef, executeSelectedSlashCommand, inlinePlaceholders, mode, placeholder, syncTableContext]);
+  ], [closeSlashMenu, editable, editorViewRef, executeSelectedSlashCommand, inlinePlaceholders, mode, placeholder]);
 
   useEffect(() => {
     const view = editorViewRef.current;
@@ -423,21 +405,7 @@ function Editor({
     });
     isApplyingExternalValue.current = false;
     syncSlashMenu(view);
-    syncTableContext(view);
-  }, [content, editorViewRef, syncSlashMenu, syncTableContext]);
-
-  const applyTableChange = useCallback((operation) => {
-    const view = editorViewRef.current;
-    if (!view) return;
-    const result = operation(view.state.doc.toString(), view.state.selection.main.head);
-    if (!result) return;
-
-    replaceRange(view, 0, view.state.doc.length, result.text, {
-      selectFrom: result.cursor,
-      selectTo: result.cursor,
-    });
-    syncTableContext(view);
-  }, [editorViewRef, syncTableContext]);
+  }, [content, editorViewRef, syncSlashMenu]);
 
   const handleFileChange = async (event) => {
     const file = event.target.files?.[0];
@@ -452,7 +420,15 @@ function Editor({
     formData.append('file', file);
 
     try {
-      const response = await fetch(`/upload/${itemId}`, { method: 'POST', body: formData });
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      const token = data.session?.access_token;
+      if (!token) throw new Error('로그인이 필요합니다.');
+      const response = await fetch(`/upload/${itemId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
       if (!response.ok) throw new Error('업로드 실패');
       const result = await response.json();
 
@@ -472,18 +448,12 @@ function Editor({
   return (
     <div
       className="space-y-3"
-      onMouseEnter={() => setIsSurfaceHovered(true)}
-      onMouseLeave={() => setIsSurfaceHovered(false)}
     >
       <EditorToolbar
         editable={editable}
         commandMap={commandMap}
         runCommandById={runCommandById}
         insertBold={() => insertAroundSelection(editorViewRef.current, '**', '**')}
-        tableContext={tableContext}
-        applyTableChange={applyTableChange}
-        isSurfaceHovered={isSurfaceHovered}
-        isEditorFocused={isEditorFocused}
         onLinkExistingPage={onLinkExistingPage}
         onAddChildPage={onAddChildPage}
         itemId={itemId}
@@ -519,28 +489,23 @@ function Editor({
           onCreateEditor={(view) => {
             editorViewRef.current = view;
             syncSlashMenu(view);
-            syncTableContext(view);
           }}
           onUpdate={(viewUpdate) => {
             syncSlashMenu(viewUpdate.view);
-            syncTableContext(viewUpdate.view);
             externalOnUpdate?.(viewUpdate.view);
           }}
           onChange={(value, viewUpdate) => {
             if (isApplyingExternalValue.current) return;
             onChange?.(value);
             syncSlashMenu(viewUpdate.view);
-            syncTableContext(viewUpdate.view);
             externalOnUpdate?.(viewUpdate.view);
           }}
           onBlur={(event) => {
             if (event.relatedTarget?.closest?.('[data-slash-menu-root]')) return;
-            setIsEditorFocused(false);
             onEditorBlur?.(event);
             onBlur?.(event);
           }}
           onFocus={(event) => {
-            setIsEditorFocused(true);
             onFocus?.(event);
           }}
         />

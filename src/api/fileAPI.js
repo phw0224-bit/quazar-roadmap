@@ -8,9 +8,23 @@
  * uploadFile 반환: { url, filename, originalName, mimetype, size }
  */
 import axios from 'axios';
+import { supabase } from '../lib/supabase';
 
 const FILE_SERVER_URL = '';
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+async function getAuthHeaders(extra = {}) {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  const token = data.session?.access_token;
+  if (!token) {
+    throw new Error('로그인이 필요합니다.');
+  }
+  return {
+    Authorization: `Bearer ${token}`,
+    ...extra,
+  };
+}
 
 // 허용된 파일 타입
 const ALLOWED_MIME_TYPES = {
@@ -107,7 +121,7 @@ export async function uploadFile(file, itemId, onProgress) {
       formData,
       {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          ...(await getAuthHeaders({ 'Content-Type': 'multipart/form-data' })),
         },
         onUploadProgress: (progressEvent) => {
           if (onProgress && progressEvent.total) {
@@ -148,7 +162,8 @@ export async function uploadFile(file, itemId, onProgress) {
 export async function deleteFile(itemId, filename) {
   try {
     const response = await axios.delete(
-      `${FILE_SERVER_URL}/uploads/${itemId}/${filename}`
+      `${FILE_SERVER_URL}/uploads/${itemId}/${filename}`,
+      { headers: await getAuthHeaders() }
     );
     
     return response.data;
@@ -168,7 +183,8 @@ export async function deleteFile(itemId, filename) {
 export async function deleteAllFiles(itemId) {
   try {
     const response = await axios.delete(
-      `${FILE_SERVER_URL}/uploads/${itemId}`
+      `${FILE_SERVER_URL}/uploads/${itemId}`,
+      { headers: await getAuthHeaders() }
     );
     
     return response.data;

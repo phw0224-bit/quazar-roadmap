@@ -7,6 +7,7 @@ import { marked } from 'marked';
 import TurndownService from 'turndown';
 import { DOMSerializer } from '@tiptap/pm/model';
 import { useRef, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 import {
   Bold, Italic, List, ListOrdered, Quote, Code, Minus,
   Heading1, Heading2, Heading3, ImagePlus
@@ -133,6 +134,14 @@ function Divider() {
 function Toolbar({ editor, itemId, onShowToast }) {
   const fileInputRef = useRef(null);
 
+  const getAuthHeader = async () => {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    const token = data.session?.access_token;
+    if (!token) throw new Error('로그인이 필요합니다.');
+    return { Authorization: `Bearer ${token}` };
+  };
+
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -146,8 +155,10 @@ function Toolbar({ editor, itemId, onShowToast }) {
     formData.append('file', file);
 
     try {
+      const authHeader = await getAuthHeader();
       const response = await fetch(`/upload/${itemId}`, {
         method: 'POST',
+        headers: authHeader,
         body: formData,
       });
       if (!response.ok) throw new Error('업로드 실패');

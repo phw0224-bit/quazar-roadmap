@@ -1,5 +1,6 @@
 import { Upload } from 'lucide-react';
 import { useRef } from 'react';
+import { supabase } from '../lib/supabase';
 
 export default function FileUploadButton({ 
   itemId, 
@@ -23,8 +24,13 @@ export default function FileUploadButton({
         formData.append('file', file);
 
         // 파일 업로드
+        const { data, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        const token = data.session?.access_token;
+        if (!token) throw new Error('로그인이 필요합니다.');
         const response = await fetch(`/upload/${itemId}`, {
           method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
           body: formData,
         });
 
