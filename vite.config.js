@@ -25,16 +25,25 @@ export default defineConfig({
         description: '팀별 커스텀 로드맵 및 작업 관리 도구',
         start_url: '/',
         scope: '/',
+        display_override: ['window-controls-overlay', 'standalone'],
         display: 'standalone',
         orientation: 'portrait-primary',
         background_color: '#0B1020',
         theme_color: '#111827',
         lang: 'ko-KR',
+        prefer_related_applications: false,
+        categories: ['productivity', 'business'],
         icons: [
           {
             src: '/pwa-192.png',
             sizes: '192x192',
             type: 'image/png',
+          },
+          {
+            src: '/pwa-192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'maskable',
           },
           {
             src: '/pwa-512.png',

@@ -400,18 +400,31 @@ export const useKanbanData = () => {
     dispatch({ type: 'ADD_ITEM', payload: { projectId, item: newItem } });
   };
 
+  const resolveProjectForItem = (projectId, itemId) => {
+    if (projectId) {
+      const matchedProject = state.projects.find(p => p.id === projectId);
+      if (matchedProject) return matchedProject;
+    }
+
+    if (!itemId) return null;
+
+    return state.projects.find((project) =>
+      (project.items || []).some((item) => item.id === itemId),
+    ) || null;
+  };
+
   const updateItem = async (projectId, itemId, updates) => {
-    const project = state.projects.find(p => p.id === projectId);
+    const project = resolveProjectForItem(projectId, itemId);
     const boardType = project?.board_type ?? 'main';
     const updated = await API.updateItem(projectId, itemId, updates, boardType);
-    dispatch({ type: 'UPDATE_ITEM', payload: { projectId, itemId, updates: updated } });
+    dispatch({ type: 'UPDATE_ITEM', payload: { projectId: project?.id ?? projectId, itemId, updates: updated } });
   };
 
   const deleteItem = async (projectId, itemId) => {
-    const project = state.projects.find(p => p.id === projectId);
+    const project = resolveProjectForItem(projectId, itemId);
     const boardType = project?.board_type ?? 'main';
     await API.deleteItem(projectId, itemId, boardType);
-    dispatch({ type: 'DELETE_ITEM', payload: { projectId, itemId } });
+    dispatch({ type: 'DELETE_ITEM', payload: { projectId: project?.id ?? projectId, itemId } });
   };
 
   /**

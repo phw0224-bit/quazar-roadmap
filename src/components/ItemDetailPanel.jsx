@@ -80,6 +80,8 @@ function ItemDetailPanel({
   const contextLabel = getEntityLabel(entityContext || {});
   const isProjectLike = entityContext?.type === ENTITY_TYPES.PROJECT || item.page_type === 'project';
   const isMemo = entityContext?.type === ENTITY_TYPES.MEMO;
+  const itemProjectId = item?.project_id ?? phase?.id ?? null;
+  const phaseId = phase?.id ?? null;
   const sectionLabel = entityContext?.collection === 'general'
     ? `📚 ${contextLabel}`
     : entityContext?.type === ENTITY_TYPES.MEMO
@@ -201,9 +203,27 @@ function ItemDetailPanel({
     }
   };
 
+  const handleSaveTitle = async () => {
+    const nextTitle = titleInput.trim();
+    const currentTitle = item.title || item.content || '';
+
+    if (nextTitle === currentTitle) {
+      setIsEditingTitle(false);
+      return;
+    }
+
+    try {
+      await onUpdateItem(itemProjectId, item.id, { title: nextTitle });
+      onShowToast?.('제목이 업데이트되었습니다.');
+      setIsEditingTitle(false);
+    } catch (error) {
+      onShowToast?.(`제목 업데이트 실패: ${error.message}`, 'error');
+    }
+  };
+
   const handleSaveAssignees = async () => {
     const updated = assigneeInput.split(',').map(s => s.trim()).filter(s => s !== '');
-    await onUpdateItem(phase.id, item.id, { assignees: updated });
+    await onUpdateItem(itemProjectId, item.id, { assignees: updated });
     setIsEditingAssignees(false);
     onShowToast?.('담당자가 업데이트되었습니다.');
   };
@@ -216,7 +236,7 @@ function ItemDetailPanel({
     }
     const currentTags = item.tags || [];
     if (!currentTags.includes(tagName)) {
-      await onUpdateItem(phase.id, item.id, { tags: [...currentTags, tagName] });
+      await onUpdateItem(itemProjectId, item.id, { tags: [...currentTags, tagName] });
       onShowToast?.(`태그 #${tagName} 추가됨`);
     }
     setNewTagInput('');
@@ -238,7 +258,7 @@ function ItemDetailPanel({
       nextUpdates.description = templateContent;
     }
 
-    await onUpdateItem(phase.id, item.id, nextUpdates);
+    await onUpdateItem(itemProjectId, item.id, nextUpdates);
 
     if (nextUpdates.description) {
       onShowToast?.(`태그 #${tagName} 추가 및 ${tagName} 템플릿 적용됨`);
@@ -254,7 +274,7 @@ function ItemDetailPanel({
 
   const handleRemoveTag = async (tag) => {
     const updated = (item.tags || []).filter(t => t !== tag);
-    await onUpdateItem(phase.id, item.id, { tags: updated });
+    await onUpdateItem(itemProjectId, item.id, { tags: updated });
     onShowToast?.(`태그 #${tag} 삭제됨`);
   };
 
@@ -264,7 +284,7 @@ function ItemDetailPanel({
     const updated = currentTeams.includes(team) 
       ? currentTeams.filter(t => t !== team) 
       : [...currentTeams, team];
-    await onUpdateItem(phase.id, item.id, { teams: updated });
+    await onUpdateItem(itemProjectId, item.id, { teams: updated });
     onShowToast?.(`${team} ${isAdding ? '추가' : '제외'}됨`);
   };
 
@@ -272,7 +292,7 @@ function ItemDetailPanel({
     const currentRelations = item.related_items || [];
     if (!currentRelations.includes(relatedItemId)) {
       try {
-        await onUpdateItem(phase.id, item.id, { related_items: [...currentRelations, relatedItemId] });
+        await onUpdateItem(itemProjectId, item.id, { related_items: [...currentRelations, relatedItemId] });
         onShowToast?.('연관 업무가 연결되었습니다.');
       } catch {
         onShowToast?.('연관 업무 저장에 실패했습니다.');
@@ -286,7 +306,7 @@ function ItemDetailPanel({
   const handleRemoveRelation = async (relatedItemId) => {
     const updated = (item.related_items || []).filter(id => id !== relatedItemId);
     try {
-      await onUpdateItem(phase.id, item.id, { related_items: updated });
+      await onUpdateItem(itemProjectId, item.id, { related_items: updated });
     } catch {
       onShowToast?.('연관 업무 저장에 실패했습니다.');
     }
@@ -312,7 +332,7 @@ function ItemDetailPanel({
         setGitHubIssues((current) => [result.issue, ...current]);
       }
       if (result?.itemStatus === 'in-progress' && (item?.status || 'none') === 'none') {
-        await onUpdateItem(phase.id, item.id, { status: 'in-progress' });
+        await onUpdateItem(itemProjectId, item.id, { status: 'in-progress' });
       }
       const baseMessage = result?.ticket?.ticket_key
         ? `${result.ticket.ticket_key} 티켓으로 GitHub 이슈가 생성되었고 상태가 진행 중으로 변경되었습니다.`
@@ -411,9 +431,9 @@ function ItemDetailPanel({
 
                   onShowConfirm(confirmTitle, confirmMsg, async () => {
                     if (isProject) {
-                      await onDeletePhase?.(phase.id);
+                      await onDeletePhase?.(phaseId);
                     } else {
-                      await onDeleteItem(phase.id, item.id);
+                      await onDeleteItem(itemProjectId, item.id);
                     }
                     onClose();
                   }, 'danger');
@@ -521,20 +541,11 @@ function ItemDetailPanel({
                 className="text-display text-gray-900 dark:text-text-primary bg-gray-50 dark:bg-bg-hover rounded-2xl p-2 -ml-2 w-full border-none focus:ring-4 focus:ring-brand-500/10"
                 value={titleInput}
                 onChange={e => setTitleInput(e.target.value)}
-                onBlur={() => {
-                  if (titleInput !== (item.title || item.content)) {
-                    onUpdateItem(phase.id, item.id, { title: titleInput });
-                    onShowToast?.('제목이 업데이트되었습니다.');
-                  }
-                  setIsEditingTitle(false);
-                }}
-                onKeyDown={e => {
+                onBlur={handleSaveTitle}
+                onKeyDown={async (e) => {
                   if (e.key === 'Enter') {
-                    if (titleInput !== (item.title || item.content)) {
-                      onUpdateItem(phase.id, item.id, { title: titleInput });
-                      onShowToast?.('제목이 업데이트되었습니다.');
-                    }
-                    setIsEditingTitle(false);
+                    e.preventDefault();
+                    await handleSaveTitle();
                   }
                   if (e.key === 'Escape') setIsEditingTitle(false);
                 }}
@@ -560,7 +571,7 @@ function ItemDetailPanel({
                     value={item.status || 'none'}
                     onChange={(e) => {
                       const newStatus = e.target.value;
-                      onUpdateItem(phase.id, item.id, { status: newStatus });
+                      onUpdateItem(itemProjectId, item.id, { status: newStatus });
                       onShowToast?.(`상태가 ${STATUS_MAP[newStatus].label}로 변경됨`);
                     }}
                   >
@@ -797,9 +808,9 @@ function ItemDetailPanel({
                   onChange={e => {
                     const newValue = e.target.value || null;
                     if (item.page_type === 'project') {
-                      onUpdatePhase?.(phase.id, { start_date: newValue });
+                      onUpdatePhase?.(phaseId, { start_date: newValue });
                     } else {
-                      onUpdateItem(phase.id, item.id, { start_date: newValue });
+                      onUpdateItem(itemProjectId, item.id, { start_date: newValue });
                     }
                   }}
                   className="bg-transparent border-none p-0 text-sm font-black text-gray-800 dark:text-text-primary focus:ring-0 cursor-pointer w-full dark:color-scheme-dark disabled:cursor-default"
@@ -821,9 +832,9 @@ function ItemDetailPanel({
                   onChange={e => {
                     const newValue = e.target.value || null;
                     if (item.page_type === 'project') {
-                      onUpdatePhase?.(phase.id, { end_date: newValue });
+                      onUpdatePhase?.(phaseId, { end_date: newValue });
                     } else {
-                      onUpdateItem(phase.id, item.id, { end_date: newValue });
+                      onUpdateItem(itemProjectId, item.id, { end_date: newValue });
                     }
                   }}
                   className="bg-transparent border-none p-0 text-sm font-black text-gray-800 dark:text-text-primary focus:ring-0 cursor-pointer w-full dark:color-scheme-dark disabled:cursor-default"
@@ -847,7 +858,7 @@ function ItemDetailPanel({
                 <select
                   disabled={isReadOnly}
                   value={item.priority ?? 0}
-                  onChange={e => onUpdateItem(phase.id, item.id, { priority: Number(e.target.value) })}
+                  onChange={e => onUpdateItem(itemProjectId, item.id, { priority: Number(e.target.value) })}
                   className="bg-transparent border-none p-0 text-sm font-black text-gray-800 dark:text-text-primary focus:ring-0 cursor-pointer appearance-none w-full dark:color-scheme-dark disabled:cursor-default"
                 >
                   {Object.entries(PRIORITY_MAP).map(([val, { label, icon }]) => (
@@ -984,7 +995,7 @@ function ItemDetailPanel({
           {/* Description Section */}
           <ItemDescriptionSection
             item={item}
-                projectId={phase.id}
+                projectId={itemProjectId}
             allItems={allItems}
             isReadOnly={isReadOnly}
             entityContext={entityContext}
@@ -1066,7 +1077,7 @@ function ItemDetailPanel({
                 )}
               </div>
               <CommentSection
-                projectId={phase.id} itemId={item.id} comments={item.comments || []}
+                projectId={itemProjectId} itemId={item.id} comments={item.comments || []}
                 onAddComment={onAddComment} onUpdateComment={onUpdateComment} onDeleteComment={onDeleteComment}
                 onShowConfirm={onShowConfirm} onShowToast={onShowToast}
               />
