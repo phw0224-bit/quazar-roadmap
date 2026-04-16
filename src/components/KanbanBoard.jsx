@@ -86,6 +86,8 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
     moveSidebarProject,
     // 신규: 일반 문서
     generalDocs, addGeneralDocument, updateGeneralDocument, deleteGeneralDocument, setBoardType,
+    // 신규: 팀 보드 설정
+    team_boards, updateTeamBoard,
   } = useKanbanData();
 
   const { user, logout } = useAuth();
@@ -825,6 +827,19 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                     )}
                   </div>
 
+                  {/* 보드 타이틀 바로 아래 설명 영역 */}
+                  {(team_boards?.[boardName.toLowerCase()]?.description || !isReadOnly) && (
+                    <BoardDescription
+                      boardType={boardName.toLowerCase()}
+                      description={team_boards?.[boardName.toLowerCase()]?.description ?? ''}
+                      isReadOnly={isReadOnly}
+                      onSave={(updates) => updateTeamBoard(boardName.toLowerCase(), updates)}
+                      onOpenDetail={handleOpenDetail}
+                      generalDocs={generalDocs.filter(doc => (doc.board_type || 'main') === boardName.toLowerCase())}
+                      pinnedDocIds={team_boards?.[boardName.toLowerCase()]?.pinned_doc_ids ?? []}
+                    />
+                  )}
+
                   {(() => {
                     const standaloneProjects = boardProjects.filter(p => !p.section_id);
                     const boardSections = sections
@@ -861,30 +876,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                           </div>
                         ) : (
                           <>
-                            {boardSections.length > 0 && (
-                              <SortableContext items={boardSections.map(s => s.id)} strategy={verticalListSortingStrategy}>
-                                {boardSections.map(section => (
-                                  <BoardSection
-                                    key={section.id}
-                                    section={section}
-                                    projects={boardProjects.filter(p => p.section_id === section.id)}
-                                    isCollapsed={!expandedSections.has(section.id)}
-                                    onToggleCollapse={() => setExpandedSections(prev => {
-                                      const next = new Set(prev);
-                                      next.has(section.id) ? next.delete(section.id) : next.add(section.id);
-                                      return next;
-                                    })}
-                                    onUpdateSection={updateSection}
-                                    onDeleteSection={deleteSection}
-                                    onAddProject={addProject}
-                                    onShowPrompt={showPrompt}
-                                    {...projectColumnProps}
-                                  />
-                                ))}
-                              </SortableContext>
-                            )}
-
-                            {/* 일반 문서 섹션 - 접고 펼칠 수 있음 */}
+                            {/* 일반 문서 섹션 - 접고 펼칠 수 있음 (최상단) */}
                             {boardGeneralDocs.length > 0 && (
                               <div className="mt-8">
                                 <div className="flex items-center justify-between gap-2">
@@ -1018,11 +1010,46 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                                           }
                                         );
                                       }}
+                                      onTogglePinDocument={(docId, isPinned) => {
+                                        const currentPinned = team_boards?.[boardName.toLowerCase()]?.pinned_doc_ids ?? [];
+                                        const newPinned = isPinned
+                                          ? [...currentPinned, docId]
+                                          : currentPinned.filter(id => id !== docId);
+                                        updateTeamBoard(boardName.toLowerCase(), {
+                                          description: team_boards?.[boardName.toLowerCase()]?.description ?? '',
+                                          pinned_doc_ids: newPinned
+                                        });
+                                        showToast(isPinned ? '보드 안내에 고정되었습니다.' : '고정이 해제되었습니다.', 'success');
+                                      }}
+                                      pinnedDocIds={team_boards?.[boardName.toLowerCase()]?.pinned_doc_ids ?? []}
                                       isReadOnly={isReadOnly}
                                     />
                                   </div>
                                 )}
                               </div>
+                            )}
+
+                            {boardSections.length > 0 && (
+                              <SortableContext items={boardSections.map(s => s.id)} strategy={verticalListSortingStrategy}>
+                                {boardSections.map(section => (
+                                  <BoardSection
+                                    key={section.id}
+                                    section={section}
+                                    projects={boardProjects.filter(p => p.section_id === section.id)}
+                                    isCollapsed={!expandedSections.has(section.id)}
+                                    onToggleCollapse={() => setExpandedSections(prev => {
+                                      const next = new Set(prev);
+                                      next.has(section.id) ? next.delete(section.id) : next.add(section.id);
+                                      return next;
+                                    })}
+                                    onUpdateSection={updateSection}
+                                    onDeleteSection={deleteSection}
+                                    onAddProject={addProject}
+                                    onShowPrompt={showPrompt}
+                                    {...projectColumnProps}
+                                  />
+                                ))}
+                              </SortableContext>
                             )}
 
                             {standaloneProjects.length > 0 && (
@@ -1295,5 +1322,155 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
     </DndContext>
     </AppLayout>
     </PresenceContext.Provider>
+  );
+}
+
+function BoardDescription({ boardType, description, isReadOnly, onSave, onOpenDetail, generalDocs, pinnedDocIds = [] }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(description);
+  const [showMoreDocs, setShowMoreDocs] = useState(false);
+
+  useEffect(() => {
+    setDraft(description);
+  }, [description]);
+
+  if (!description && isReadOnly) return null;
+
+  const docs = generalDocs.filter(d => d.page_type !== 'folder');
+  const pinnedDocs = docs.filter(d => pinnedDocIds.includes(d.id));
+  const unpinnedDocs = docs.filter(d => !pinnedDocIds.includes(d.id));
+  const maxVisibleDocs = 3;
+  const shouldShowMore = unpinnedDocs.length > maxVisibleDocs;
+  const visibleUnpinnedDocs = showMoreDocs ? unpinnedDocs : unpinnedDocs.slice(0, maxVisibleDocs);
+
+  return (
+    <div className="mt-2 mb-6 px-4">
+      <div className="bg-white/50 dark:bg-bg-elevated/40 border border-gray-200 dark:border-border-subtle rounded-xl px-4 py-3.5 backdrop-blur-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1">
+            {editing ? (
+              <>
+                <textarea
+                  value={draft}
+                  onChange={e => setDraft(e.target.value)}
+                  placeholder="팀 보드에 대한 설명을 작성하세요."
+                  className="w-full p-2 bg-white dark:bg-bg-base border border-gray-300 dark:border-border-strong rounded-lg text-sm text-gray-900 dark:text-text-primary placeholder-gray-400 dark:placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-600 resize-none"
+                  rows={3}
+                  autoFocus
+                />
+                <div className="flex gap-2 mt-2 justify-end">
+                  <button
+                    onClick={() => {
+                      onSave({ description: draft, pinned_doc_ids: pinnedDocIds });
+                      setEditing(false);
+                    }}
+                    className="px-3 py-1.5 bg-blue-500 dark:bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors"
+                  >
+                    저장
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDraft(description);
+                      setEditing(false);
+                    }}
+                    className="px-3 py-1.5 bg-gray-200 dark:bg-bg-base text-gray-700 dark:text-text-primary rounded-lg text-xs font-bold hover:bg-gray-300 dark:hover:bg-bg-hover transition-colors"
+                  >
+                    취소
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-start gap-2 min-h-5">
+                  <span className="text-sm text-gray-700 dark:text-text-primary leading-relaxed flex-1 whitespace-pre-wrap">
+                    {description}
+                  </span>
+                  {!isReadOnly && (
+                    <button
+                      onClick={() => setEditing(true)}
+                      className="p-1 hover:bg-gray-200 dark:hover:bg-bg-hover rounded transition-colors flex-shrink-0 mt-0.5"
+                      title="편집"
+                    >
+                      <svg className="w-4 h-4 text-gray-500 dark:text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+
+                {/* 고정된 문서만 표시 */}
+                {!editing && pinnedDocs.length > 0 && (
+                  <div className="mt-2.5 flex flex-wrap gap-2">
+                    {pinnedDocs.map(doc => (
+                      <DocumentButton
+                        key={doc.id}
+                        doc={doc}
+                        onOpenDetail={onOpenDetail}
+                        onTogglePin={(docId, isPinned) => {
+                          const newPinned = isPinned
+                            ? [...pinnedDocIds, docId]
+                            : pinnedDocIds.filter(id => id !== docId);
+                          onSave({ description, pinned_doc_ids: newPinned });
+                        }}
+                        isReadOnly={isReadOnly}
+                        isPinned={true}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DocumentButton({ doc, onOpenDetail, onTogglePin, isReadOnly, isPinned = false }) {
+  const [showMenu, setShowMenu] = useState(false);
+
+  const bgClass = isPinned
+    ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700/40 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:border-blue-400 dark:hover:border-blue-600'
+    : 'bg-gray-100 dark:bg-bg-base border-gray-300 dark:border-border-strong text-gray-700 dark:text-text-primary hover:bg-gray-200 dark:hover:bg-bg-hover hover:border-gray-400 dark:hover:border-border-strong';
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => onOpenDetail(doc.id)}
+        className={`text-xs px-2 py-1.5 border rounded-lg transition-colors font-medium flex items-center gap-1.5 max-w-xs group ${bgClass}`}
+      >
+        <span>{isPinned ? '📌' : '📄'}</span>
+        <span className="truncate">{doc.title}</span>
+        {!isReadOnly && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowMenu(!showMenu);
+            }}
+            className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-white/50 dark:hover:bg-bg-elevated rounded"
+            title="메뉴"
+          >
+            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
+            </svg>
+          </button>
+        )}
+      </button>
+      {showMenu && (
+        <div className="absolute top-full right-0 mt-1 bg-white dark:bg-bg-elevated border border-gray-200 dark:border-border-subtle rounded-lg shadow-lg z-10">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onTogglePin(doc.id, !isPinned);
+              setShowMenu(false);
+            }}
+            className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-text-primary hover:bg-gray-100 dark:hover:bg-bg-hover rounded-lg transition-colors"
+          >
+            {isPinned ? '📍 고정 해제' : '📌 고정하기'}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

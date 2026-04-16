@@ -25,7 +25,7 @@ import DocumentOutline from './DocumentOutline';
 import BacklinksPanel from './BacklinksPanel';
 import { TEAMS, STATUS_MAP, PRIORITY_MAP } from '../lib/constants';
 import { TAG_CATALOG } from '../lib/tagCatalog';
-import { getTemplateContent } from '../lib/itemTemplates';
+import { getTemplateScaffold } from '../lib/itemTemplates';
 import { usePresenceContext } from '../hooks/usePresenceContext';
 import ItemViewers from './ItemViewers';
 import { ENTITY_TYPES, getEntityLabel } from '../lib/entityModel';
@@ -253,22 +253,22 @@ function ItemDetailPanel({
     const preset = TAG_CATALOG.find((tag) => tag.name === tagName);
     const nextUpdates = { tags: [...currentTags, tagName] };
     const currentDescription = String(item.description || '').trim();
-    const templateContent = preset?.templateType ? getTemplateContent(preset.templateType) : '';
+    const templateScaffold = preset?.templateType ? getTemplateScaffold(preset.templateType) : '';
 
-    if (!currentDescription && templateContent) {
-      nextUpdates.description = templateContent;
+    if (!currentDescription && templateScaffold) {
+      nextUpdates.description = templateScaffold;
     }
 
     await onUpdateItem(itemProjectId, item.id, nextUpdates);
 
     if (nextUpdates.description) {
-      onShowToast?.(`태그 #${tagName} 추가 및 ${tagName} 템플릿 적용됨`);
+      onShowToast?.(`태그 #${tagName} 추가됨. 기본 구조를 넣고 각 항목 안내는 placeholder로 표시합니다.`);
       return;
     }
 
     onShowToast?.(
-      templateContent
-        ? `태그 #${tagName} 추가됨. 기존 설명이 있어 템플릿은 덮어쓰지 않았습니다.`
+      templateScaffold
+        ? `태그 #${tagName} 추가됨. 기존 설명이 있어 placeholder 가이드는 표시되지 않습니다.`
         : `태그 #${tagName} 추가됨`
     );
   };

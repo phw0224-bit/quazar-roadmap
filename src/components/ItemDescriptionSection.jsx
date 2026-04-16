@@ -26,6 +26,8 @@ import {
 } from './editor/utils/markdownTransform';
 
 import { ENTITY_TYPES } from '../lib/entityModel';
+import { TAG_CATALOG_BY_NAME } from '../lib/tagCatalog';
+import { getTemplateInlinePlaceholders } from '../lib/itemTemplates';
 
 export default function ItemDescriptionSection({
   item,
@@ -198,6 +200,24 @@ export default function ItemDescriptionSection({
     [allItems],
   );
 
+  const matchedTemplateType = useMemo(
+    () => [...(item?.tags || [])]
+      .reverse()
+      .map((tagName) => TAG_CATALOG_BY_NAME.get(tagName)?.templateType)
+      .find(Boolean),
+    [item?.tags],
+  );
+
+  const descriptionPlaceholder = useMemo(
+    () => (description.trim() ? '' : '내용을 입력하세요...'),
+    [description],
+  );
+
+  const templateInlinePlaceholders = useMemo(
+    () => (isReadOnly || !matchedTemplateType ? {} : getTemplateInlinePlaceholders(matchedTemplateType)),
+    [isReadOnly, matchedTemplateType],
+  );
+
   return (
     <>
       <div className="flex flex-col gap-6">
@@ -323,6 +343,8 @@ export default function ItemDescriptionSection({
             <MarkdownEditor
               key={`editor-${item.id}`}
               content={description}
+              placeholder={descriptionPlaceholder}
+              inlinePlaceholders={templateInlinePlaceholders}
               onChange={setDescription}
               editable={!isReadOnly}
               mode={descriptionMode === 'live' ? 'live' : 'source'}

@@ -14,7 +14,7 @@ import {
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { Prec } from '@codemirror/state';
-import { EditorView, keymap } from '@codemirror/view';
+import { EditorView, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
 import { oneDark } from '@codemirror/theme-one-dark';
 import SlashCommandMenu from './SlashCommandMenu';
 import EditorToolbar from './EditorToolbar';
@@ -40,6 +40,7 @@ import {
   toggleHeadingFold,
 } from './codemirror/livePreviewExtension';
 import { createTableSelectionExtension } from './codemirror/tableSelectionExtension';
+import { createTemplatePlaceholderExtension } from './codemirror/templatePlaceholderExtension';
 
 const LIVE_WIDGET_SELECTOR = [
   '.cm-live-codeblock-widget',
@@ -55,6 +56,8 @@ const LIVE_WIDGET_SELECTOR = [
 
 function Editor({
   content,
+  placeholder = '내용을 입력하세요...',
+  inlinePlaceholders = {},
   onChange,
   editable,
   mode = 'live',
@@ -294,6 +297,13 @@ function Editor({
       base: markdownLanguage,
     }),
     EditorView.lineWrapping,
+    cmPlaceholder(() => {
+      const element = document.createElement('div');
+      element.className = 'cm-editor-placeholder';
+      element.textContent = placeholder;
+      return element;
+    }),
+    ...createTemplatePlaceholderExtension(inlinePlaceholders),
     ...createLivePreviewExtension(mode === 'live'),
     ...createTableSelectionExtension(editable),
     Prec.highest(keymap.of([
@@ -398,7 +408,7 @@ function Editor({
         return false;
       },
     }),
-  ], [closeSlashMenu, editable, editorViewRef, executeSelectedSlashCommand, mode, syncTableContext]);
+  ], [closeSlashMenu, editable, editorViewRef, executeSelectedSlashCommand, inlinePlaceholders, mode, placeholder, syncTableContext]);
 
   useEffect(() => {
     const view = editorViewRef.current;

@@ -289,6 +289,26 @@ input:focus, textarea:focus {
   color: #5a5a5a;
 }
 
+.cm-editor-placeholder {
+  white-space: pre-wrap;
+  color: #9ca3af;
+  opacity: 0.9;
+}
+
+.dark .cm-editor-placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.cm-inline-template-placeholder {
+  white-space: pre-wrap;
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.dark .cm-inline-template-placeholder {
+  color: var(--color-text-tertiary);
+}
+
 .tiptap-content .tiptap img {
   max-width: 100%;
   height: auto;

@@ -596,6 +596,25 @@ const supabaseAPI = {
     if (errors.length > 0) throw errors[0].error;
   },
 
+  getTeamBoardConfig: async (boardType) => {
+    const { data } = await supabase
+      .from('team_boards')
+      .select('description, pinned_doc_ids')
+      .eq('board_type', boardType)
+      .maybeSingle();
+    return {
+      description: data?.description ?? '',
+      pinned_doc_ids: data?.pinned_doc_ids ?? [],
+    };
+  },
+
+  upsertTeamBoardConfig: async (boardType, updates) => {
+    const { error } = await supabase
+      .from('team_boards')
+      .upsert({ board_type: boardType, ...updates, updated_at: new Date().toISOString() });
+    if (error) throw error;
+  },
+
   // ========== 타임라인 전용 함수 ==========
 
   /**

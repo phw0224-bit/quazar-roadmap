@@ -13,6 +13,8 @@ function GeneralDocumentSection({
   onDeleteDocument,
   onMoveToFolder,
   onAddDocumentToFolder,
+  onTogglePinDocument,
+  pinnedDocIds = [],
   isReadOnly = false,
 }) {
   // 각 문서별 펼침 상태 (폴더 같은 구조)
@@ -100,6 +102,22 @@ function GeneralDocumentSection({
               aria-label={`"${doc.title}"에 문서 추가`}
             >
               <span>➕</span>
+            </button>
+          )}
+
+          {/* 고정 버튼 (문서만) */}
+          {!isReadOnly && doc.page_type !== 'folder' && (
+            <button
+              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity px-1 text-gray-400 dark:text-text-tertiary hover:text-amber-500 dark:hover:text-amber-400"
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePinDocument?.(doc.id, !pinnedDocIds.includes(doc.id));
+              }}
+              title={pinnedDocIds.includes(doc.id) ? '고정 해제' : '보드 안내에 고정'}
+              onPointerDown={(e) => e.stopPropagation()}
+              aria-label={`"${doc.title}" ${pinnedDocIds.includes(doc.id) ? '고정 해제' : '고정'}`}
+            >
+              {pinnedDocIds.includes(doc.id) ? '📌' : '📍'}
             </button>
           )}
 

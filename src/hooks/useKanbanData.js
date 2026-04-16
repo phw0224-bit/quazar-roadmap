@@ -23,6 +23,7 @@ const INITIAL_STATE = {
   projects: [],
   sections: [],
   generalDocs: [],  // project_id=null, page_type='page' 문서들 (팀별 분리)
+  team_boards: {},  // { [boardType]: description }
   loading: true,
   error: null,
   currentBoardType: 'main',  // 현재 선택된 팀별 보드
@@ -256,6 +257,16 @@ const kanbanReducer = (state, action) => {
           )
         }))
       };
+    case 'SET_TEAM_BOARDS':
+      return { ...state, team_boards: action.payload };
+    case 'UPDATE_TEAM_BOARD':
+      return {
+        ...state,
+        team_boards: {
+          ...state.team_boards,
+          [action.boardType]: { ...(state.team_boards[action.boardType] || {}), ...action.updates }
+        }
+      };
     default:
       return state;
   }
@@ -267,6 +278,17 @@ export const useKanbanData = () => {
   const fetchData = useCallback(async () => {
     try {
       const data = await API.getBoardData();
+
+      // team_boards 설정 병렬 로드
+      const boardTypes = ['main', '개발팀', 'AI팀', '기획팀', '지원팀', '감정팀'];
+      const configEntries = await Promise.all(
+        boardTypes.map(async (bt) => {
+          const config = await API.getTeamBoardConfig(bt);
+          return [bt, { description: config.description, pinned_doc_ids: config.pinned_doc_ids }];
+        })
+      );
+      const teamBoardsConfig = Object.fromEntries(configEntries);
+
       dispatch({
         type: 'SET_DATA',
         payload: {
@@ -274,6 +296,10 @@ export const useKanbanData = () => {
           sections: data.sections,
           generalDocs: data.generalDocs,  // 신규: 일반 문서 포함
         }
+      });
+      dispatch({
+        type: 'SET_TEAM_BOARDS',
+        payload: teamBoardsConfig
       });
     } catch (err) {
       dispatch({ type: 'SET_ERROR', payload: err.message });
@@ -579,6 +605,17 @@ export const useKanbanData = () => {
     }
   };
 
+  const updateTeamBoard = useCallback(async (boardType, updates) => {
+    // updates = { description?: string, pinned_doc_ids?: string[] }
+    dispatch({ type: 'UPDATE_TEAM_BOARD', boardType, updates });
+    try {
+      await API.upsertTeamBoardConfig(boardType, updates);
+    } catch (err) {
+      console.error('[updateTeamBoard] Error:', err.message);
+      throw err;
+    }
+  }, []);
+
   const moveSidebarProject = async (projectId, targetSectionId, targetIndex) => {
     const snapshot = cloneProjectsSnapshot(state.projects);
     const project = state.projects.find(p => p.id === projectId);
@@ -598,6 +635,7 @@ export const useKanbanData = () => {
         projects: state.projects,
     sections: state.sections,
     generalDocs: state.generalDocs,  // 신규: 일반 문서 (팀별 분리)
+    team_boards: state.team_boards,  // 신규: 팀 보드 설정 (보드 하단 설명)
     currentBoardType: state.currentBoardType,  // 신규: 현재 보드 타입
     loading: state.loading,
     error: state.error,
@@ -623,6 +661,7 @@ export const useKanbanData = () => {
     updateGeneralDocument,
     deleteGeneralDocument,
     moveGeneralDocument,
+    updateTeamBoard,  // 신규: 팀 보드 설정 업데이트
     setBoardType,
     moveSidebarItem,
     moveSidebarProject,
