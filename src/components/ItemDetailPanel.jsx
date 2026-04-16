@@ -82,6 +82,7 @@ function ItemDetailPanel({
   const isMemo = entityContext?.type === ENTITY_TYPES.MEMO;
   const itemProjectId = item?.project_id ?? phase?.id ?? null;
   const phaseId = phase?.id ?? null;
+  const canCreateProjectChildPage = entityContext?.collection === 'project' && Boolean(itemProjectId);
   const sectionLabel = entityContext?.collection === 'general'
     ? `📚 ${contextLabel}`
     : entityContext?.type === ENTITY_TYPES.MEMO
@@ -1003,7 +1004,7 @@ function ItemDetailPanel({
             onOpenDetail={onOpenDetail}
             onShowToast={onShowToast}
             onUpdateItem={onUpdateItem}
-            onAddChildPage={onAddChildPage}
+            onAddChildPage={canCreateProjectChildPage ? onAddChildPage : null}
             onShowPrompt={onShowPrompt}
             editorViewRef={editorViewRef}
             onEditorUpdate={handleEditorUpdate}

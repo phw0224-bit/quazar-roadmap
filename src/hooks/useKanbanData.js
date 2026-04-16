@@ -416,15 +416,17 @@ export const useKanbanData = () => {
   const updateItem = async (projectId, itemId, updates) => {
     const project = resolveProjectForItem(projectId, itemId);
     const boardType = project?.board_type ?? 'main';
-    const updated = await API.updateItem(projectId, itemId, updates, boardType);
-    dispatch({ type: 'UPDATE_ITEM', payload: { projectId: project?.id ?? projectId, itemId, updates: updated } });
+    const resolvedProjectId = project?.id ?? projectId;
+    const updated = await API.updateItem(resolvedProjectId, itemId, updates, boardType);
+    dispatch({ type: 'UPDATE_ITEM', payload: { projectId: resolvedProjectId, itemId, updates: updated } });
   };
 
   const deleteItem = async (projectId, itemId) => {
     const project = resolveProjectForItem(projectId, itemId);
     const boardType = project?.board_type ?? 'main';
-    await API.deleteItem(projectId, itemId, boardType);
-    dispatch({ type: 'DELETE_ITEM', payload: { projectId: project?.id ?? projectId, itemId } });
+    const resolvedProjectId = project?.id ?? projectId;
+    await API.deleteItem(resolvedProjectId, itemId, boardType);
+    dispatch({ type: 'DELETE_ITEM', payload: { projectId: resolvedProjectId, itemId } });
   };
 
   /**
