@@ -193,8 +193,8 @@ export default function AssigneePicker({
                     onClick={() => handleToggleProfile(profile.cleanName)}
                     className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-black transition-all cursor-pointer ${
                       isSelected
-                        ? 'border-blue-200 dark:border-blue-800/50 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-300'
-                        : 'border-gray-200 dark:border-border-subtle bg-white dark:bg-bg-base text-gray-600 dark:text-text-secondary hover:border-blue-200 dark:hover:border-blue-800/40 hover:bg-blue-50 dark:hover:bg-blue-900/15'
+                        ? 'border-brand-200 dark:border-brand-700/50 bg-brand-50 dark:bg-brand-800/25 text-brand-600 dark:text-brand-400'
+                        : 'border-gray-200 dark:border-border-subtle bg-white dark:bg-bg-base text-gray-600 dark:text-text-secondary hover:border-brand-200 dark:hover:border-brand-700/40 hover:bg-brand-50 dark:hover:bg-brand-800/15'
                     }`}
                   >
                     {isSelected ? <Check size={12} strokeWidth={3} /> : <Plus size={12} strokeWidth={3} />}

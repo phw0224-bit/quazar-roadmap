@@ -518,7 +518,7 @@ export default function TimelineView({ projects = [], phases = projects, section
             onClick={() => setHideUndated(v => !v)}
             className={`px-3 py-1 text-xs font-bold rounded-xl transition-all cursor-pointer ${
               hideUndated
-                ? 'bg-blue-500 text-white'
+                ? 'bg-brand-500 text-white'
                 : 'bg-gray-100 dark:bg-bg-elevated text-gray-500 dark:text-text-tertiary hover:text-gray-800 dark:hover:text-text-secondary'
             }`}
           >
@@ -568,7 +568,7 @@ export default function TimelineView({ projects = [], phases = projects, section
                         key={i}
                         className={`absolute top-0 h-full flex items-center justify-center text-[10px] border-l ${
                           isToday
-                            ? 'border-blue-400 text-blue-500 font-black dark:text-blue-400 dark:border-blue-400'
+                            ? 'border-brand-400 text-brand-500 font-black dark:text-brand-400 dark:border-brand-400'
                             : isWeekend
                             ? 'border-gray-100/50 dark:border-border-subtle/20 text-gray-300 dark:text-text-tertiary/30'
                             : 'border-gray-100 dark:border-border-subtle/30 text-gray-400 dark:text-text-tertiary'
@@ -587,7 +587,7 @@ export default function TimelineView({ projects = [], phases = projects, section
             <div className="relative">
               {/* 오늘 수직선 */}
               <div
-                className="absolute top-0 z-10 w-px bg-blue-400/50 dark:bg-blue-400/40 pointer-events-none"
+                className="absolute top-0 z-10 w-px bg-brand-400/50 dark:bg-brand-400/40 pointer-events-none"
                 style={{ left: LEFT_W + todayX, height: totalRowHeight }}
               />
 

@@ -148,7 +148,7 @@ export default function PresenceAvatars() {
                     disabled={loadingSummary || reactingType === type || selectedUser.userId === currentUserId}
                     className={`rounded-xl border px-1 py-1.5 flex flex-col items-center gap-1 text-xs transition-colors ${
                       isMine
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                        ? 'border-brand-400 bg-brand-50 dark:bg-brand-800/30'
                         : 'border-gray-200 dark:border-border-subtle hover:border-gray-300 dark:hover:border-border-strong'
                     } ${
                       selectedUser.userId === currentUserId ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'

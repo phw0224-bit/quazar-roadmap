@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { ChevronRight, Plus, GripVertical } from 'lucide-react';
+import { ChevronRight, Plus, GripVertical, Ticket } from 'lucide-react';
 import { useSortable, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -58,6 +58,11 @@ const SortableTreeItem = memo(function SortableTreeItem({
 
   const label = node.title || node.content || '제목 없음';
   const icon = isProject ? '📋' : node.page_type === 'folder' ? '📁' : '📄';
+  const ticketKey = node.ticket_key || '';
+  const hasTicket = Boolean(ticketKey || node.is_ticket);
+  const labels = Array.isArray(node.tags) ? node.tags.filter(Boolean) : [];
+  const firstLabel = labels[0] || '';
+  const extraLabelCount = Math.max(labels.length - (firstLabel ? 1 : 0), 0);
   const isOver = dragOverInfo?.id === node.id;
   const canAddChild = !isReadOnly && Boolean(isProject || node.project_id);
 
@@ -111,6 +116,32 @@ const SortableTreeItem = memo(function SortableTreeItem({
         >
           {label}
         </span>
+
+        {hasTicket && (
+          <span
+            className="inline-flex max-w-[120px] items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800/60 dark:text-slate-200"
+            title={ticketKey || 'GitHub ticket'}
+          >
+            <Ticket size={10} strokeWidth={2.25} />
+            <span className="truncate">{ticketKey || 'TICKET'}</span>
+          </span>
+        )}
+        {firstLabel && (
+          <span
+            className="inline-flex max-w-[96px] items-center rounded-md bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
+            title={firstLabel}
+          >
+            <span className="truncate">#{firstLabel}</span>
+          </span>
+        )}
+        {extraLabelCount > 0 && (
+          <span
+            className="inline-flex items-center rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600 dark:bg-bg-hover dark:text-text-secondary"
+            title={`라벨 ${extraLabelCount}개 더 있음`}
+          >
+            +{extraLabelCount}
+          </span>
+        )}
 
         {/* + button */}
         {canAddChild && (

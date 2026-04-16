@@ -98,12 +98,12 @@ export default function BoardSection({
               if (e.key === 'Enter') handleSaveTitle();
               if (e.key === 'Escape') { setTitleInput(section.title); setIsEditingTitle(false); }
             }}
-            className="text-lg font-black text-gray-900 dark:text-text-primary bg-white dark:bg-bg-base border border-blue-400 rounded-lg px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 w-48"
+            className="text-lg font-black text-gray-900 dark:text-text-primary bg-white dark:bg-bg-base border border-brand-300 rounded-lg px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-brand-500/20 w-48"
           />
         ) : (
           <h3
             onClick={() => !isReadOnly && setIsEditingTitle(true)}
-            className={`text-lg font-black text-gray-900 dark:text-text-primary tracking-tight transition-colors ${!isReadOnly ? 'cursor-pointer hover:text-blue-600 dark:hover:text-blue-400' : ''}`}
+            className={`text-lg font-black text-gray-900 dark:text-text-primary tracking-tight transition-colors ${!isReadOnly ? 'cursor-pointer hover:text-brand-600 dark:hover:text-brand-400' : ''}`}
           >
             {section.title}
           </h3>

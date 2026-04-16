@@ -110,6 +110,7 @@ Google Chat Bot (:3002)
 
 ## 상세 문서
 
+- **[docs/FRONTEND_PROJECT_MAP.md](./docs/FRONTEND_PROJECT_MAP.md)** — `server/` 제외 프론트엔드 프로젝트 맵
 - **[CLAUDE.md](./CLAUDE.md)** — 프로젝트 전체 맵 (아키텍처, 데이터 모델, 비즈니스 규칙, 플로우)
 - **[docs/DATA_MODEL.md](./docs/DATA_MODEL.md)** — DB 스키마 상세
 - **[docs/BUSINESS_RULES.md](./docs/BUSINESS_RULES.md)** — 비즈니스 로직
