@@ -878,10 +878,10 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                           <>
                             {/* 일반 문서 섹션 - 접고 펼칠 수 있음 (최상단) */}
                             {boardGeneralDocs.length > 0 && (
-                              <div className="mt-8">
+                              <div className="mt-8 rounded-[28px] border border-gray-200/80 bg-white/80 px-4 py-3 shadow-sm dark:border-white/8 dark:bg-[#101010]">
                                 <div className="flex items-center justify-between gap-2">
                                   <button
-                                    className="flex items-center gap-2 px-2 py-2 text-sm font-bold text-gray-500 dark:text-text-secondary hover:text-gray-900 dark:hover:text-text-primary transition-colors cursor-pointer"
+                                    className="flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-bold text-gray-500 transition-colors hover:bg-gray-100/80 hover:text-gray-900 dark:text-zinc-300 dark:hover:bg-white/5 dark:hover:text-white cursor-pointer"
                                     onClick={() => setExpandedGeneralDocBoards(prev => {
                                       const next = new Set(prev);
                                       next.has(boardName) ? next.delete(boardName) : next.add(boardName);
@@ -893,7 +893,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                                       className={`transition-transform duration-200 ${expandedGeneralDocBoards.has(boardName) ? 'rotate-90' : ''}`}
                                     />
                                     <span>📄 일반 문서</span>
-                                    <span className="px-2 py-0.5 bg-brand-100 dark:bg-brand-800/30 text-brand-600 dark:text-brand-400 rounded-full text-xs font-bold tabular-nums">
+                                    <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs font-bold tabular-nums text-brand-600 dark:bg-brand-500/15 dark:text-brand-300">
                                       {boardGeneralDocs.length}
                                     </span>
                                   </button>
@@ -902,7 +902,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                                   {!isReadOnly && (
                                     <div className="flex gap-2">
                                       <button
-                                        className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 dark:text-text-primary hover:bg-brand-50 dark:hover:bg-brand-800/10 rounded transition-colors"
+                                        className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-brand-50 dark:bg-[#171717] dark:text-zinc-200 dark:hover:bg-brand-500/10"
                                         onClick={() => {
                                           showPrompt(
                                             '새 문서 추가',
@@ -922,7 +922,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                                         <span>문서</span>
                                       </button>
                                       <button
-                                        className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 dark:text-text-primary hover:bg-amber-50 dark:hover:bg-amber-900/10 rounded transition-colors"
+                                        className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-amber-50 dark:bg-[#171717] dark:text-zinc-200 dark:hover:bg-amber-500/10"
                                         onClick={() => {
                                           showPrompt(
                                             '새 폴더 추가',
@@ -946,7 +946,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                                 </div>
 
                                 {expandedGeneralDocBoards.has(boardName) && (
-                                  <div className="mt-3">
+                                  <div className="mt-3 rounded-2xl bg-gray-50/40 p-1.5 dark:bg-[#0d0d0d]">
                                     <GeneralDocumentSection
                                       documents={boardGeneralDocs}
                                       onOpenDetail={handleOpenDetail}

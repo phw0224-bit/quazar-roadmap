@@ -14,7 +14,7 @@
  * setUrlState → pushState (뒤로가기 가능)
  * replaceUrlState → replaceState (히스토리 없음)
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 // filter 파라미터 형식: "status:done,teams:AI팀"
 // sort 파라미터 형식: "title:asc"
@@ -75,21 +75,36 @@ function buildSearch(state) {
 
 export function useUrlState() {
   const [state, setState] = useState(parseUrlState);
+  const stateRef = useRef(state);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   const setUrlState = useCallback((partial) => {
-    setState(prev => {
-      const next = { ...prev, ...partial };
-      window.history.pushState({}, '', buildSearch(next));
-      return next;
-    });
+    const next = { ...stateRef.current, ...partial };
+    const nextSearch = buildSearch(next);
+    const currentSearch = window.location.search || window.location.pathname;
+
+    if (nextSearch !== currentSearch) {
+      window.history.pushState({}, '', nextSearch);
+    }
+
+    stateRef.current = next;
+    setState(next);
   }, []);
 
   const replaceUrlState = useCallback((partial) => {
-    setState(prev => {
-      const next = { ...prev, ...partial };
-      window.history.replaceState({}, '', buildSearch(next));
-      return next;
-    });
+    const next = { ...stateRef.current, ...partial };
+    const nextSearch = buildSearch(next);
+    const currentSearch = window.location.search || window.location.pathname;
+
+    if (nextSearch !== currentSearch) {
+      window.history.replaceState({}, '', nextSearch);
+    }
+
+    stateRef.current = next;
+    setState(next);
   }, []);
 
   useEffect(() => {
