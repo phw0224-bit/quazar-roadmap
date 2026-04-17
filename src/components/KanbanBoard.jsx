@@ -33,6 +33,7 @@ import { useKanbanData } from '../hooks/useKanbanData';
 import { useUrlState } from '../hooks/useUrlState';
 import { useAuth } from '../hooks/useAuth';
 import { usePresence } from '../hooks/usePresence';
+import { useNewItems } from '../hooks/useNewItems';
 import { PresenceContext } from '../hooks/usePresenceContext';
 import PresenceAvatars from './PresenceAvatars';
 import { useLayoutState } from '../hooks/useLayoutState.js';
@@ -119,6 +120,20 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
   const { theme, resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [showNewPanelMap, setShowNewPanelMap] = useState({}); // {boardName: boolean}
+
+  // 모든 보드의 새 아이템 훅 호출 (Rules of Hooks 준수)
+  const mainNewItems = useNewItems(projects, 'main', isReadOnly);
+  const devTeamNewItems = useNewItems(projects, '개발팀', isReadOnly);
+  const aiTeamNewItems = useNewItems(projects, 'AI팀', isReadOnly);
+  const supportTeamNewItems = useNewItems(projects, '지원팀', isReadOnly);
+
+  const newItemsMap = useMemo(() => ({
+    main: mainNewItems,
+    '개발팀': devTeamNewItems,
+    'AI팀': aiTeamNewItems,
+    '지원팀': supportTeamNewItems,
+  }), [mainNewItems, devTeamNewItems, aiTeamNewItems, supportTeamNewItems]);
 
   useEffect(() => setMounted(true), []);
 
@@ -183,6 +198,17 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // 새 아이템 패널 외부 클릭 닫기
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('[data-new-panel]')) {
+        setShowNewPanelMap({});
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handleSaveProfileCustomization = async (nextCustomization) => {
@@ -771,13 +797,55 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
               const boardDisplayName = boardName === 'main' ? '전사 로드맵' : `${boardName} 보드`;
               const boardIcon = boardName === 'main' ? '🗺️' : boardName === '개발팀' ? '⚙️' : '📂';
 
+              // 새 아이템 알림 (이미 호출된 훅에서 가져오기)
+              const { newItems, markAsRead } = newItemsMap[boardName] || { newItems: [], markAsRead: () => {} };
+              const showNewPanel = showNewPanelMap[boardName] || false;
+
               return (
                 <section key={boardName} className="flex flex-col gap-8 border-t border-gray-100 dark:border-border-subtle pt-16 first:border-none first:pt-0 transition-all duration-300 ease-notion">
                   <div className="flex items-center justify-between px-4 group">
                     <div className="flex items-center gap-4">
                       <div className="text-3xl filter drop-shadow-sm">{boardIcon}</div>
-                      <div className="flex flex-col">
-                        <h2 className="text-2xl font-black text-gray-900 dark:text-text-primary tracking-tight leading-tight">{boardDisplayName}</h2>
+                      <div className="flex flex-col relative" data-new-panel>
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-2xl font-black text-gray-900 dark:text-text-primary tracking-tight leading-tight">{boardDisplayName}</h2>
+                          {newItems.length > 0 && (
+                            <button
+                              onClick={() => setShowNewPanelMap(prev => ({ ...prev, [boardName]: !prev[boardName] }))}
+                              className="ml-2 px-2 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded-md text-sm font-bold hover:bg-red-200 dark:hover:bg-red-500/30 transition-colors cursor-pointer"
+                            >
+                              *NEW {newItems.length}
+                            </button>
+                          )}
+                        </div>
+                        {showNewPanel && newItems.length > 0 && (
+                          <div className="absolute top-full left-0 mt-2 z-50 bg-white dark:bg-bg-elevated border border-gray-200 dark:border-border-strong rounded-lg shadow-lg p-2 min-w-96">
+                            {newItems.map(item => (
+                              <div
+                                key={item.id}
+                                className="px-3 py-2.5 rounded-md hover:bg-gray-50 dark:hover:bg-bg-hover transition-colors flex justify-between items-start gap-2 text-sm group"
+                              >
+                                <button
+                                  onClick={() => {
+                                    handleOpenDetail(item.id);
+                                    setShowNewPanelMap(prev => ({ ...prev, [boardName]: false }));
+                                  }}
+                                  className="text-left flex-1 hover:underline"
+                                >
+                                  <span className="text-gray-900 dark:text-text-primary font-medium block truncate">{item.displayName}</span>
+                                  <span className="text-gray-500 dark:text-text-tertiary text-xs">{item.timeAgoText}</span>
+                                </button>
+                                <button
+                                  onClick={() => markAsRead(item.id)}
+                                  className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                                  title="읽음 표시"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         <div className="flex items-center gap-2 mt-1">
                           <span className="px-2.5 py-0.5 bg-gray-100 dark:bg-bg-elevated text-gray-500 dark:text-text-tertiary rounded-md text-[13px] font-bold tabular-nums border border-gray-100 dark:border-border-subtle shadow-sm uppercase tracking-wider">
                             {boardProjects.length} 프로젝트
@@ -963,15 +1031,12 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                                       documents={boardGeneralDocs}
                                       onOpenDetail={handleOpenDetail}
                                       onDeleteDocument={(itemId) => {
-                                        console.log('[onDeleteDocument] itemId:', itemId, 'boardGeneralDocs:', boardGeneralDocs);
                                         const doc = boardGeneralDocs.find(d => d.id === itemId);
-                                        console.log('[onDeleteDocument] found doc:', doc);
                                         if (doc) {
                                           showConfirm(
                                             '삭제',
                                             `"${doc.title}"을(를) 삭제하시겠습니까?`,
                                             async (confirmed) => {
-                                              console.log('[onDeleteDocument] confirmed:', confirmed);
                                               if (confirmed) {
                                                 await deleteGeneralDocument(itemId);
                                                 showToast('삭제되었습니다.', 'success');

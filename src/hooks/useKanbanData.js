@@ -558,10 +558,15 @@ export const useKanbanData = () => {
   };
 
   const deleteGeneralDocument = async (itemId) => {
-    const doc = state.generalDocs.find(d => d.id === itemId);
-    const boardType = doc?.board_type ?? 'main';
-    await API.deleteGeneralDocument(itemId, boardType);
-    dispatch({ type: 'DELETE_GENERAL_DOC', payload: itemId });
+    try {
+      const doc = state.generalDocs.find(d => d.id === itemId);
+      const boardType = doc?.board_type ?? 'main';
+      await API.deleteGeneralDocument(itemId, boardType);
+      dispatch({ type: 'DELETE_GENERAL_DOC', payload: itemId });
+    } catch (err) {
+      console.error('[deleteGeneralDocument] error:', err);
+      throw err;
+    }
   };
 
   const moveGeneralDocument = async (itemId, newIndex) => {

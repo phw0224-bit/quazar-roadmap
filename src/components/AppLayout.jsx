@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { PanelLeftOpen, Search, LayoutGrid, Clock, StickyNote, Users, BellDot, Sun, Moon } from 'lucide-react';
 import { useLayoutState } from '../hooks/useLayoutState.js';
 import { SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH } from '../hooks/layoutStateUtils.js';
+import { useNewItems } from '../hooks/useNewItems';
 import ProfileAvatar from './ProfileAvatar';
 import Sidebar from './Sidebar';
 
@@ -40,6 +41,10 @@ export default function AppLayout({
     collapsedWidth,
   } = useLayoutState();
   const [isResizing, setIsResizing] = useState(false);
+
+  // 사이드바 알림 배지용 (collapsed 상태)
+  const userDepartment = user?.user_metadata?.department || null;
+  const { newItems } = useNewItems(projects, userDepartment, isReadOnly);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -181,18 +186,25 @@ export default function AppLayout({
 
           <div className="mt-auto pt-2">
             {user ? (
-              <button
-                type="button"
-                className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-[color:var(--color-bg-hover)] transition-colors cursor-pointer"
-                onClick={onOpenProfileSettings}
-                title={user?.user_metadata?.name || user?.email?.split('@')[0] || '프로필'}
-              >
-                <ProfileAvatar
-                  name={user?.user_metadata?.name || user?.email || 'U'}
-                  customization={profileCustomization}
-                  size="sm"
-                />
-              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-[color:var(--color-bg-hover)] transition-colors cursor-pointer"
+                  onClick={onOpenProfileSettings}
+                  title={user?.user_metadata?.name || user?.email?.split('@')[0] || '프로필'}
+                >
+                  <ProfileAvatar
+                    name={user?.user_metadata?.name || user?.email || 'U'}
+                    customization={profileCustomization}
+                    size="sm"
+                  />
+                </button>
+                {newItems.length > 0 && (
+                  <div className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center leading-none">
+                    {newItems.length}
+                  </div>
+                )}
+              </div>
             ) : (
               <button
                 type="button"

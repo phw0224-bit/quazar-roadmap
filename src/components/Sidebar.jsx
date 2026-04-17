@@ -1,5 +1,5 @@
 import { useState, useEffect, createElement, useMemo, useCallback } from 'react';
-import { ChevronRight, LayoutGrid, Clock, Users, Ellipsis, BellDot, Moon, Sun, LogOut, Map, Settings, Search, StickyNote, PanelLeftClose } from 'lucide-react';
+import { ChevronRight, LayoutGrid, Clock, Users, Ellipsis, BellDot, Moon, Sun, LogOut, Map, Settings, Search, StickyNote, PanelLeftClose, Bell } from 'lucide-react';
 import {
   DndContext,
   PointerSensor,
@@ -10,6 +10,7 @@ import {
   DragOverlay
 } from '@dnd-kit/core';
 import { usePageTree } from '../hooks/usePageTree';
+import { useNewItems } from '../hooks/useNewItems';
 import ProfileAvatar from './ProfileAvatar';
 import SidebarTree from './SidebarTree';
 import { getDropTypeFromRelativeY, getRelativeY } from './sidebarDropZones';
@@ -74,6 +75,11 @@ export default function Sidebar({
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [dragOverInfo, setDragOverInfo] = useState(null);
   const [activeDragItem, setActiveDragItem] = useState(null);
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
+
+  // 새 아이템 알림 (사용자 팀에만)
+  const userDepartment = user?.user_metadata?.department || null;
+  const { newItems, markAsRead } = useNewItems(projects, userDepartment, isReadOnly);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -542,6 +548,48 @@ export default function Sidebar({
         </div>
 
         <div className="flex-shrink-0 border-t border-[color:var(--color-border-subtle)] px-2 py-2">
+          {user && newItems.length > 0 && (
+            <div className="mb-2 pb-2 border-b border-[color:var(--color-border-subtle)]">
+              <button
+                onClick={() => setShowNotifPanel(!showNotifPanel)}
+                className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-left hover:bg-[color:var(--color-bg-hover)] transition-colors cursor-pointer relative"
+                title="새 아이템"
+              >
+                <Bell size={16} className="text-red-500 flex-shrink-0" />
+                <span className="text-[12px] font-semibold text-[color:var(--color-text-primary)]">새 아이템</span>
+                <span className="ml-auto px-1.5 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded text-[10px] font-bold">
+                  {newItems.length}
+                </span>
+              </button>
+              {showNotifPanel && (
+                <div className="mt-1 space-y-0.5 bg-[color:var(--color-bg-elevated)] border border-[color:var(--color-border-strong)] rounded-md p-1">
+                  {newItems.map(item => (
+                    <div
+                      key={item.id}
+                      className="px-2 py-1.5 rounded text-left hover:bg-[color:var(--color-bg-hover)] transition-colors group flex gap-1"
+                    >
+                      <button
+                        onClick={() => {
+                          onOpenItem(item.id);
+                          setShowNotifPanel(false);
+                        }}
+                        className="flex-1 text-[11px] text-[color:var(--color-text-primary)] hover:underline truncate"
+                      >
+                        {item.displayName}
+                      </button>
+                      <button
+                        onClick={() => markAsRead(item.id)}
+                        className="flex-shrink-0 text-[color:var(--color-text-tertiary)] hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity text-[10px]"
+                        title="읽음 표시"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           {user ? (
             <div className="space-y-1">
               <button
