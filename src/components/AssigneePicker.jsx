@@ -1,10 +1,8 @@
 /**
  * @fileoverview 아이템/프로젝트 담당자 편집을 공통화하는 선택기.
  *
- * profiles.name 기반 추천 목록과 직접 입력을 함께 제공해 assignees string[] 포맷은 유지하면서
- * 사용자는 클릭 선택 또는 자유 입력 중 편한 방식을 쓸 수 있게 한다.
- *
- * value는 현재 선택된 담당자 목록, onChange는 정규화/중복 제거된 string[]를 반환한다.
+ * 선택 결과는 이름과 사용자 id를 함께 유지해 assignees / assignee_user_ids를
+ * 동시에 저장할 수 있도록 만든다.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Check, Plus, UserPlus, X } from 'lucide-react';
@@ -12,29 +10,39 @@ import { supabase } from '../lib/supabase';
 
 const normalizeAssignee = (value) => (value || '').trim().toLowerCase();
 
-const dedupeAssignees = (values = []) => {
-  const seen = new Set();
+const dedupeAssigneeEntries = (values = []) => {
+  const seenIds = new Set();
+  const seenNames = new Set();
 
   return values.reduce((acc, rawValue) => {
-    const trimmed = (rawValue || '').trim();
-    if (!trimmed) return acc;
+    const id = rawValue?.id || null;
+    const name = (rawValue?.name || '').trim();
+    if (!name) return acc;
 
-    const key = normalizeAssignee(trimmed);
-    if (seen.has(key)) return acc;
+    if (id) {
+      if (seenIds.has(id)) return acc;
+      seenIds.add(id);
+      acc.push({ id, name });
+      return acc;
+    }
 
-    seen.add(key);
-    acc.push(trimmed);
+    const key = normalizeAssignee(name);
+    if (seenNames.has(key)) return acc;
+    seenNames.add(key);
+    acc.push({ id: null, name });
     return acc;
   }, []);
 };
 
 export default function AssigneePicker({
   value = [],
+  selectedUserIds = [],
   profiles,
   onChange,
   onCancel,
+  onInvalidAssignee,
   isReadOnly = false,
-  placeholder = '이름 직접 입력',
+  placeholder = '등록된 이름 입력',
   emptyLabel = '비어 있음',
   className = '',
 }) {
@@ -66,8 +74,6 @@ export default function AssigneePicker({
     };
   }, [profiles]);
 
-  const selectedAssignees = useMemo(() => dedupeAssignees(value), [value]);
-
   const profileSuggestions = useMemo(() => {
     return (availableProfiles || [])
       .filter((profile) => (profile.name || '').trim())
@@ -77,28 +83,73 @@ export default function AssigneePicker({
       }));
   }, [availableProfiles]);
 
-  const selectedKeys = useMemo(() => {
-    return new Set(selectedAssignees.map(normalizeAssignee));
-  }, [selectedAssignees]);
+  const profilesById = useMemo(
+    () => new Map(profileSuggestions.map((profile) => [profile.id, profile])),
+    [profileSuggestions]
+  );
+
+  const selectedEntries = useMemo(() => {
+    const entriesFromIds = (selectedUserIds || [])
+      .map((userId) => {
+        const profile = profilesById.get(userId);
+        if (!profile) return null;
+        return { id: profile.id, name: profile.cleanName };
+      })
+      .filter(Boolean);
+
+    const entriesFromNames = (value || [])
+      .map((rawName) => {
+        const trimmed = (rawName || '').trim();
+        if (!trimmed) return null;
+
+        const matchedProfile = profileSuggestions.find(
+          (profile) => normalizeAssignee(profile.cleanName) === normalizeAssignee(trimmed)
+        );
+
+        if (matchedProfile && !(selectedUserIds || []).includes(matchedProfile.id)) {
+          return { id: matchedProfile.id, name: matchedProfile.cleanName };
+        }
+
+        if (matchedProfile) return null;
+        return { id: null, name: trimmed };
+      })
+      .filter(Boolean);
+
+    return dedupeAssigneeEntries([...entriesFromIds, ...entriesFromNames]);
+  }, [profileSuggestions, profilesById, selectedUserIds, value]);
+
+  const selectedIdSet = useMemo(
+    () => new Set(selectedEntries.map((entry) => entry.id).filter(Boolean)),
+    [selectedEntries]
+  );
 
   const applyAssignees = (nextValues) => {
-    onChange?.(dedupeAssignees(nextValues));
+    const normalizedEntries = dedupeAssigneeEntries(nextValues);
+    onChange?.(
+      normalizedEntries.map((entry) => entry.name),
+      normalizedEntries.map((entry) => entry.id).filter(Boolean),
+    );
   };
 
-  const handleToggleProfile = (profileName) => {
+  const handleToggleProfile = (profile) => {
     if (isReadOnly) return;
 
-    const key = normalizeAssignee(profileName);
-    const nextValues = selectedKeys.has(key)
-      ? selectedAssignees.filter((assignee) => normalizeAssignee(assignee) !== key)
-      : [...selectedAssignees, profileName];
+    const nextValues = selectedIdSet.has(profile.id)
+      ? selectedEntries.filter((entry) => entry.id !== profile.id)
+      : [...selectedEntries, { id: profile.id, name: profile.cleanName }];
 
     applyAssignees(nextValues);
   };
 
   const handleRemoveAssignee = (assignee) => {
     if (isReadOnly) return;
-    applyAssignees(selectedAssignees.filter((value) => normalizeAssignee(value) !== normalizeAssignee(assignee)));
+
+    applyAssignees(selectedEntries.filter((entry) => {
+      if (assignee.id && entry.id) {
+        return entry.id !== assignee.id;
+      }
+      return normalizeAssignee(entry.name) !== normalizeAssignee(assignee.name);
+    }));
   };
 
   const handleAddManual = () => {
@@ -107,7 +158,16 @@ export default function AssigneePicker({
     const trimmed = manualInput.trim();
     if (!trimmed) return;
 
-    applyAssignees([...selectedAssignees, trimmed]);
+    const matchedProfile = profileSuggestions.find(
+      (profile) => normalizeAssignee(profile.cleanName) === normalizeAssignee(trimmed)
+    );
+
+    if (!matchedProfile) {
+      onInvalidAssignee?.('담당자는 등록된 프로필만 지정할 수 있습니다.');
+      return;
+    }
+
+    applyAssignees([...selectedEntries, { id: matchedProfile.id, name: matchedProfile.cleanName }]);
     setManualInput('');
   };
 
@@ -115,19 +175,19 @@ export default function AssigneePicker({
     <div className={`w-full rounded-2xl border border-gray-200 dark:border-border-subtle bg-white dark:bg-bg-elevated p-4 shadow-sm ${className}`}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2 min-h-[32px]">
-          {selectedAssignees.length > 0 ? (
-            selectedAssignees.map((assignee) => (
+          {selectedEntries.length > 0 ? (
+            selectedEntries.map((assignee) => (
               <span
-                key={assignee}
+                key={assignee.id || assignee.name}
                 className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 dark:border-border-subtle bg-gray-50 dark:bg-bg-hover px-3 py-1 text-[13px] font-bold text-gray-700 dark:text-text-secondary"
               >
-                <span>@{assignee}</span>
+                <span>@{assignee.name}</span>
                 {!isReadOnly && (
                   <button
                     type="button"
                     onClick={() => handleRemoveAssignee(assignee)}
                     className="rounded-full p-0.5 text-gray-400 hover:bg-gray-200 dark:hover:bg-bg-base hover:text-gray-700 dark:hover:text-text-primary transition-colors cursor-pointer"
-                    aria-label={`${assignee} 제거`}
+                    aria-label={`${assignee.name} 제거`}
                   >
                     <X size={12} strokeWidth={3} />
                   </button>
@@ -184,13 +244,13 @@ export default function AssigneePicker({
           <div className="mt-4 flex flex-wrap gap-2">
             {profileSuggestions.length > 0 ? (
               profileSuggestions.map((profile) => {
-                const isSelected = selectedKeys.has(normalizeAssignee(profile.cleanName));
+                const isSelected = selectedIdSet.has(profile.id);
 
                 return (
                   <button
                     key={profile.id}
                     type="button"
-                    onClick={() => handleToggleProfile(profile.cleanName)}
+                    onClick={() => handleToggleProfile(profile)}
                     className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-black transition-all cursor-pointer ${
                       isSelected
                         ? 'border-brand-200 dark:border-brand-700/50 bg-brand-50 dark:bg-brand-800/25 text-brand-600 dark:text-brand-400'

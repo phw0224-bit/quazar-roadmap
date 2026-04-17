@@ -19,6 +19,7 @@ import {
   toCustomizationPayload,
 } from '../lib/profileAppearance';
 
+const API_SERVER_URL = '';
 const normalizeNameKey = (value) => (value || '').trim().toLowerCase();
 
 const itemsTable = (boardType) => boardType === 'main' ? 'roadmap_items' : 'items';
@@ -35,6 +36,156 @@ const requireAuthenticatedUserId = async () => {
   return user.id;
 };
 
+const getServerAuthHeaders = async (extra = {}) => {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+
+  const token = data.session?.access_token;
+  if (!token) {
+    throw new Error('로그인이 필요합니다.');
+  }
+
+  return {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+    ...extra,
+  };
+};
+
+const normalizeAssigneeNames = (values = []) => {
+  const seen = new Set();
+
+  return (Array.isArray(values) ? values : [])
+    .map((value) => (value || '').trim())
+    .filter(Boolean)
+    .filter((value) => {
+      const key = normalizeNameKey(value);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+};
+
+const normalizeUuidList = (values = []) => {
+  const seen = new Set();
+
+  return (Array.isArray(values) ? values : [])
+    .map((value) => `${value || ''}`.trim())
+    .filter(Boolean)
+    .filter((value) => {
+      if (seen.has(value)) return false;
+      seen.add(value);
+      return true;
+    });
+};
+
+const diffAddedAssigneeUserIds = (previousValues = [], nextValues = []) => {
+  const previousIds = new Set(normalizeUuidList(previousValues));
+  return normalizeUuidList(nextValues).filter((userId) => !previousIds.has(userId));
+};
+
+const createAssignmentNotifications = async ({
+  recipientUserIds = [],
+  entityTable,
+  entityId,
+  entityTitle,
+  boardType,
+  parentEntityTable = null,
+  parentEntityId = null,
+}) => {
+  const recipients = normalizeUuidList(recipientUserIds);
+  if (recipients.length === 0) return;
+
+  const response = await fetch(`${API_SERVER_URL}/api/notifications/assignments`, {
+    method: 'POST',
+    headers: await getServerAuthHeaders(),
+    body: JSON.stringify({
+      recipient_user_ids: recipients,
+      entity_table: entityTable,
+      entity_id: entityId,
+      entity_title: entityTitle || null,
+      board_type: boardType || null,
+      parent_entity_table: parentEntityTable,
+      parent_entity_id: parentEntityId,
+    }),
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.error || '담당자 알림 생성에 실패했습니다.');
+  }
+};
+
+const fetchProfileIdentityMaps = async () => {
+  const { data: profiles, error } = await supabase
+    .from('profiles')
+    .select('id, name');
+
+  if (error) throw error;
+
+  const idsByNameKey = new Map();
+  const namesById = new Map();
+
+  (profiles || []).forEach((profile) => {
+    const cleanName = (profile.name || '').trim();
+    if (!cleanName) return;
+
+    const key = normalizeNameKey(cleanName);
+    const current = idsByNameKey.get(key) || [];
+    current.push(profile.id);
+    idsByNameKey.set(key, current);
+    namesById.set(profile.id, cleanName);
+  });
+
+  return { idsByNameKey, namesById };
+};
+
+const resolveAssigneeFields = async (updates = {}) => {
+  const hasAssigneeNames = Object.prototype.hasOwnProperty.call(updates, 'assignees');
+  const hasAssigneeIds = Object.prototype.hasOwnProperty.call(updates, 'assignee_user_ids');
+
+  if (!hasAssigneeNames && !hasAssigneeIds) {
+    return updates;
+  }
+
+  const { idsByNameKey, namesById } = await fetchProfileIdentityMaps();
+
+  if (hasAssigneeIds) {
+    const assigneeUserIds = normalizeUuidList(updates.assignee_user_ids);
+    const assignees = assigneeUserIds.map((userId) => {
+      const profileName = namesById.get(userId);
+      if (!profileName) {
+        throw new Error(`존재하지 않는 담당자 프로필입니다: ${userId}`);
+      }
+      return profileName;
+    });
+
+    return {
+      ...updates,
+      assignees,
+      assignee_user_ids: assigneeUserIds,
+    };
+  }
+
+  const assignees = normalizeAssigneeNames(updates.assignees);
+  const assigneeUserIds = assignees.map((assigneeName) => {
+    const matchedIds = idsByNameKey.get(normalizeNameKey(assigneeName)) || [];
+    if (matchedIds.length === 0) {
+      throw new Error(`등록된 프로필이 없는 담당자입니다: ${assigneeName}`);
+    }
+    if (matchedIds.length > 1) {
+      throw new Error(`동명이인 프로필이 있어 담당자를 식별할 수 없습니다: ${assigneeName}`);
+    }
+    return matchedIds[0];
+  });
+
+  return {
+    ...updates,
+    assignees,
+    assignee_user_ids: assigneeUserIds,
+  };
+};
+
 const normalizePersonalMemo = (memo) => ({
   ...memo,
   board_type: 'personal',
@@ -46,6 +197,7 @@ const normalizePersonalMemo = (memo) => ({
   project_id: null,
   related_items: [],
   assignees: [],
+  assignee_user_ids: [],
   teams: [],
   tags: [],
   comments: [],
@@ -143,12 +295,14 @@ const supabaseAPI = {
     const formattedProjects = allProjects.map(project => ({
       ...project,
       assignees: Array.isArray(project.assignees) ? project.assignees : [],
+      assignee_user_ids: Array.isArray(project.assignee_user_ids) ? project.assignee_user_ids : [],
       items: allItems
         .filter(item => item.project_id === project.id)
         .sort((a, b) => a.order_index - b.order_index)
         .map(item => ({
           ...item,
           related_items: Array.isArray(item.related_items) ? item.related_items : [],
+          assignee_user_ids: Array.isArray(item.assignee_user_ids) ? item.assignee_user_ids : [],
           creator_profile: item.created_by ? profilesById.get(item.created_by) || null : null,
           comments: (item.comments || [])
             .map((comment) => {
@@ -171,6 +325,7 @@ const supabaseAPI = {
     const formattedGeneralDocs = (generalDocItems || []).map(item => ({
       ...item,
       related_items: Array.isArray(item.related_items) ? item.related_items : [],
+      assignee_user_ids: Array.isArray(item.assignee_user_ids) ? item.assignee_user_ids : [],
       creator_profile: item.created_by ? profilesById.get(item.created_by) || null : null,
       comments: (item.comments || [])
         .map((comment) => {
@@ -317,7 +472,7 @@ const supabaseAPI = {
 
     const { data, error } = await supabase
       .from(projectsTable(boardType))
-      .insert([{ title, order_index: nextOrder, board_type: boardType, assignees: [], section_id: sectionId }])
+      .insert([{ title, order_index: nextOrder, board_type: boardType, assignees: [], assignee_user_ids: [], section_id: sectionId }])
       .select();
 
     if (error) throw error;
@@ -325,14 +480,47 @@ const supabaseAPI = {
   },
 
   updateProject: async (projectId, updates, boardType = 'main') => {
+    const tableName = projectsTable(boardType);
+    const { data: existingProject, error: existingError } = await supabase
+      .from(tableName)
+      .select('id, title, assignee_user_ids')
+      .eq('id', projectId)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+
+    const normalizedUpdates = await resolveAssigneeFields(updates);
     const { data, error } = await supabase
-      .from(projectsTable(boardType))
-      .update(updates)
+      .from(tableName)
+      .update(normalizedUpdates)
       .eq('id', projectId)
       .select();
 
     if (error) throw error;
-    return data[0];
+    const updatedProject = data[0];
+
+    if (Object.prototype.hasOwnProperty.call(normalizedUpdates, 'assignee_user_ids') && updatedProject) {
+      const addedAssigneeUserIds = diffAddedAssigneeUserIds(
+        existingProject?.assignee_user_ids || [],
+        updatedProject.assignee_user_ids || []
+      );
+
+      if (addedAssigneeUserIds.length > 0) {
+        try {
+          await createAssignmentNotifications({
+            recipientUserIds: addedAssigneeUserIds,
+            entityTable: tableName,
+            entityId: updatedProject.id,
+            entityTitle: updatedProject.title,
+            boardType,
+          });
+        } catch (notificationError) {
+          console.warn('[updateProject] Assignment notification failed:', notificationError.message);
+        }
+      }
+    }
+
+    return updatedProject;
   },
 
   /**
@@ -439,6 +627,7 @@ const supabaseAPI = {
         board_type: boardType,
         teams: [],
         assignees: [],
+        assignee_user_ids: [],
         tags: [],
         related_items: []
       }])
@@ -449,16 +638,49 @@ const supabaseAPI = {
   },
 
   updateItem: async (projectId, itemId, updates, boardType = 'main') => {
+    const tableName = itemsTable(boardType);
+    const { data: existingItem, error: existingError } = await supabase
+      .from(tableName)
+      .select('id, title, project_id, assignee_user_ids')
+      .eq('id', itemId)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+
+    const normalizedUpdates = await resolveAssigneeFields(updates);
     const { data, error } = await supabase
-      .from(itemsTable(boardType))
-      .update(updates)
+      .from(tableName)
+      .update(normalizedUpdates)
       .eq('id', itemId)
       .select();
     
     if (error) throw error;
     const updatedItem = data[0];
 
-    if (Object.prototype.hasOwnProperty.call(updates, 'status') && updatedItem?.status) {
+    if (Object.prototype.hasOwnProperty.call(normalizedUpdates, 'assignee_user_ids') && updatedItem) {
+      const addedAssigneeUserIds = diffAddedAssigneeUserIds(
+        existingItem?.assignee_user_ids || [],
+        updatedItem.assignee_user_ids || []
+      );
+
+      if (addedAssigneeUserIds.length > 0) {
+        try {
+          await createAssignmentNotifications({
+            recipientUserIds: addedAssigneeUserIds,
+            entityTable: tableName,
+            entityId: updatedItem.id,
+            entityTitle: updatedItem.title,
+            boardType,
+            parentEntityTable: projectsTable(boardType),
+            parentEntityId: updatedItem.project_id || projectId || null,
+          });
+        } catch (notificationError) {
+          console.warn('[updateItem] Assignment notification failed:', notificationError.message);
+        }
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(normalizedUpdates, 'status') && updatedItem?.status) {
       try {
         await syncGitHubIssueStatus(itemId, updatedItem.status);
       } catch (syncError) {
@@ -919,6 +1141,7 @@ export async function createChildPage(projectId, parentItemId, title, inheritedP
       page_type: 'page',
       status: 'none',
       assignees: [],
+      assignee_user_ids: [],
       teams: inheritedProps.teams || [],
       tags: inheritedProps.tags || [],
       related_items: [],

@@ -71,11 +71,15 @@ const stopProp = (e) => e.stopPropagation();
 ```javascript
 <AssigneePicker
   value={item.assignees || []}
-  onChange={(assignees) => onUpdateItem(phase.id, item.id, { assignees })}
+  selectedUserIds={item.assignee_user_ids || []}
+  onChange={(assignees, assigneeUserIds) => onUpdateItem(phase.id, item.id, {
+    assignees,
+    assignee_user_ids: assigneeUserIds,
+  })}
 />
 ```
 
-추천 유저 선택과 직접 입력을 모두 지원하지만 저장값은 계속 `profiles.name` 기반 `string[]`를 유지한다.
+표시용 `assignees`와 식별용 `assignee_user_ids`를 함께 유지한다. 직접 입력도 등록된 프로필 이름만 허용한다.
 
 **페이지와 카드 분리 렌더링:**
 

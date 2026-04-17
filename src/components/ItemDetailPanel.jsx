@@ -23,6 +23,7 @@ import CommentSection from './CommentSection';
 import ItemDescriptionSection from './ItemDescriptionSection';
 import DocumentOutline from './DocumentOutline';
 import BacklinksPanel from './BacklinksPanel';
+import AssigneePicker from './AssigneePicker';
 import { TEAMS, STATUS_MAP, PRIORITY_MAP } from '../lib/constants';
 import { TAG_CATALOG } from '../lib/tagCatalog';
 import { getTemplateScaffold } from '../lib/itemTemplates';
@@ -51,7 +52,6 @@ function ItemDetailPanel({
   const stopProp = (e) => e.stopPropagation();
   const { updateEditing } = usePresenceContext();
   const [isEditingAssignees, setIsEditingAssignees] = useState(false);
-  const [assigneeInput, setAssigneeInput] = useState((item?.assignees || []).join(', '));
   const [isEditingTags, setIsEditingTags] = useState(false);
   const [newTagInput, setNewTagInput] = useState('');
   const [isEditingRelations, setIsEditingRelations] = useState(false);
@@ -100,7 +100,6 @@ function ItemDetailPanel({
   const headerToggleButtonClass = 'p-1.5 rounded-lg transition-colors cursor-pointer';
 
   useEffect(() => {
-    setAssigneeInput((item?.assignees || []).join(', '));
     setTitleInput(item?.title || item?.content || '');
     setIsEditingRelations(false);
     setRelationSearchQuery('');
@@ -222,9 +221,22 @@ function ItemDetailPanel({
     }
   };
 
-  const handleSaveAssignees = async () => {
-    const updated = assigneeInput.split(',').map(s => s.trim()).filter(s => s !== '');
-    await onUpdateItem(itemProjectId, item.id, { assignees: updated });
+  const handleSaveAssignees = async (updatedAssignees, updatedUserIds) => {
+    const currentNames = item.assignees || [];
+    const currentIds = item.assignee_user_ids || [];
+
+    if (
+      JSON.stringify(updatedAssignees) === JSON.stringify(currentNames)
+      && JSON.stringify(updatedUserIds) === JSON.stringify(currentIds)
+    ) {
+      setIsEditingAssignees(false);
+      return;
+    }
+
+    await onUpdateItem(itemProjectId, item.id, {
+      assignees: updatedAssignees,
+      assignee_user_ids: updatedUserIds,
+    });
     setIsEditingAssignees(false);
     onShowToast?.('담당자가 업데이트되었습니다.');
   };
@@ -595,24 +607,24 @@ function ItemDetailPanel({
                 onClick={() => !isReadOnly && setIsEditingAssignees(true)}
               >
                 {!isEditingAssignees ? (
-                  <div className="flex flex-wrap gap-2 w-full">
+                 <div className="flex flex-wrap gap-2 w-full">
                     {(item.assignees || []).length > 0 ? (
                        item.assignees.map(a => <span key={a} className="bg-gray-100 dark:bg-bg-base text-gray-800 dark:text-text-primary px-3 py-1 rounded-lg text-[13px] font-black border border-gray-200 dark:border-border-subtle shadow-sm">@{a}</span>)
                      ) : <span className="text-[13px] font-bold text-gray-300 dark:text-text-tertiary italic">비어 있음</span>}
                    </div>
                  ) : (
-                   <input
-                     autoFocus
-                     className="w-full bg-transparent border-none p-0 text-sm font-black text-gray-900 dark:text-text-primary placeholder:text-gray-400 dark:placeholder:text-text-tertiary focus:ring-0 outline-none"
-                    placeholder="이름 입력 (쉼표로 구분)..."
-                    value={assigneeInput}
-                    onChange={e => setAssigneeInput(e.target.value)}
-                    onBlur={handleSaveAssignees}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') handleSaveAssignees();
-                      if (e.key === 'Escape') setIsEditingAssignees(false);
-                    }}
-                  />
+                   <div className="w-full" onClick={stopProp} onPointerDown={stopProp}>
+                     <AssigneePicker
+                       value={item.assignees || []}
+                       selectedUserIds={item.assignee_user_ids || []}
+                       onChange={handleSaveAssignees}
+                       onCancel={() => setIsEditingAssignees(false)}
+                       onInvalidAssignee={onShowToast}
+                       isReadOnly={isReadOnly}
+                       placeholder="등록된 담당자 이름 입력"
+                       className="w-full"
+                     />
+                   </div>
                 )}
               </div>
             </div>

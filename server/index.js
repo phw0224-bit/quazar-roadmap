@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { PORT } from './lib/config.js';
 import { githubRouter } from './routes/github.js';
+import { notificationsRouter } from './routes/notifications.js';
 import { uploadRouter, UPLOAD_DIR } from './routes/upload.js';
 import { summarizeRouter } from './routes/summarize.js';
 
@@ -22,6 +23,7 @@ app.use(express.json({
 app.use('/uploads', express.static(UPLOAD_DIR));
 
 app.use('/api/github', githubRouter);
+app.use('/', notificationsRouter);
 app.use('/', uploadRouter);
 app.use('/', summarizeRouter);
 

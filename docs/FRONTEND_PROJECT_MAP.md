@@ -75,6 +75,7 @@ lib/*
 ### 4.2 Update strategy
 - 이동/정렬: 낙관적 업데이트(먼저 dispatch, 이후 API 반영)
 - 일반 수정: API 응답을 받은 뒤 dispatch
+- 담당자 저장: UI는 이름을 보여주되 API 계층에서 `assignees`와 `assignee_user_ids`를 함께 동기화
 
 ### 4.3 View state in URL
 - `useUrlState`가 `view/item/filter/sort/group/fullscreen`을 URL과 동기화.
@@ -117,6 +118,7 @@ lib/*
 - DnD 충돌 방지를 위한 `stopProp` 패턴 유지
 - 다크모드 클래스는 `dark:` prefix 강제
 - 배열 필드는 `[]` 기본값 유지 (`null` 지양)
+- 담당자/알림 스키마는 표시 이름과 식별자 분리 원칙을 따른다 (`assignees`, `assignee_user_ids`, `notifications`)
 
 ---
 
@@ -129,4 +131,3 @@ lib/*
 - 빌드: `yarn build`
 
 `fileAPI`, `summarizeAPI`, `githubAPI`는 서버 엔드포인트를 호출하지만, 해당 서버 구현 설명은 이 문서의 범위 밖이다.
-

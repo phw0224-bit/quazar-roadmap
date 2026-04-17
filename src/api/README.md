@@ -49,3 +49,6 @@ return data;
 - `completeProject()`는 완료 시 원래 위치(`pre_completion_*`)를 저장하고, 복귀 시 복원한다.
 - `moveItem()`은 칸반 보드뿐 아니라 Sidebar 트리 이동도 지원하도록 `targetParentId`를 받을 수 있다.
 - `getPersonalMemos()` 계열은 더 이상 `roadmap_items.is_private`에 의존하지 않고 전용 `personal_memos` 저장소를 사용한다.
+- 담당자 저장은 `assignees` 표시 이름 배열과 `assignee_user_ids` 식별자 배열을 함께 동기화한다.
+- 담당자 변경 알림은 `updateItem()` / `updateProject()`에서 assignee diff를 계산한 뒤 `POST /api/notifications/assignments`로 전달한다.
+- 알림 저장소는 `notifications` 테이블을 기준으로 설계하며, 쓰기는 Express 서버의 service-role 경로를 통하고 읽기 권한은 수신자 본인으로 제한한다.

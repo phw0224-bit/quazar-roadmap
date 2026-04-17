@@ -1,10 +1,11 @@
 # server/
 
-> Express 5 백엔드. 파일 업로드와 AI 요약을 담당하며, 업로드 권한 확인을 위해 Supabase auth/admin 클라이언트를 사용한다.
+> Express 5 백엔드. 파일 업로드, 담당자 알림 기록, AI 요약을 담당하며, 인증 검증과 service-role 작업에 Supabase auth/admin 클라이언트를 사용한다.
 
 ## 책임
 - multipart/form-data 파일 수신 및 디스크 저장
 - 업로드/삭제 요청 인증 및 개인 메모 소유권 검증
+- 담당자 추가 시 `notifications` 테이블 기록
 - Ollama AI 요약 프록시 (HTML → Ollama → JSON)
 
 ## 주요 파일
@@ -21,6 +22,7 @@
 | POST | `/upload/:itemId` | 인증 사용자만 파일 업로드. 개인 메모는 소유자만 가능 |
 | DELETE | `/uploads/:itemId/:filename` | 인증 사용자만 단일 파일 삭제. 개인 메모는 소유자만 가능 |
 | DELETE | `/uploads/:itemId` | 인증 사용자만 아이템의 모든 파일 삭제. 개인 메모는 소유자만 가능 |
+| POST | `/api/notifications/assignments` | 인증 사용자가 추가한 담당자에게 assignment 알림 레코드 생성 |
 | POST | `/api/summarize` | AI 요약. `{ content: htmlString }` |
 
 ## 파일 업로드 제약

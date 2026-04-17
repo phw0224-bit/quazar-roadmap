@@ -130,14 +130,22 @@ export default function ProjectColumn({
     };
   }, [showMenu]);
 
-  const handleSaveAssignees = async (updated) => {
-    const current = (project.assignees || []);
-    if (JSON.stringify(updated) === JSON.stringify(current)) {
+  const handleSaveAssignees = async (updatedAssignees, updatedUserIds) => {
+    const currentNames = project.assignees || [];
+    const currentIds = project.assignee_user_ids || [];
+
+    if (
+      JSON.stringify(updatedAssignees) === JSON.stringify(currentNames)
+      && JSON.stringify(updatedUserIds) === JSON.stringify(currentIds)
+    ) {
       setIsEditingAssignees(false);
       return;
     }
     setIsEditingAssignees(false);
-    await onUpdateProject(project.id, { assignees: updated });
+    await onUpdateProject(project.id, {
+      assignees: updatedAssignees,
+      assignee_user_ids: updatedUserIds,
+    });
     onShowToast?.('프로젝트 담당자가 업데이트되었습니다.');
   };
 
@@ -289,10 +297,12 @@ export default function ProjectColumn({
             ) : (
               <AssigneePicker
                 value={project.assignees || []}
+                selectedUserIds={project.assignee_user_ids || []}
                 onChange={handleSaveAssignees}
                 onCancel={() => setIsEditingAssignees(false)}
+                onInvalidAssignee={onShowToast}
                 isReadOnly={isReadOnly}
-                placeholder="직접 담당자 이름 입력"
+                placeholder="등록된 담당자 이름 입력"
                 className="w-full"
               />
             )}
