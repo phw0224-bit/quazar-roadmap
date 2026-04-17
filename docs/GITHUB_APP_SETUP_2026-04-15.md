@@ -17,9 +17,10 @@ GITHUB_REDIRECT_URI=https://roadmap.ai-quazar.uk/api/github/connect/callback
 
 # 신규 GitHub App 설정
 GITHUB_APP_SLUG=quazar-roadmap
-# 선택: 설치 목록 필터를 더 엄격히 하고 싶을 때만
 GITHUB_APP_ID=1234567
-# 선택: 상태 API 응답 표시용 (설치 후 리다이렉트 URL)
+GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
+# 또는 파일 경로 사용
+# GITHUB_APP_PRIVATE_KEY_PATH=.secrets/quazar-roadmap.pem
 GITHUB_APP_INSTALL_REDIRECT_URI=https://roadmap.ai-quazar.uk/api/github/app/install/callback
 
 # App Webhook secret (기존 webhook 검증과 동일 키로 사용)
@@ -51,5 +52,6 @@ GitHub App 페이지에서 아래를 설정합니다.
 ## 4. 현재 코드 동작
 
 - OAuth로 생성한 이슈는 GitHub에서 생성자가 사용자로 기록됩니다.
+- GitHub App 설치 여부와 설치된 repo 목록은 `App ID + private key`로 조회합니다.
 - GitHub App Webhook으로 `issues.closed/reopened` 이벤트를 받아 로드맵 상태를 동기화합니다.
 - DB 스키마 추가 변경은 이번 단계에서 필요하지 않습니다.

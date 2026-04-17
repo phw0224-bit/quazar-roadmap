@@ -45,6 +45,16 @@ export const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 export const GITHUB_REDIRECT_URI = process.env.GITHUB_REDIRECT_URI || `http://localhost:${PORT}/api/github/connect/callback`;
 export const GITHUB_APP_ID = process.env.GITHUB_APP_ID || '';
 export const GITHUB_APP_SLUG = process.env.GITHUB_APP_SLUG || '';
+const gitHubAppPrivateKeyPath = process.env.GITHUB_APP_PRIVATE_KEY_PATH
+  ? path.resolve(ROOT_DIR, process.env.GITHUB_APP_PRIVATE_KEY_PATH)
+  : null;
+const gitHubAppPrivateKeyRaw = process.env.GITHUB_APP_PRIVATE_KEY
+  || (gitHubAppPrivateKeyPath && fs.existsSync(gitHubAppPrivateKeyPath)
+    ? fs.readFileSync(gitHubAppPrivateKeyPath, 'utf8')
+    : '');
+export const GITHUB_APP_PRIVATE_KEY = gitHubAppPrivateKeyRaw
+  ? gitHubAppPrivateKeyRaw.replace(/\\n/g, '\n').trim()
+  : '';
 export const GITHUB_APP_INSTALL_REDIRECT_URI =
   process.env.GITHUB_APP_INSTALL_REDIRECT_URI || `http://localhost:${PORT}/api/github/app/install/callback`;
 export const GITHUB_STATE_SECRET =

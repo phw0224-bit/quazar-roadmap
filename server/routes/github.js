@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { TAG_CATALOG_BY_NAME } from '../../src/lib/tagCatalog.js';
 import { supabaseAdminClient } from '../lib/supabase.js';
 import {
+  isGitHubAppAuthConfigured,
   isGitHubAppConfigured,
   requireAuthenticatedUser,
   requireServerConfig,
@@ -10,6 +11,7 @@ import {
 import {
   GITHUB_APP_ID,
   GITHUB_APP_INSTALL_REDIRECT_URI,
+  GITHUB_APP_PRIVATE_KEY,
   GITHUB_APP_SLUG,
   APP_BASE_URL,
   GITHUB_CLIENT_ID,
@@ -316,54 +318,87 @@ function normalizeGitHubAppInstallations(payload) {
       ? payload
       : [];
 
-  return installations.filter((installation) => {
-    if (!installation || typeof installation !== 'object') return false;
-
-    const slugMatches = GITHUB_APP_SLUG
-      ? installation?.app_slug === GITHUB_APP_SLUG
-      : true;
-    const idMatches = GITHUB_APP_ID
-      ? String(installation?.app_id || '') === String(GITHUB_APP_ID)
-      : true;
-
-    return slugMatches && idMatches;
-  });
+  return installations.filter((installation) => installation && typeof installation === 'object');
 }
 
-async function getGitHubAppInstallations(token) {
-  if (!isGitHubAppConfigured()) return [];
+function encodeBase64UrlJson(value) {
+  return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
+}
 
-  try {
-    const payload = await fetchGitHubJson(
-      'https://api.github.com/user/installations?per_page=100',
-      token
-    );
-    return normalizeGitHubAppInstallations(payload);
-  } catch (error) {
-    if (error.status === 403 || error.status === 404) return [];
-    throw error;
+function createGitHubAppJwt() {
+  if (!isGitHubAppAuthConfigured()) {
+    throw createHttpError(500, 'GitHub App private key server configuration is missing.');
   }
+
+  const issuedAt = Math.floor(Date.now() / 1000) - 60;
+  const expiresAt = issuedAt + 9 * 60;
+  const header = encodeBase64UrlJson({ alg: 'RS256', typ: 'JWT' });
+  const payload = encodeBase64UrlJson({
+    iat: issuedAt,
+    exp: expiresAt,
+    iss: GITHUB_APP_ID,
+  });
+  const signingInput = `${header}.${payload}`;
+  const signature = crypto.sign('RSA-SHA256', Buffer.from(signingInput, 'utf8'), GITHUB_APP_PRIVATE_KEY);
+
+  return `${signingInput}.${signature.toString('base64url')}`;
 }
 
-async function getGitHubAppInstalledRepoSet(token, installations) {
-  const repoSet = new Set();
-  if (!Array.isArray(installations) || installations.length === 0) return repoSet;
+async function fetchGitHubAppJson(url, init = {}) {
+  return fetchGitHubJson(url, createGitHubAppJwt(), init);
+}
+
+async function getGitHubAppInstallations() {
+  if (!isGitHubAppConfigured() || !isGitHubAppAuthConfigured()) return [];
+
+  const payload = await fetchGitHubAppJson(
+    'https://api.github.com/app/installations?per_page=100'
+  );
+  return normalizeGitHubAppInstallations(payload);
+}
+
+async function createGitHubInstallationToken(installationId) {
+  const payload = await fetchGitHubAppJson(
+    `https://api.github.com/app/installations/${installationId}/access_tokens`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }
+  );
+
+  if (!payload?.token) {
+    throw createHttpError(500, 'GitHub App installation token을 발급받지 못했습니다.');
+  }
+
+  return payload.token;
+}
+
+async function getGitHubAppInstalledRepoIndex() {
+  const repoIndex = new Map();
+  const installations = await getGitHubAppInstallations();
 
   for (const installation of installations) {
     const installationId = installation?.id;
     if (!installationId) continue;
 
+    const installationToken = await createGitHubInstallationToken(installationId);
     const payload = await fetchGitHubJson(
-      `https://api.github.com/user/installations/${installationId}/repositories?per_page=100`,
-      token
+      'https://api.github.com/installation/repositories?per_page=100',
+      installationToken
     );
     const repositories = Array.isArray(payload?.repositories) ? payload.repositories : [];
+
     for (const repo of repositories) {
-      if (repo?.full_name) repoSet.add(repo.full_name);
+      if (!repo?.full_name) continue;
+      repoIndex.set(repo.full_name, {
+        installationId,
+        accountLogin: installation?.account?.login || null,
+      });
     }
   }
 
-  return repoSet;
+  return { installations, repoIndex };
 }
 
 function normalizeGitHubLabels(tags) {
@@ -589,12 +624,14 @@ router.get('/status', async (req, res) => {
 
     const connection = await getStoredGitHubConnection(user.id);
     const appConfigured = isGitHubAppConfigured();
+    const appAuthConfigured = isGitHubAppAuthConfigured();
 
     if (!connection) {
       return res.json({
         connected: false,
         app: {
           configured: appConfigured,
+          authConfigured: appAuthConfigured,
           slug: GITHUB_APP_SLUG || null,
           installRedirectUri: appConfigured ? GITHUB_APP_INSTALL_REDIRECT_URI : null,
           installed: false,
@@ -604,8 +641,27 @@ router.get('/status', async (req, res) => {
     }
 
     let appInstallations = [];
-    if (appConfigured && connection.access_token) {
-      appInstallations = await getGitHubAppInstallations(connection.access_token);
+    if (appConfigured && appAuthConfigured && connection.access_token) {
+      const repos = await fetchGitHubJson(
+        'https://api.github.com/user/repos?per_page=100&sort=updated',
+        connection.access_token
+      );
+      const userRepoNames = new Set(
+        (Array.isArray(repos) ? repos : [])
+          .map((repo) => repo?.full_name)
+          .filter(Boolean)
+      );
+      const { repoIndex } = await getGitHubAppInstalledRepoIndex();
+      const matchedInstallationIds = new Set();
+
+      for (const repoFullName of userRepoNames) {
+        const installation = repoIndex.get(repoFullName);
+        if (installation?.installationId) {
+          matchedInstallationIds.add(installation.installationId);
+        }
+      }
+
+      appInstallations = [...matchedInstallationIds];
     }
 
     res.json({
@@ -615,6 +671,7 @@ router.get('/status', async (req, res) => {
       scope: connection.scope,
       app: {
         configured: appConfigured,
+        authConfigured: appAuthConfigured,
         slug: GITHUB_APP_SLUG || null,
         installRedirectUri: appConfigured ? GITHUB_APP_INSTALL_REDIRECT_URI : null,
         installed: appInstallations.length > 0,
@@ -658,10 +715,13 @@ router.get('/repos', async (req, res) => {
       }));
 
     if (isGitHubAppConfigured()) {
-      const appInstallations = await getGitHubAppInstallations(connection.access_token);
-      const appInstalledRepoSet = await getGitHubAppInstalledRepoSet(connection.access_token, appInstallations);
+      if (!isGitHubAppAuthConfigured()) {
+        return res.status(500).json({ error: 'GitHub App private key server configuration is missing.' });
+      }
 
-      filteredRepos = filteredRepos.filter((repo) => appInstalledRepoSet.has(repo.full_name));
+      const { repoIndex } = await getGitHubAppInstalledRepoIndex();
+
+      filteredRepos = filteredRepos.filter((repo) => repoIndex.has(repo.full_name));
     }
 
     res.json({ repos: filteredRepos });
@@ -703,15 +763,20 @@ router.post('/issues', async (req, res) => {
     }
 
     if (isGitHubAppConfigured()) {
-      const appInstallations = await getGitHubAppInstallations(connection.access_token);
-      if (appInstallations.length === 0) {
+      if (!isGitHubAppAuthConfigured()) {
+        return res.status(500).json({
+          error: 'GitHub App private key server configuration is missing.',
+        });
+      }
+
+      const { repoIndex } = await getGitHubAppInstalledRepoIndex();
+      if (repoIndex.size === 0) {
         return res.status(403).json({
           error: 'GitHub App 설치가 필요합니다. 프로필에서 GitHub App을 설치한 뒤 다시 시도해주세요.',
         });
       }
 
-      const appInstalledRepoSet = await getGitHubAppInstalledRepoSet(connection.access_token, appInstallations);
-      if (!appInstalledRepoSet.has(repoFullName)) {
+      if (!repoIndex.has(repoFullName)) {
         return res.status(403).json({
           error: '선택한 레포에 GitHub App이 설치되어 있지 않습니다. 해당 레포에 앱을 설치한 뒤 다시 시도해주세요.',
         });

@@ -1,5 +1,7 @@
 import { supabaseAuthClient, supabaseAdminClient } from './supabase.js';
 import {
+  GITHUB_APP_ID,
+  GITHUB_APP_PRIVATE_KEY,
   GITHUB_APP_SLUG,
   GITHUB_CLIENT_ID,
   GITHUB_CLIENT_SECRET,
@@ -21,6 +23,10 @@ export function requireServerConfig(res) {
 
 export function isGitHubAppConfigured() {
   return Boolean(GITHUB_APP_SLUG);
+}
+
+export function isGitHubAppAuthConfigured() {
+  return Boolean(GITHUB_APP_ID && GITHUB_APP_PRIVATE_KEY);
 }
 
 export async function getAuthenticatedUser(req) {
