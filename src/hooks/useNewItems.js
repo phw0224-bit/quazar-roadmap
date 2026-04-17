@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { timeAgo } from '../lib/timeUtils';
 
 /**
@@ -13,7 +13,7 @@ import { timeAgo } from '../lib/timeUtils';
  * @returns {Object} { newItems, markAsRead }
  */
 export function useNewItems(projects, currentBoardType, isReadOnly) {
-  const [newItemIds, setNewItemIds] = useState(new Set());
+  const [, setReadVersion] = useState(0);
 
   const STORAGE_KEY = `newItems_read_${currentBoardType}`;
   const BOARD_TYPE = currentBoardType.toLowerCase() === 'main' ? 'main' : currentBoardType.toLowerCase();
@@ -34,11 +34,7 @@ export function useNewItems(projects, currentBoardType, isReadOnly) {
     const readIds = getReadIds();
     readIds.add(itemId);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(readIds)));
-    setNewItemIds(prev => {
-      const next = new Set(prev);
-      next.delete(itemId);
-      return next;
-    });
+    setReadVersion(prev => prev + 1);
   }, [STORAGE_KEY, getReadIds]);
 
   // 모든 아이템 수집 및 필터링
@@ -81,20 +77,12 @@ export function useNewItems(projects, currentBoardType, isReadOnly) {
       }
     });
 
-    // created_at 내림차순 정렬 (가장 최신 먼저) 후 최대 5개만
+    // created_at 내림차순 정렬 (가장 최신 먼저)
     const sorted = allNewItems
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .slice(0, 5);
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     return sorted;
   }, [projects, isReadOnly, BOARD_TYPE, getReadIds]);
-
-  // 초기 로드 및 projects 변경 시 업데이트
-  useEffect(() => {
-    const items = collectNewItems();
-    const ids = new Set(items.map(item => item.id));
-    setNewItemIds(ids);
-  }, [projects, isReadOnly, BOARD_TYPE, collectNewItems]);
 
   // 표시 이름 생성 (프로젝트명/아이템명 또는 아이템명만)
   const getDisplayName = (item) => {

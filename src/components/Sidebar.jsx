@@ -562,7 +562,7 @@ export default function Sidebar({
                 </span>
               </button>
               {showNotifPanel && (
-                <div className="mt-1 space-y-0.5 bg-[color:var(--color-bg-elevated)] border border-[color:var(--color-border-strong)] rounded-md p-1">
+                <div className="mt-1 max-h-64 overflow-y-auto space-y-0.5 bg-[color:var(--color-bg-elevated)] border border-[color:var(--color-border-strong)] rounded-md p-1 custom-scrollbar">
                   {newItems.map(item => (
                     <div
                       key={item.id}
