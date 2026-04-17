@@ -12,6 +12,8 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Calendar, GripVertical, MoreHorizontal, Ticket } from 'lucide-react';
 import { STATUS_MAP, PRIORITY_MAP } from '../lib/constants';
+import { usePresenceContext } from '../hooks/usePresenceContext';
+import ProfileAvatar from './ProfileAvatar';
 
 function formatDateRange(startDate, endDate) {
   if (startDate && endDate) return `${startDate} ~ ${endDate}`;
@@ -24,6 +26,13 @@ function formatAssignees(assignees = []) {
   return `${assignees.slice(0, 2).join(', ')} 외 ${assignees.length - 2}명`;
 }
 
+const FIELD_LABEL = {
+  title: '제목',
+  tags: '태그',
+  assignees: '담당자',
+  description: '본문',
+};
+
 export default function KanbanCard({
   item,
   onOpenDetail,
@@ -33,6 +42,11 @@ export default function KanbanCard({
   const [showMenu, setShowMenu] = useState(false);
   const [isMoveMode, setIsMoveMode] = useState(false);
   const menuRef = useRef(null);
+  const { onlineUsers, currentUserId } = usePresenceContext();
+
+  const cardViewers = onlineUsers.filter(
+    (u) => u.itemId === item.id && u.userId !== currentUserId
+  );
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging: isSortableDragging } = useSortable({
     id: item.id,
@@ -206,6 +220,27 @@ export default function KanbanCard({
           <p className="m-0 truncate text-[12px] font-medium leading-4 text-gray-500 dark:text-text-secondary">
             {assigneeText}
           </p>
+        )}
+
+        {cardViewers.length > 0 && (
+          <div className="flex items-center -space-x-1.5 mt-1">
+            {cardViewers.slice(0, 3).map((u) => (
+              <ProfileAvatar
+                key={u.userId}
+                name={u.name}
+                size="sm"
+                customization={{
+                  avatarStyle: u.avatarStyle,
+                  themeColor: u.themeColor,
+                  moodEmoji: u.moodEmoji,
+                }}
+                title={`${u.name}${u.editingField ? ' · ' + FIELD_LABEL[u.editingField] + ' 편집 중' : ' 열람 중'}`}
+              />
+            ))}
+            {cardViewers.length > 3 && (
+              <span className="text-[10px] text-text-tertiary pl-2">+{cardViewers.length - 3}</span>
+            )}
+          </div>
         )}
 
         {isMoveMode && !isDragging && (
