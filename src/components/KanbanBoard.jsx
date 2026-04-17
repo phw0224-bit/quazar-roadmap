@@ -36,6 +36,7 @@ import { usePresence } from '../hooks/usePresence';
 import { useNewItems } from '../hooks/useNewItems';
 import { PresenceContext } from '../hooks/usePresenceContext';
 import PresenceAvatars from './PresenceAvatars';
+import NotificationsInbox from './NotificationsInbox';
 import { useLayoutState } from '../hooks/useLayoutState.js';
 import API from '../api/kanbanAPI';
 import { supabase } from '../lib/supabase';
@@ -708,6 +709,27 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
     });
   };
 
+  const handleOpenNotification = async (notification) => {
+    const targetView = notification.payload?.board_type === 'main' ? 'roadmap' : 'board';
+    const entityTable = notification.entity_table;
+    const entityId = notification.entity_id;
+
+    setUrlState({
+      view: targetView,
+      itemId: entityTable?.includes('items') ? entityId : null,
+      fullscreen: entityTable?.includes('items'),
+    });
+
+    if (!entityTable?.includes('projects')) return;
+
+    window.setTimeout(() => {
+      const target = document.getElementById(`project-${entityId}`);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }, 80);
+  };
+
   return (
     <PresenceContext.Provider value={{ onlineUsers, updateEditing, currentUserId: user?.id ?? null }}>
     <AppLayout
@@ -764,6 +786,11 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                   onSetSort={setSort}
                 />
               )}
+              <NotificationsInbox
+                user={user}
+                onOpenNotification={handleOpenNotification}
+                onShowToast={showToast}
+              />
               {!isReadOnly && <PresenceAvatars />}
             </div>
           </header>

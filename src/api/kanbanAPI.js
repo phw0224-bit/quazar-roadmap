@@ -1104,6 +1104,88 @@ const supabaseAPI = {
 
     return supabaseAPI.getProfileReactionSummary(targetUserId);
   },
+
+  getNotifications: async (limit = 20) => {
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError) throw userError;
+    if (!user) {
+      return { notifications: [], unreadCount: 0 };
+    }
+
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 20, 50));
+    const [
+      { data: notifications, error: notificationsError },
+      { count: unreadCount, error: unreadCountError },
+    ] = await Promise.all([
+      supabase
+        .from('notifications')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(safeLimit),
+      supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .is('read_at', null),
+    ]);
+
+    if (notificationsError) throw notificationsError;
+    if (unreadCountError) throw unreadCountError;
+
+    const actorUserIds = normalizeUuidList((notifications || []).map((row) => row.actor_user_id));
+    let actorProfiles = [];
+
+    if (actorUserIds.length > 0) {
+      const { data: profileRows, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, name, department')
+        .in('id', actorUserIds);
+      if (profileError) throw profileError;
+      actorProfiles = profileRows || [];
+    }
+
+    const actorProfilesById = new Map(
+      actorProfiles.map((profile) => [profile.id, profile])
+    );
+
+    return {
+      notifications: (notifications || []).map((notification) => ({
+        ...notification,
+        actor_profile: notification.actor_user_id
+          ? actorProfilesById.get(notification.actor_user_id) || null
+          : null,
+      })),
+      unreadCount: unreadCount || 0,
+    };
+  },
+
+  markNotificationsAsRead: async (notificationIds = []) => {
+    const normalizedIds = normalizeUuidList(notificationIds);
+    if (normalizedIds.length === 0) return [];
+
+    const timestamp = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('notifications')
+      .update({ read_at: timestamp })
+      .in('id', normalizedIds)
+      .is('read_at', null)
+      .select('id, read_at');
+    if (error) throw error;
+    return data || [];
+  },
+
+  markAllNotificationsAsRead: async () => {
+    const timestamp = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('notifications')
+      .update({ read_at: timestamp })
+      .is('read_at', null)
+      .select('id, read_at');
+    if (error) throw error;
+    return data || [];
+  },
 };
 
 /**

@@ -17,6 +17,7 @@
 | `AppLayout.jsx` | Sidebar와 메인 콘텐츠를 배치하는 공통 레이아웃 |
 | `AssigneePicker.jsx` | **핵심.** 담당자 추천 선택 + 직접 입력을 공통화하는 편집 UI |
 | `KanbanBoard.jsx` | **최상위 오케스트레이터.** DnD 컨텍스트, 뷰 전환, 전역 모달 관리 |
+| `NotificationsInbox.jsx` | 보드 헤더 우측 알림함. 담당자 지정 알림 조회/읽음 처리/대상 이동 |
 | `PresenceAvatars.jsx` | 보드 헤더 우측의 전체 접속자 아바타 표시 |
 | `ItemDetailPanel.jsx` | 우측 슬라이드 패널. 에디터+메타데이터+AI요약+댓글. 가장 복잡한 컴포넌트 |
 | `ItemViewers.jsx` | 상세 패널 상단에서 같은 아이템을 보는 중/편집 중인 사용자 표시 |
