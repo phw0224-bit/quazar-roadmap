@@ -10,6 +10,7 @@
  * items.created_by는 auth.users.id를 저장하고, 조회 시 creator_profile로 표시용 이름을 붙인다.
  */
 import { supabase } from '../lib/supabase';
+import { v4 as uuidv4 } from 'uuid';
 import { buildProjectMovePlan } from './projectMove';
 import { syncGitHubIssueStatus } from './githubAPI';
 import {
@@ -1354,10 +1355,12 @@ export async function createPersonalMemo(title, content = '', createdBy) {
 
   if (orderError) throw orderError;
   const nextOrder = existingItems?.[0] ? existingItems[0].order_index + 1 : 0;
+  const memoId = uuidv4();
 
   const { data, error } = await supabase
     .from(personalMemosTable)
     .insert([{
+      id: memoId,
       title,
       content,
       description: '',
