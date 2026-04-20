@@ -15,6 +15,7 @@ export default defineConfig({
         'favicon.ico',
         'favicon-16x16.png',
         'favicon-32x32.png',
+        'favicon-48x48.png',
         'apple-touch-icon.png',
         'icons.svg',
       ],
@@ -35,23 +36,23 @@ export default defineConfig({
         categories: ['productivity', 'business'],
         icons: [
           {
-            src: '/pwa-192.png',
+            src: '/pwa-192x192.png',
             sizes: '192x192',
             type: 'image/png',
           },
           {
-            src: '/pwa-192.png',
+            src: '/pwa-192x192.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'maskable',
           },
           {
-            src: '/pwa-512.png',
+            src: '/pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png',
           },
           {
-            src: '/pwa-512.png',
+            src: '/pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
