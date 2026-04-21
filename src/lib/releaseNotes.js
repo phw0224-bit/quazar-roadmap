@@ -9,6 +9,303 @@ export const RELEASE_NOTES_STORAGE_KEY = 'kanban-release-notes-last-seen';
 
 export const RELEASE_NOTES = [
   {
+    id: '2026-04-21-dev-request-board',
+    version: 'v0.10.0',
+    title: '개발팀 요청 보드',
+    description: '개발팀 요청 전용 보드와 상세 편집 흐름이 정리되고, 생성/수정/삭제 UI가 분리되었습니다.',
+    sections: [
+      {
+        title: '추가',
+        items: [
+          '개발팀 요청 전용 보드/템플릿 정리 — 요청 등록, 상세 확인, 수정/삭제 흐름을 별도 영역으로 분리',
+          '요청 상세 링크를 URL로 바로 열 수 있는 연결 방식 정리',
+        ],
+      },
+      {
+        title: '변경',
+        items: [
+          '요청 상세/목록 렌더링을 팀 보드 구조와 맞춰 정리',
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026-04-21-dev-request-tags',
+    version: 'v0.9.9',
+    title: '요청 태그 & 템플릿 정리',
+    description: '개발팀 요청 템플릿과 태그 카탈로그를 정리해 작성 가이드를 보강했습니다.',
+    sections: [
+      {
+        title: '추가',
+        items: [
+          '요청 템플릿 항목 정리로 개발팀 요청 작성 가이드 강화',
+          '태그 카탈로그 확장 — 요청/저장소 기능에서 쓰는 태그 정의 보강',
+        ],
+      },
+      {
+        title: '변경',
+        items: [
+          '템플릿 placeholder와 태그 선택 UI를 요청/일반 문서 흐름에 맞게 조정',
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026-04-21-github-repository-dashboard',
+    version: 'v0.9.9',
+    title: 'GitHub 저장소 대시보드',
+    description: 'GitHub App 연동과 저장소 대시보드가 추가되어, 레포별 이슈/PR/커밋과 티켓 관리 흐름을 한곳에서 볼 수 있게 되었습니다.',
+    sections: [
+      {
+        title: '추가',
+        items: [
+          'GitHub App 설치/연동 지원 — 조직 또는 레포 단위 접근을 앱 기준으로 처리',
+          'Repository Dashboard — 저장소별 이슈/PR/커밋 목록 조회',
+          '레포별 티켓 약어 설정 및 이슈 생성 흐름 정리',
+        ],
+      },
+      {
+        title: '변경',
+        items: [
+          'GitHub 관련 서버 라우트를 확장해 대시보드/연결/동기화 로직을 분리',
+          'URL 상태와 레포 선택 흐름을 저장소 화면에 맞게 정리',
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026-04-20-vite-config-cleanup',
+    version: 'v0.9.8',
+    title: 'Vite 설정 정리',
+    description: '배포 설정을 정리해 빌드와 개발 환경 구성이 조금 더 명확해졌습니다.',
+    sections: [
+      {
+        title: '정리',
+        items: [
+          'vite.config.js 구성 정리',
+          '정적 자산 처리와 배포 설정을 가볍게 다듬음',
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026-04-20-icon-refresh-primary',
+    version: 'v0.9.7',
+    title: '브라우저 아이콘 교체',
+    description: '브라우저 탭과 설치 아이콘의 기본 자산을 새 이미지로 교체했습니다.',
+    sections: [
+      {
+        title: '정리',
+        items: [
+          'favicon, apple-touch-icon, favicon.ico, favicon.svg 정리',
+          '브라우저 탭과 설치 아이콘 표시를 새 자산으로 통일',
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026-04-20-icon-refresh-pwa',
+    version: 'v0.9.6',
+    title: 'PWA 아이콘 정리',
+    description: 'PWA용 아이콘 파일을 새 자산으로 맞추고 오래된 파일을 정리했습니다.',
+    sections: [
+      {
+        title: '정리',
+        items: [
+          'pwa-192x192.png, pwa-512x512.png, pwa-192.png 교체',
+          '이전 pwa-512 복제 파일 제거',
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026-04-17-alert-sidebar-badge',
+    version: 'v0.9.5',
+    title: '새 항목 알림 배지',
+    description: '새로 들어온 아이템을 사이드바와 보드 상단에서 더 잘 보이게 정리했습니다.',
+    sections: [
+      {
+        title: '추가',
+        items: [
+          '새 항목 배지/표시 로직 추가로 새로 들어온 변경을 더 잘 드러내도록 개선',
+          '사이드바에서 새 항목 알림 상태를 더 쉽게 확인 가능',
+        ],
+      },
+      {
+        title: '변경',
+        items: [
+          'useNewItems 훅과 보드/사이드바 연동 구조를 분리해 정리',
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026-04-17-assignee-notifications',
+    version: 'v0.9.4',
+    title: '담당자 알림 전송',
+    description: '담당자 추가 시 알림이 서버를 거쳐 생성되도록 분리하고, 알림 전송 로직을 정리했습니다.',
+    sections: [
+      {
+        title: '추가',
+        items: [
+          '담당자 추가 알림 생성 흐름을 API 레이어와 서버 라우트로 분리',
+          'server/routes/notifications.js 추가',
+        ],
+      },
+      {
+        title: '변경',
+        items: [
+          'src/api/kanbanAPI.js에서 담당자 알림 전송 호출을 정리',
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026-04-17-notifications-inbox',
+    version: 'v0.9.3',
+    title: '알림함 UI',
+    description: '담당자 알림 인박스 화면을 추가해 최근 알림을 한곳에서 볼 수 있게 했습니다.',
+    sections: [
+      {
+        title: '추가',
+        items: [
+          '담당자 알림함 UI 추가 — 읽지 않은 알림과 최근 알림을 확인 가능',
+          'KanbanBoard에 알림함 패널 연결',
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026-04-17-realtime-presence',
+    version: 'v0.9.2',
+    title: 'Presence & 실시간 협업',
+    description: '실시간 접속자 표시와 함께 같은 아이템을 보고 있는 사람을 더 잘 보이도록 개선했습니다.',
+    sections: [
+      {
+        title: '추가',
+        items: [
+          'Presence 시스템: Supabase Realtime을 이용해 현재 접속자 실시간 추적',
+          'PresenceAvatars: 보드 상단에 온라인 팀원 아바타 표시',
+          'ItemViewers: 아이템 상세 패널에서 같이 보고 있는 팀원 및 편집 중인 필드 표시',
+        ],
+      },
+      {
+        title: '변경',
+        items: [
+          '상세 패널 헤더 액션(공유·전체화면 등) 개선',
+          '사이드바 컨트롤 개선',
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026-04-17-personal-memo-fix',
+    version: 'v0.9.1',
+    title: '개인 메모 생성 수정',
+    description: '개인 메모가 생성될 때 ID 처리와 저장 흐름을 바로잡았습니다.',
+    sections: [
+      {
+        title: '수정',
+        items: [
+          '개인 메모 생성 시 UUID를 명시적으로 부여하도록 수정',
+          '메모 저장 후 상세 패널/보드 반영 흐름 정리',
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026-04-17-github-app-setup',
+    version: 'v0.9.0',
+    title: 'GitHub App 연동',
+    description: 'GitHub App 기반 인증과 서버 설정을 보강해 저장소 기능의 토대를 마련했습니다.',
+    sections: [
+      {
+        title: '변경',
+        items: [
+          'GitHub App 인증/설정 플로우 정리',
+          '서버 측 GitHub 라우트와 환경 변수 처리 확장',
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026-04-16-general-document-ux',
+    version: 'v0.8.9',
+    title: '일반 문서 UI/UX 개편',
+    description: '일반 문서 섹션의 화면 구성과 경로 상태 처리 방식을 정리했습니다.',
+    sections: [
+      {
+        title: '변경',
+        items: [
+          'GeneralDocumentSection 레이아웃 정리',
+          'KanbanBoard와 URL 상태 동기화 흐름 조정',
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026-04-16-tag-template-catalog',
+    version: 'v0.8.8',
+    title: '태그 템플릿 추가',
+    description: '템플릿 입력 시 쓸 수 있는 태그 카탈로그와 관련 UI를 확장했습니다.',
+    sections: [
+      {
+        title: '추가',
+        items: [
+          '템플릿 placeholder extension 추가',
+          'itemTemplates와 태그 카탈로그 확장',
+          '템플릿 관련 테스트 보강',
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026-04-16-project-context-priority',
+    version: 'v0.8.7',
+    title: '패널 문맥 해석 정리',
+    description: '상세 패널이 넘긴 id만 믿지 않고 아이템이 해석한 프로젝트 문맥을 우선하도록 정리했습니다.',
+    sections: [
+      {
+        title: '변경',
+        items: [
+          'ItemDetailPanel과 useKanbanData의 프로젝트 해석 우선순위 조정',
+          '패널에서 전달되는 id 해석 흐름을 보수적으로 정리',
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026-04-16-item-title-edit-fix',
+    version: 'v0.8.6',
+    title: '아이템 제목 수정 버그 수정',
+    description: '아이템 제목을 바꿀 때 발생하던 저장 오류를 고쳤습니다.',
+    sections: [
+      {
+        title: '수정',
+        items: [
+          'ItemDetailPanel 제목 수정 흐름 보정',
+          'useKanbanData 업데이트 경로 안정화',
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026-04-16-database-refactor',
+    version: 'v0.8.5',
+    title: '개인 메모/업로드 저장 구조 정리',
+    description: '개인 메모와 파일 업로드를 포함한 저장 구조를 분리하고 서버 라우트를 재정리했습니다.',
+    sections: [
+      {
+        title: '변경',
+        items: [
+          'personal memos migration 추가',
+          'upload 서버 라우트와 파일 API 정리',
+          '에디터/URL 상태/엔티티 모델 연동 정리',
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-04-15-roadmap-separate-page',
     version: 'v0.9.3',
     title: '전사 로드맵 전용 페이지',

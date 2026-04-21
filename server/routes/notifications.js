@@ -1,10 +1,13 @@
 import { Router } from 'express';
 import { requireAuthenticatedUser } from '../lib/auth.js';
-import { supabaseAdminClient } from '../lib/supabase.js';
+import { GOOGLE_CHAT_DEV_REQUEST_WEBHOOK_URL } from '../lib/config.js';
+import { supabaseAdminClient, supabaseAuthClient } from '../lib/supabase.js';
+import { buildDevRequestChatMessage, postGoogleChatWebhookMessage } from '../lib/googleChat.js';
 
 const router = Router();
 
 const ALLOWED_ENTITY_TABLES = new Set(['items', 'projects', 'roadmap_items', 'roadmap_projects']);
+const DEV_REQUEST_TABLE = 'team_requests';
 
 function normalizeUuidList(values = []) {
   const seen = new Set();
@@ -23,6 +26,95 @@ function normalizeOptionalText(value) {
   const trimmed = `${value || ''}`.trim();
   return trimmed || null;
 }
+
+async function fetchRequestProfileName(userId) {
+  const cleanUserId = normalizeOptionalText(userId);
+  if (!cleanUserId || !supabaseAdminClient) {
+    return null;
+  }
+
+  const { data, error } = await supabaseAdminClient
+    .from('profiles')
+    .select('name')
+    .eq('id', cleanUserId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return normalizeOptionalText(data?.name);
+}
+
+async function fetchDevRequestById(requestId) {
+  const cleanRequestId = normalizeOptionalText(requestId);
+  if (!cleanRequestId || !supabaseAdminClient) {
+    return null;
+  }
+
+  const { data, error } = await supabaseAdminClient
+    .from(DEV_REQUEST_TABLE)
+    .select('id, title, description, request_team, status, priority, board_type, created_by')
+    .eq('id', cleanRequestId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data || null;
+}
+
+router.post('/api/notifications/dev-requests', async (req, res) => {
+  try {
+    if (!supabaseAuthClient || !supabaseAdminClient) {
+      return res.status(500).json({ error: 'Supabase server configuration is missing.' });
+    }
+
+    const user = await requireAuthenticatedUser(req, res);
+    if (!user) return;
+
+    const requestId = normalizeOptionalText(req.body?.request_id || req.body?.requestId);
+    if (!requestId) {
+      return res.status(400).json({ error: 'request_id가 필요합니다.' });
+    }
+
+    if (!GOOGLE_CHAT_DEV_REQUEST_WEBHOOK_URL) {
+      return res.json({ success: true, skipped: true, reason: 'webhook-not-configured' });
+    }
+
+    const request = await fetchDevRequestById(requestId);
+    if (!request) {
+      return res.status(404).json({ error: '개발팀 요청을 찾을 수 없습니다.' });
+    }
+
+    if (request.board_type !== '개발팀') {
+      return res.status(400).json({ error: '개발팀 요청만 알림으로 보낼 수 있습니다.' });
+    }
+
+    const creatorName =
+      (await fetchRequestProfileName(request.created_by)) ||
+      user?.user_metadata?.name ||
+      user?.email ||
+      '알 수 없음';
+    const messageText = buildDevRequestChatMessage({
+      request: {
+        ...request,
+        id: request.id,
+      },
+      creatorName,
+    });
+
+    await postGoogleChatWebhookMessage(GOOGLE_CHAT_DEV_REQUEST_WEBHOOK_URL, messageText);
+
+    return res.json({
+      success: true,
+      request: {
+        id: request.id,
+        title: request.title,
+      },
+    });
+  } catch (error) {
+    console.error('Dev request Google Chat notification error:', error);
+    return res.status(error.status || 500).json({
+      error: error.message || '개발팀 요청 Google Chat 알림 전송에 실패했습니다.',
+    });
+  }
+});
 
 router.post('/api/notifications/assignments', async (req, res) => {
   try {

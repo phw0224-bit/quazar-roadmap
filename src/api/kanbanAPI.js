@@ -119,6 +119,24 @@ const createAssignmentNotifications = async ({
   }
 };
 
+const notifyDevRequestCreated = async ({ requestId }) => {
+  const cleanRequestId = `${requestId || ''}`.trim();
+  if (!cleanRequestId) return;
+
+  const response = await fetch(`${API_SERVER_URL}/api/notifications/dev-requests`, {
+    method: 'POST',
+    headers: await getServerAuthHeaders(),
+    body: JSON.stringify({
+      request_id: cleanRequestId,
+    }),
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.error || '개발팀 요청 Google Chat 알림 전송에 실패했습니다.');
+  }
+};
+
 const fetchProfileIdentityMaps = async () => {
   const { data: profiles, error } = await supabase
     .from('profiles')
@@ -1467,8 +1485,8 @@ export async function createGeneralDocument(
         created_by: createdBy,
       },
     ])
-    .select('*')
-    .single();
+  .select('*')
+  .single();
 
   if (error) throw error;
   return data;
@@ -1519,7 +1537,15 @@ export async function createTeamRequest(boardType, title, createdBy = null, upda
     .single();
 
   if (error) throw error;
-  return data;
+  const createdRequest = data;
+
+  if (createdRequest?.id && boardType === '개발팀') {
+    void notifyDevRequestCreated({ requestId: createdRequest.id }).catch((notificationError) => {
+      console.warn('[createTeamRequest] Google Chat notification failed:', notificationError.message);
+    });
+  }
+
+  return createdRequest;
 }
 
 /**

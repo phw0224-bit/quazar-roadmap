@@ -41,6 +41,7 @@ SUPABASE_URL=https://xxx.supabase.co
 SUPABASE_SERVICE_KEY=eyJ...
 OLLAMA_URL=http://localhost:11434
 OLLAMA_MODEL=qwen2.5:14b
+GOOGLE_CHAT_DEV_REQUEST_WEBHOOK_URL=https://chat.googleapis.com/v1/spaces/...
 ```
 
 ### 3. 실행
