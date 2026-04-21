@@ -64,33 +64,65 @@ export function ConfirmModal({ title, message, confirmText = '확인', cancelTex
  */
 export function InputModal({ title, placeholder, defaultValue = '', confirmText = '완료', cancelText = '취소', onConfirm, onCancel }) {
   const [value, setValue] = useState(defaultValue);
+  const isCreateFlow = /추가|생성|새 메모|하위 페이지|문서/i.test(title || '');
+  const flowTitle = isCreateFlow
+    ? (title?.includes('메모') ? '새 메모 추가'
+      : title?.includes('문서') ? '새 문서 추가'
+      : title?.includes('프로젝트') ? '새 프로젝트 추가'
+      : title?.includes('하위 페이지') ? '하위 페이지 추가'
+      : '새 항목 추가')
+    : '입력';
+  const flowCopy = isCreateFlow
+    ? '제목만 입력하면 바로 생성됩니다.'
+    : '값을 입력한 뒤 확인을 누르세요.';
 
   return (
     <div className="fixed inset-0 z-[1100] flex items-center justify-center p-6">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={onCancel}></div>
-      <div className="relative bg-white dark:bg-bg-elevated w-full max-w-[420px] rounded-[40px] shadow-[0_30px_80px_rgba(0,0,0,0.4)] p-10 flex flex-col gap-8 animate-scale-in border border-gray-100 dark:border-border-subtle transition-colors duration-200">
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <span className="text-[11px] font-black text-text-tertiary uppercase tracking-[0.3em] ml-1">입력 필요</span>
-            <h3 className="text-2xl font-black text-gray-900 dark:text-text-primary tracking-tight">{title}</h3>
-          </div>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={onCancel} />
+      <div className="relative w-full max-w-[420px] rounded-2xl border border-gray-200 bg-white p-7 shadow-none animate-scale-in dark:border-border-subtle dark:bg-bg-elevated transition-colors duration-200">
+        <div className="flex items-center gap-3">
+          <div className="h-2.5 w-2.5 rounded-full bg-gray-900 dark:bg-white" />
+          <span className="text-[11px] font-black uppercase tracking-[0.24em] text-gray-400 dark:text-text-tertiary">
+            {flowTitle}
+          </span>
+        </div>
+
+        <h3 className="mt-4 text-2xl font-black tracking-tight text-gray-900 dark:text-text-primary">
+          {title}
+        </h3>
+        <p className="mt-2 text-sm leading-6 text-gray-500 dark:text-text-secondary">
+          {flowCopy}
+        </p>
+
+        <div className="mt-6">
           <input
             autoFocus
-            className="w-full bg-gray-50 dark:bg-bg-base border-2 border-transparent dark:border-border-subtle p-5 rounded-[24px] text-lg font-bold text-gray-900 dark:text-text-primary focus:ring-8 focus:ring-blue-500/5 focus:outline-none focus:border-blue-500/30 focus:bg-white dark:focus:bg-bg-base transition-all placeholder:text-gray-300 dark:placeholder:text-text-tertiary"
+            className="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-[15px] font-semibold text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-gray-300 dark:border-border-subtle dark:bg-bg-base dark:text-text-primary dark:placeholder:text-text-tertiary"
             placeholder={placeholder}
             value={value}
-            onChange={e => setValue(e.target.value)}
-            onKeyDown={e => {
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => {
               if (e.key === 'Enter') onConfirm(value);
               if (e.key === 'Escape') onCancel();
             }}
           />
         </div>
-        <div className="flex gap-3">
-          <button onClick={onCancel} className="flex-1 py-4 bg-gray-50 dark:bg-bg-base text-gray-400 dark:text-text-tertiary rounded-2xl font-black text-[13px] uppercase tracking-widest hover:bg-gray-100 dark:hover:bg-bg-hover transition-all cursor-pointer border border-transparent dark:border-border-subtle">
+
+        <div className="mt-4 text-[11px] font-medium text-gray-400 dark:text-text-tertiary">
+          Enter로 확인, ESC로 닫기
+        </div>
+
+        <div className="mt-8 flex items-center justify-end gap-2 border-t border-gray-100 pt-4 dark:border-border-subtle">
+          <button
+            onClick={onCancel}
+            className="rounded-lg px-3.5 py-2 text-sm font-bold text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-text-tertiary dark:hover:bg-bg-hover dark:hover:text-text-primary cursor-pointer"
+          >
             {cancelText}
           </button>
-          <button onClick={() => onConfirm(value)} className="flex-1 py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-black text-[13px] uppercase tracking-widest hover:bg-black dark:hover:bg-gray-100 transition-all cursor-pointer shadow-xl shadow-black/10 hover:scale-105 active:scale-95">
+          <button
+            onClick={() => onConfirm(value)}
+            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-black text-white transition-colors hover:bg-black dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 cursor-pointer"
+          >
             {confirmText}
           </button>
         </div>
