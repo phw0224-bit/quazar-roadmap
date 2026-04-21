@@ -1,5 +1,11 @@
 export const TAG_CATALOG = [
   {
+    name: '일지',
+    description: '개발일지',
+    color: '64748b',
+    templateType: 'daily',
+  },
+  {
     name: '공통',
     description: '개발팀 포함 여러 팀/업무에 공통 적용되는 항목',
     color: '64748b',

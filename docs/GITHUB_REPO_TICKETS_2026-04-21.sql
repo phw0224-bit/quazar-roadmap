@@ -28,7 +28,9 @@ create table if not exists public.repo_ticket_counters (
   constraint repo_ticket_counters_key_format check (repo_key ~ '^[A-Z0-9]{2,8}$')
 );
 
-create or replace function public.allocate_repo_ticket_number(repo_key text)
+drop function if exists public.allocate_repo_ticket_number(text);
+
+create function public.allocate_repo_ticket_number(p_repo_key text)
 returns bigint
 language plpgsql
 security definer
@@ -38,19 +40,19 @@ declare
   normalized_key text;
   allocated_number bigint;
 begin
-  normalized_key := upper(trim(coalesce(repo_key, '')));
+  normalized_key := upper(trim(coalesce(p_repo_key, '')));
 
   if normalized_key !~ '^[A-Z0-9]{2,8}$' then
     raise exception 'repo_key must match ^[A-Z0-9]{2,8}$';
   end if;
 
-  insert into public.repo_ticket_counters (repo_key, next_number)
+  insert into public.repo_ticket_counters as rtc (repo_key, next_number)
   values (normalized_key, 2)
   on conflict (repo_key)
   do update set
-    next_number = public.repo_ticket_counters.next_number + 1,
+    next_number = rtc.next_number + 1,
     updated_at = now()
-  returning next_number - 1 into allocated_number;
+  returning rtc.next_number - 1 into allocated_number;
 
   return allocated_number;
 end;

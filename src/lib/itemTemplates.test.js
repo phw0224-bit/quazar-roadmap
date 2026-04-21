@@ -9,16 +9,25 @@ import {
 test('returns development scaffold with structure only', () => {
   const scaffold = getTemplateScaffold('development');
 
-  assert.match(scaffold, /1\. 개발/);
-  assert.match(scaffold, /\[원인\]\n\n\[목표\]/);
+  assert.match(scaffold, /## 개발/);
+  assert.match(scaffold, /## \[원인\]\n\n##\[목표\]/);
   assert.doesNotMatch(scaffold, /왜 이 작업을 하는지/);
+});
+
+test('returns daily scaffold as direct section content', () => {
+  const scaffold = getTemplateScaffold('daily');
+
+  assert.match(scaffold, /## 일일업무/);
+  assert.match(scaffold, /### 어제 진행/);
+  assert.match(scaffold, /### 오늘 예정/);
+  assert.deepEqual(getTemplateInlinePlaceholders('daily'), {});
 });
 
 test('returns inline guidance placeholders separate from scaffold content', () => {
   const placeholders = getTemplateInlinePlaceholders('development');
 
-  assert.equal(placeholders['[원인]'], '- 왜 이 작업을 하는지, 요청 배경이나 문제상황');
-  assert.equal(placeholders['[결과]'], '- 완료 내용, 현재 상태, 남은 액션, 참고 링크');
+  assert.equal(placeholders['## [원인]'], '- 왜 이 작업을 하는지, 요청 배경이나 문제상황');
+  assert.equal(placeholders['## [결과]'], '- 완료 내용, 현재 상태, 남은 액션, 참고 링크');
 });
 
 test('returns empty values for unknown template types', () => {
