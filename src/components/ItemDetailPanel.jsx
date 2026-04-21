@@ -852,7 +852,11 @@ function ItemDetailPanel({
                 onClick={() => !isReadOnly && setIsEditingTags(true)}
               >
                 {(item.tags || []).map(tag => (
-                  <span key={tag} className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/50 text-slate-700 dark:text-text-secondary border border-slate-200 dark:border-border-subtle px-3 py-1 rounded-lg font-mono text-[11px] font-black uppercase shadow-sm group/tag">
+                  <span
+                    key={tag}
+                    className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/50 text-slate-700 dark:text-text-secondary border border-slate-200 dark:border-border-subtle px-3 py-1 rounded-lg font-mono text-[11px] font-black uppercase shadow-sm group/tag"
+                    title={TAG_CATALOG.find((candidate) => candidate.name === tag)?.description || tag}
+                  >
                     #{tag}
                     {!isReadOnly && <button onClick={(e) => { e.stopPropagation(); handleRemoveTag(tag); }} className="hover:text-red-600 cursor-pointer opacity-0 group-hover/tag:opacity-100 transition-opacity"><X size={10} strokeWidth={4} /></button>}
                   </span>
@@ -881,19 +885,6 @@ function ItemDetailPanel({
                             </button>
                           );
                         })}
-                      </div>
-                      <div className="grid gap-1.5 text-[12px] text-gray-500 dark:text-text-tertiary">
-                        {TAG_CATALOG.map((tag) => (
-                          <div key={`${tag.name}-description`} className="leading-relaxed">
-                            <span className="font-black text-gray-700 dark:text-text-secondary">#{tag.name}</span>
-                            {' '}
-                            {tag.description}
-                          </div>
-                        ))}
-                      </div>
-                      <div className="text-[12px] text-gray-500 dark:text-text-tertiary leading-relaxed">
-                        추천 태그를 고르면 설명이 비어 있을 때 임시 템플릿이 자동 적용됩니다.
-                        템플릿은 <code className="font-mono">src/lib/itemTemplates.js</code>에서 수정할 수 있습니다.
                       </div>
                       <input
                         autoFocus
