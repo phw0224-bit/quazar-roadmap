@@ -1,5 +1,5 @@
 import { useState, useEffect, createElement, useMemo, useCallback } from 'react';
-import { ChevronRight, LayoutGrid, Clock, Users, Ellipsis, BellDot, Moon, Sun, LogOut, Map, Settings, Search, StickyNote, PanelLeftClose, Bell } from 'lucide-react';
+import { ChevronRight, LayoutGrid, Clock, Users, Ellipsis, BellDot, Moon, Sun, LogOut, Map, Settings, Search, StickyNote, PanelLeftClose, Bell, Github } from 'lucide-react';
 import {
   DndContext,
   PointerSensor,
@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { view: 'roadmap', label: '전사 로드맵', icon: Map },
   { view: 'board', label: '팀 보드', icon: LayoutGrid },
   { view: 'timeline', label: '타임라인', icon: Clock },
+  { view: 'repositories', label: '레포지토리', icon: Github, requiresUser: true },
   { view: 'personal', label: '개인 메모', icon: StickyNote },
   { view: 'people', label: '피플 보드', icon: Users },
 ];
@@ -412,7 +413,9 @@ export default function Sidebar({
 
         {/* Fixed nav items */}
         <nav className="flex-shrink-0 px-2 pt-2 pb-1">
-          {NAV_ITEMS.map(({ view, label, icon }) => {
+          {NAV_ITEMS
+            .filter((item) => !item.requiresUser || Boolean(user))
+            .map(({ view, label, icon }) => {
             const isActive = activeView === view;
             const iconNode = createElement(icon, { size: 15, strokeWidth: 1.75, className: 'flex-shrink-0' });
             return (

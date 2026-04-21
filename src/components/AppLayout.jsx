@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { PanelLeftOpen, Search, LayoutGrid, Clock, StickyNote, Users, BellDot, Sun, Moon } from 'lucide-react';
+import { PanelLeftOpen, Search, LayoutGrid, Clock, StickyNote, Users, BellDot, Sun, Moon, Github } from 'lucide-react';
 import { useLayoutState } from '../hooks/useLayoutState.js';
 import { SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH } from '../hooks/layoutStateUtils.js';
 import { useNewItems } from '../hooks/useNewItems';
@@ -92,6 +92,7 @@ export default function AppLayout({
   const collapsedNavItems = [
     { view: 'board', label: '팀 보드', icon: LayoutGrid },
     { view: 'timeline', label: '타임라인', icon: Clock },
+    { view: 'repositories', label: '레포지토리', icon: Github, requiresUser: true },
     { view: 'personal', label: '개인 메모', icon: StickyNote, requiresUser: true },
     { view: 'people', label: '피플 보드', icon: Users },
   ];

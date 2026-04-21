@@ -17,6 +17,7 @@ async function serverRequest(path, init = {}) {
   const response = await fetch(`${SERVER_URL}${path}`, {
     ...init,
     headers: {
+      Accept: 'application/json',
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
       ...(init.headers || {}),
@@ -24,7 +25,19 @@ async function serverRequest(path, init = {}) {
   });
 
   const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    const preview = text
+      ? text.replace(/\s+/g, ' ').slice(0, 140)
+      : 'empty response';
+    throw new Error(
+      response.ok
+        ? `GitHub API 응답을 해석하지 못했습니다. 서버 응답이 JSON이 아닙니다: ${preview}`
+        : `GitHub API 요청이 실패했습니다. 서버 응답이 JSON이 아닙니다: ${preview}`
+    );
+  }
 
   if (!response.ok) {
     throw new Error(data?.error || 'GitHub 요청 처리에 실패했습니다.');
@@ -56,6 +69,42 @@ export async function startGitHubAppInstall() {
 export async function getGitHubRepos() {
   const data = await serverRequest('/api/github/repos', { method: 'GET' });
   return data?.repos || [];
+}
+
+export async function getGitHubRepositoryDashboardList() {
+  const data = await serverRequest('/api/github/dashboard/repositories', { method: 'GET' });
+  return data?.repositories || [];
+}
+
+export async function getGitHubRepositoryDashboardOverview(repoFullName) {
+  const search = new URLSearchParams({ repoFullName });
+  return serverRequest(`/api/github/dashboard/repository/overview?${search.toString()}`, { method: 'GET' });
+}
+
+export async function getGitHubRepositorySettings(repoFullName) {
+  const search = new URLSearchParams({ repoFullName });
+  const data = await serverRequest(`/api/github/dashboard/repository/settings?${search.toString()}`, { method: 'GET' });
+  return data?.settings || null;
+}
+
+export async function saveGitHubRepositorySettings(repoFullName, ticketPrefix) {
+  const data = await serverRequest('/api/github/dashboard/repository/settings', {
+    method: 'PUT',
+    body: JSON.stringify({ repoFullName, ticketPrefix }),
+  });
+  return data?.settings || null;
+}
+
+export async function getGitHubRepositoryDashboardEntities(repoFullName, type) {
+  const search = new URLSearchParams({ repoFullName, type });
+  return serverRequest(`/api/github/dashboard/repository/entities?${search.toString()}`, { method: 'GET' });
+}
+
+export async function linkGitHubRepositoryEntityToItem({ repoFullName, type, number, itemId }) {
+  return serverRequest('/api/github/dashboard/repository/link', {
+    method: 'POST',
+    body: JSON.stringify({ repoFullName, type, number, itemId }),
+  });
 }
 
 export async function createGitHubIssue(itemId, repoFullName) {

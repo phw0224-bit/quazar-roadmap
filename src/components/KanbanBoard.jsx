@@ -66,6 +66,7 @@ const PeopleBoard = lazy(() => import('./PeopleBoard'));
 const TimelineView = lazy(() => import('./TimelineView'));
 const SearchModal = lazy(() => import('./SearchModal'));
 const PersonalMemoBoard = lazy(() => import('./PersonalMemoBoard'));
+const RepositoriesDashboard = lazy(() => import('./RepositoriesDashboard'));
 
 function ViewLoadingFallback({ label, fullHeight = true }) {
   return (
@@ -97,6 +98,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
   const [urlState, setUrlState, replaceUrlState] = useUrlState();
   const activeView = urlState.view;
   const detailItemId = urlState.itemId;
+  const selectedRepoFullName = urlState.repoFullName;
   const isReadOnly = !user;
   const [profileCustomization, setProfileCustomization] = useState(DEFAULT_PROFILE_CUSTOMIZATION);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -737,7 +739,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
       projects={projects}
       activeView={activeView}
       activeItemId={detailItemId}
-      onNavigate={(view) => setUrlState({ view, itemId: null })}
+      onNavigate={(view) => setUrlState({ view, itemId: null, repoFullName: null })}
       onOpenItem={(itemId) => setUrlState({ itemId })}
       onAddChildPage={(projectId, parentItemId, title) => addChildPage(projectId, parentItemId, title, user?.id)}
       onShowPrompt={showPrompt}
@@ -770,7 +772,17 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
           <header className={`pl-5 py-2.5 flex justify-between items-center bg-white dark:bg-bg-base border-b border-gray-100 dark:border-border-subtle transition-all duration-300 ease-notion ${detailItemId && !isDetailFullscreen ? 'pr-4' : 'pr-5'}`}>
             <div className="min-w-0">
               <h1 className="text-base font-semibold text-gray-900 dark:text-text-primary tracking-tight truncate">
-                {activeView === 'roadmap' ? '전사 로드맵' : activeView === 'board' ? '팀 보드' : activeView === 'timeline' ? '타임라인' : activeView === 'personal' ? '개인 메모장' : '인원 관리'}
+                {activeView === 'roadmap'
+                  ? '전사 로드맵'
+                  : activeView === 'board'
+                    ? '팀 보드'
+                    : activeView === 'timeline'
+                      ? '타임라인'
+                      : activeView === 'personal'
+                        ? '개인 메모장'
+                        : activeView === 'repositories'
+                          ? '레포지토리'
+                          : '인원 관리'}
               </h1>
             </div>
             <div className="flex items-center gap-2 min-w-0">
@@ -1231,6 +1243,18 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
             })}
             
             </div>
+          ) : activeView === 'repositories' ? (
+            <Suspense fallback={<ViewLoadingFallback label="레포지토리 대시보드 준비 중..." />}>
+              <RepositoriesDashboard
+                selectedRepoFullName={selectedRepoFullName}
+                onSelectRepo={(repoFullName) => setUrlState({ view: 'repositories', repoFullName, itemId: null })}
+                gitHubStatus={gitHubStatus}
+                onManageGitHubSettings={handleOpenProfileModal}
+                allItems={[...projectItems, ...generalDocs]}
+                onOpenRoadmapItem={handleOpenDetail}
+                onShowToast={showToast}
+              />
+            </Suspense>
           ) : activeView === 'personal' ? (
             <Suspense fallback={<ViewLoadingFallback label="개인 메모장 준비 중..." />}>
               <PersonalMemoBoard
