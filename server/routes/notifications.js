@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { requireAuthenticatedUser } from '../lib/auth.js';
+import { getBearerToken, requireAuthenticatedUser } from '../lib/auth.js';
 import { GOOGLE_CHAT_DEV_REQUEST_WEBHOOK_URL } from '../lib/config.js';
-import { supabaseAdminClient, supabaseAuthClient } from '../lib/supabase.js';
+import { createSupabaseUserClient, supabaseAdminClient, supabaseAuthClient } from '../lib/supabase.js';
 import { buildDevRequestChatMessage, postGoogleChatWebhookMessage } from '../lib/googleChat.js';
 
 const router = Router();
@@ -63,13 +63,13 @@ async function fetchDevRequestById(requestId) {
   return data || null;
 }
 
-async function fetchNotificationActorProfiles(actorUserIds = []) {
+async function fetchNotificationActorProfiles(actorUserIds = [], client = supabaseAdminClient) {
   const normalizedActorUserIds = normalizeUuidList(actorUserIds);
-  if (normalizedActorUserIds.length === 0 || !supabaseAdminClient) {
+  if (normalizedActorUserIds.length === 0 || !client) {
     return [];
   }
 
-  const { data, error } = await supabaseAdminClient
+  const { data, error } = await client
     .from('profiles')
     .select('id, name, department')
     .in('id', normalizedActorUserIds);
@@ -80,6 +80,11 @@ async function fetchNotificationActorProfiles(actorUserIds = []) {
 
 router.get('/api/notifications', async (req, res) => {
   try {
+    console.info('[notifications] inbox route hit', {
+      path: req.originalUrl,
+      method: req.method,
+    });
+
     if (!supabaseAdminClient) {
       return res.status(500).json({ error: 'Supabase server configuration is missing.' });
     }
@@ -87,18 +92,24 @@ router.get('/api/notifications', async (req, res) => {
     const user = await requireAuthenticatedUser(req, res);
     if (!user) return;
 
+    const accessToken = getBearerToken(req);
+    const userClient = createSupabaseUserClient(accessToken);
+    if (!userClient) {
+      return res.status(500).json({ error: 'Supabase user client is not configured.' });
+    }
+
     const limit = normalizeLimit(req.query.limit, 20, 50);
     const [
       { data: notifications, error: notificationsError },
       { count: unreadCount, error: unreadCountError },
     ] = await Promise.all([
-      supabaseAdminClient
+      userClient
         .from('notifications')
         .select('*')
         .eq('recipient_user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(limit),
-      supabaseAdminClient
+      userClient
         .from('notifications')
         .select('id', { count: 'exact', head: true })
         .eq('recipient_user_id', user.id)
@@ -109,7 +120,8 @@ router.get('/api/notifications', async (req, res) => {
     if (unreadCountError) throw unreadCountError;
 
     const actorProfiles = await fetchNotificationActorProfiles(
-      (notifications || []).map((row) => row.actor_user_id)
+      (notifications || []).map((row) => row.actor_user_id),
+      userClient
     );
     const actorProfilesById = new Map(actorProfiles.map((profile) => [profile.id, profile]));
 
@@ -132,6 +144,11 @@ router.get('/api/notifications', async (req, res) => {
 
 router.post('/api/notifications/read', async (req, res) => {
   try {
+    console.info('[notifications] read route hit', {
+      path: req.originalUrl,
+      method: req.method,
+    });
+
     if (!supabaseAdminClient) {
       return res.status(500).json({ error: 'Supabase server configuration is missing.' });
     }
@@ -139,13 +156,19 @@ router.post('/api/notifications/read', async (req, res) => {
     const user = await requireAuthenticatedUser(req, res);
     if (!user) return;
 
+    const accessToken = getBearerToken(req);
+    const userClient = createSupabaseUserClient(accessToken);
+    if (!userClient) {
+      return res.status(500).json({ error: 'Supabase user client is not configured.' });
+    }
+
     const notificationIds = normalizeUuidList(req.body?.notificationIds || req.body?.ids);
     if (notificationIds.length === 0) {
       return res.json([]);
     }
 
     const timestamp = new Date().toISOString();
-    const { data, error } = await supabaseAdminClient
+    const { data, error } = await userClient
       .from('notifications')
       .update({ read_at: timestamp })
       .eq('recipient_user_id', user.id)
@@ -165,6 +188,11 @@ router.post('/api/notifications/read', async (req, res) => {
 
 router.post('/api/notifications/read-all', async (req, res) => {
   try {
+    console.info('[notifications] read-all route hit', {
+      path: req.originalUrl,
+      method: req.method,
+    });
+
     if (!supabaseAdminClient) {
       return res.status(500).json({ error: 'Supabase server configuration is missing.' });
     }
@@ -172,8 +200,14 @@ router.post('/api/notifications/read-all', async (req, res) => {
     const user = await requireAuthenticatedUser(req, res);
     if (!user) return;
 
+    const accessToken = getBearerToken(req);
+    const userClient = createSupabaseUserClient(accessToken);
+    if (!userClient) {
+      return res.status(500).json({ error: 'Supabase user client is not configured.' });
+    }
+
     const timestamp = new Date().toISOString();
-    const { data, error } = await supabaseAdminClient
+    const { data, error } = await userClient
       .from('notifications')
       .update({ read_at: timestamp })
       .eq('recipient_user_id', user.id)

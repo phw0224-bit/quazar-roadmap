@@ -38,7 +38,8 @@ loadEnvFile(path.join(ROOT_DIR, '.env.local'));
 export const PORT = 3001;
 export const APP_BASE_URL = process.env.APP_BASE_URL || 'http://localhost:5173';
 export const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-export const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+// Prefer the publishable key used by the browser bundle so server auth uses the same Supabase project key.
+export const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY || process.env.SUPABASE_ANON_KEY;
 export const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 export const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
 export const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;

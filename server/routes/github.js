@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import crypto from 'crypto';
 import { TAG_CATALOG_BY_NAME } from '../../src/lib/tagCatalog.js';
-import { supabaseAdminClient } from '../lib/supabase.js';
+import { createSupabaseUserClient, supabaseAdminClient } from '../lib/supabase.js';
 import {
+  getBearerToken,
   isGitHubAppAuthConfigured,
   isGitHubAppConfigured,
   requireAuthenticatedUser,
@@ -168,8 +169,12 @@ async function fetchGitHubJson(url, token, init = {}) {
   return data;
 }
 
-async function getStoredGitHubConnection(userId) {
-  const { data, error } = await supabaseAdminClient
+async function getStoredGitHubConnection(userId, client = supabaseAdminClient) {
+  if (!client) {
+    throw new Error('Supabase client is not configured');
+  }
+
+  const { data, error } = await client
     .from('user_github_connections')
     .select('*')
     .eq('user_id', userId)
@@ -1140,7 +1145,13 @@ router.get('/status', async (req, res) => {
     const user = await requireAuthenticatedUser(req, res);
     if (!user) return;
 
-    const connection = await getStoredGitHubConnection(user.id);
+    const accessToken = getBearerToken(req);
+    const userClient = createSupabaseUserClient(accessToken);
+    if (!userClient) {
+      return res.status(500).json({ error: 'Supabase user client is not configured.' });
+    }
+
+    const connection = await getStoredGitHubConnection(user.id, userClient);
     const appConfigured = isGitHubAppConfigured();
     const appAuthConfigured = isGitHubAppAuthConfigured();
 
