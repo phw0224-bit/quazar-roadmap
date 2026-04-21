@@ -25,6 +25,49 @@ const API_SERVER_URL = '';
 const normalizeNameKey = (value) => (value || '').trim().toLowerCase();
 const requestsTable = () => DEV_REQUEST_TABLE;
 
+async function getAccessToken() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+
+  return data.session?.access_token || null;
+}
+
+async function serverRequest(path, init = {}) {
+  const token = await getAccessToken();
+  if (!token) {
+    throw new Error('User not authenticated');
+  }
+
+  const response = await fetch(`${API_SERVER_URL}${path}`, {
+    ...init,
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...(init.headers || {}),
+    },
+  });
+
+  const text = await response.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    const preview = text ? text.replace(/\s+/g, ' ').slice(0, 140) : 'empty response';
+    throw new Error(
+      response.ok
+        ? `알림 서버 응답을 해석하지 못했습니다. 서버 응답이 JSON이 아닙니다: ${preview}`
+        : `알림 서버 요청이 실패했습니다. 서버 응답이 JSON이 아닙니다: ${preview}`
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(data?.error || '알림 요청 처리에 실패했습니다.');
+  }
+
+  return data;
+}
+
 const itemsTable = (boardType) => boardType === 'main' ? 'roadmap_items' : 'items';
 const projectsTable = (boardType) => boardType === 'main' ? 'roadmap_projects' : 'projects';
 const personalMemosTable = 'personal_memos';
@@ -1154,75 +1197,20 @@ const supabaseAPI = {
     }
 
     const safeLimit = Math.max(1, Math.min(Number(limit) || 20, 50));
-    const [
-      { data: notifications, error: notificationsError },
-      { count: unreadCount, error: unreadCountError },
-    ] = await Promise.all([
-      supabase
-        .from('notifications')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(safeLimit),
-      supabase
-        .from('notifications')
-        .select('id', { count: 'exact', head: true })
-        .is('read_at', null),
-    ]);
-
-    if (notificationsError) throw notificationsError;
-    if (unreadCountError) throw unreadCountError;
-
-    const actorUserIds = normalizeUuidList((notifications || []).map((row) => row.actor_user_id));
-    let actorProfiles = [];
-
-    if (actorUserIds.length > 0) {
-      const { data: profileRows, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, name, department')
-        .in('id', actorUserIds);
-      if (profileError) throw profileError;
-      actorProfiles = profileRows || [];
-    }
-
-    const actorProfilesById = new Map(
-      actorProfiles.map((profile) => [profile.id, profile])
-    );
-
-    return {
-      notifications: (notifications || []).map((notification) => ({
-        ...notification,
-        actor_profile: notification.actor_user_id
-          ? actorProfilesById.get(notification.actor_user_id) || null
-          : null,
-      })),
-      unreadCount: unreadCount || 0,
-    };
+    return serverRequest(`/api/notifications?limit=${safeLimit}`, { method: 'GET' });
   },
 
   markNotificationsAsRead: async (notificationIds = []) => {
     const normalizedIds = normalizeUuidList(notificationIds);
     if (normalizedIds.length === 0) return [];
-
-    const timestamp = new Date().toISOString();
-    const { data, error } = await supabase
-      .from('notifications')
-      .update({ read_at: timestamp })
-      .in('id', normalizedIds)
-      .is('read_at', null)
-      .select('id, read_at');
-    if (error) throw error;
-    return data || [];
+    return serverRequest('/api/notifications/read', {
+      method: 'POST',
+      body: JSON.stringify({ notificationIds: normalizedIds }),
+    });
   },
 
   markAllNotificationsAsRead: async () => {
-    const timestamp = new Date().toISOString();
-    const { data, error } = await supabase
-      .from('notifications')
-      .update({ read_at: timestamp })
-      .is('read_at', null)
-      .select('id, read_at');
-    if (error) throw error;
-    return data || [];
+    return serverRequest('/api/notifications/read-all', { method: 'POST' });
   },
 };
 

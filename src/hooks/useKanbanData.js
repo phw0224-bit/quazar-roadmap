@@ -299,6 +299,11 @@ const kanbanReducer = (state, action) => {
           [action.boardType]: { ...(state.team_boards[action.boardType] || {}), ...action.updates }
         }
       };
+    case 'SET_BOARD_TYPE':
+      if (state.currentBoardType === action.payload) {
+        return state;
+      }
+      return { ...state, currentBoardType: action.payload };
     default:
       return state;
   }
@@ -641,9 +646,9 @@ export const useKanbanData = () => {
     await API.moveTeamRequest(requestId, newIndex);
   };
 
-  const setBoardType = (boardType) => {
+  const setBoardType = useCallback((boardType) => {
     dispatch({ type: 'SET_BOARD_TYPE', payload: boardType });
-  };
+  }, []);
 
   const updateSection = async (sectionId, updates) => {
     const updated = await API.updateSection(sectionId, updates);

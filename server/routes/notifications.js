@@ -27,6 +27,10 @@ function normalizeOptionalText(value) {
   return trimmed || null;
 }
 
+function normalizeLimit(value, fallback = 20, max = 50) {
+  return Math.max(1, Math.min(Number(value) || fallback, max));
+}
+
 async function fetchRequestProfileName(userId) {
   const cleanUserId = normalizeOptionalText(userId);
   if (!cleanUserId || !supabaseAdminClient) {
@@ -58,6 +62,133 @@ async function fetchDevRequestById(requestId) {
   if (error) throw error;
   return data || null;
 }
+
+async function fetchNotificationActorProfiles(actorUserIds = []) {
+  const normalizedActorUserIds = normalizeUuidList(actorUserIds);
+  if (normalizedActorUserIds.length === 0 || !supabaseAdminClient) {
+    return [];
+  }
+
+  const { data, error } = await supabaseAdminClient
+    .from('profiles')
+    .select('id, name, department')
+    .in('id', normalizedActorUserIds);
+
+  if (error) throw error;
+  return data || [];
+}
+
+router.get('/api/notifications', async (req, res) => {
+  try {
+    if (!supabaseAdminClient) {
+      return res.status(500).json({ error: 'Supabase server configuration is missing.' });
+    }
+
+    const user = await requireAuthenticatedUser(req, res);
+    if (!user) return;
+
+    const limit = normalizeLimit(req.query.limit, 20, 50);
+    const [
+      { data: notifications, error: notificationsError },
+      { count: unreadCount, error: unreadCountError },
+    ] = await Promise.all([
+      supabaseAdminClient
+        .from('notifications')
+        .select('*')
+        .eq('recipient_user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(limit),
+      supabaseAdminClient
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('recipient_user_id', user.id)
+        .is('read_at', null),
+    ]);
+
+    if (notificationsError) throw notificationsError;
+    if (unreadCountError) throw unreadCountError;
+
+    const actorProfiles = await fetchNotificationActorProfiles(
+      (notifications || []).map((row) => row.actor_user_id)
+    );
+    const actorProfilesById = new Map(actorProfiles.map((profile) => [profile.id, profile]));
+
+    return res.json({
+      notifications: (notifications || []).map((notification) => ({
+        ...notification,
+        actor_profile: notification.actor_user_id
+          ? actorProfilesById.get(notification.actor_user_id) || null
+          : null,
+      })),
+      unreadCount: unreadCount || 0,
+    });
+  } catch (error) {
+    console.error('Notification inbox fetch error:', error);
+    return res.status(error.status || 500).json({
+      error: error.message || '알림을 불러오지 못했습니다.',
+    });
+  }
+});
+
+router.post('/api/notifications/read', async (req, res) => {
+  try {
+    if (!supabaseAdminClient) {
+      return res.status(500).json({ error: 'Supabase server configuration is missing.' });
+    }
+
+    const user = await requireAuthenticatedUser(req, res);
+    if (!user) return;
+
+    const notificationIds = normalizeUuidList(req.body?.notificationIds || req.body?.ids);
+    if (notificationIds.length === 0) {
+      return res.json([]);
+    }
+
+    const timestamp = new Date().toISOString();
+    const { data, error } = await supabaseAdminClient
+      .from('notifications')
+      .update({ read_at: timestamp })
+      .eq('recipient_user_id', user.id)
+      .in('id', notificationIds)
+      .is('read_at', null)
+      .select('id, read_at');
+
+    if (error) throw error;
+    return res.json(data || []);
+  } catch (error) {
+    console.error('Notification read update error:', error);
+    return res.status(error.status || 500).json({
+      error: error.message || '알림 읽음 처리에 실패했습니다.',
+    });
+  }
+});
+
+router.post('/api/notifications/read-all', async (req, res) => {
+  try {
+    if (!supabaseAdminClient) {
+      return res.status(500).json({ error: 'Supabase server configuration is missing.' });
+    }
+
+    const user = await requireAuthenticatedUser(req, res);
+    if (!user) return;
+
+    const timestamp = new Date().toISOString();
+    const { data, error } = await supabaseAdminClient
+      .from('notifications')
+      .update({ read_at: timestamp })
+      .eq('recipient_user_id', user.id)
+      .is('read_at', null)
+      .select('id, read_at');
+
+    if (error) throw error;
+    return res.json(data || []);
+  } catch (error) {
+    console.error('Notification read-all error:', error);
+    return res.status(error.status || 500).json({
+      error: error.message || '모든 알림을 읽음 처리하는 데 실패했습니다.',
+    });
+  }
+});
 
 router.post('/api/notifications/dev-requests', async (req, res) => {
   try {

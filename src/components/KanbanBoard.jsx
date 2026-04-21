@@ -11,7 +11,7 @@
  * DnD 타입 판별: activeId prefix ('section-', phase vs item)
  * localStorage: expandedSections Set, isMainBoardCollapsed boolean
  */
-import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { useTheme } from 'next-themes';
 import { CheckCircle2, ChevronRight, ChevronDown } from 'lucide-react';
 import {
@@ -411,9 +411,17 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
   const [prompt, setPrompt] = useState(null); // { title, placeholder, onConfirm }
   const [selectFolder, setSelectFolder] = useState(null); // { itemId, itemTitle, folders, onSelect }
 
-  const showToast = (message, type = 'success') => setToast({ message, type });
-  const showConfirm = (title, message, onConfirm, type = 'danger') => setConfirm({ title, message, onConfirm, type });
-  const showPrompt = (title, placeholder, onConfirm) => setPrompt({ title, placeholder, onConfirm });
+  const showToast = useCallback((message, type = 'success') => {
+    setToast({ message, type });
+  }, []);
+
+  const showConfirm = useCallback((title, message, onConfirm, type = 'danger') => {
+    setConfirm({ title, message, onConfirm, type });
+  }, []);
+
+  const showPrompt = useCallback((title, placeholder, onConfirm) => {
+    setPrompt({ title, placeholder, onConfirm });
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { distance: 8 }),
