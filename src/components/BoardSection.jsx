@@ -20,6 +20,7 @@ export default function BoardSection({
   onDeleteSection,
   onAddProject,
   onShowPrompt,
+  showAddProjectButton = true,
   selectedTeam, selectedTag, selectedStatus,
   onAddItem, onUpdateItem, onDeleteItem, onUpdateProject, onDeleteProject,
   onCompleteProject,
@@ -122,7 +123,7 @@ export default function BoardSection({
             <Link size={14} />
           </button>
 
-          {!isReadOnly && (<>
+          {!isReadOnly && showAddProjectButton && (<>
             <button
               onClick={() => onShowPrompt(
                 `${section.title} — 프로젝트 추가`,

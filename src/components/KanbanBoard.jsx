@@ -50,6 +50,7 @@ import ProjectColumn from './ProjectColumn';
 import KanbanCard from './KanbanCard';
 import BoardSection from './BoardSection';
 import GeneralDocumentSection from './GeneralDocumentSection';
+import RequestBoardSection from './RequestBoardSection';
 import { TEAMS, GLOBAL_TAGS } from '../lib/constants';
 import { buildEntityContext, ENTITY_TYPES } from '../lib/entityModel';
 import FilterBar from './FilterBar';
@@ -61,6 +62,7 @@ import { Toast, ConfirmModal, InputModal } from './UI/Feedback';
 
 const TEAM_BOARDS = ['개발팀', 'AI팀', '지원팀'];
 const DISPLAY_BOARDS = ['main', ...TEAM_BOARDS];
+const isLegacyRequestDoc = (doc) => doc?.entity_type === 'request' || (Array.isArray(doc?.tags) && doc.tags.includes('request'));
 const ItemDetailPanel = lazy(() => import('./ItemDetailPanel'));
 const PeopleBoard = lazy(() => import('./PeopleBoard'));
 const TimelineView = lazy(() => import('./TimelineView'));
@@ -90,6 +92,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
     moveSidebarProject,
     // 신규: 일반 문서
     generalDocs, addGeneralDocument, updateGeneralDocument, deleteGeneralDocument, setBoardType,
+    requestDocs, addRequestDocument, updateRequestDocument, deleteRequestDocument,
     // 신규: 팀 보드 설정
     team_boards, updateTeamBoard,
   } = useKanbanData();
@@ -339,9 +342,9 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
       return new Set();
     }
   });
-  const [expandedCompletedBoards, setExpandedCompletedBoards] = useState(() => {
+  const [groupedCompletedBoards, setGroupedCompletedBoards] = useState(() => {
     try {
-      const saved = localStorage.getItem('kanban-completed-expanded');
+      const saved = localStorage.getItem('kanban-completed-grouped');
       return saved ? new Set(JSON.parse(saved)) : new Set();
     } catch {
       return new Set();
@@ -517,8 +520,8 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
   }, [expandedSections]);
 
   useEffect(() => {
-    localStorage.setItem('kanban-completed-expanded', JSON.stringify([...expandedCompletedBoards]));
-  }, [expandedCompletedBoards]);
+    localStorage.setItem('kanban-completed-grouped', JSON.stringify([...groupedCompletedBoards]));
+  }, [groupedCompletedBoards]);
 
   useEffect(() => {
     localStorage.setItem('kanban-general-docs-expanded', JSON.stringify([...expandedGeneralDocBoards]));
@@ -569,6 +572,24 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
     creator_profile: null,
   });
 
+  const getRequestDetailItem = (request) => ({
+    ...request,
+    id: request.id,
+    title: request.title,
+    description: request.description || '',
+    status: request.status || '접수됨',
+    priority: request.priority || '중간',
+    page_type: null,
+    entity_type: 'request',
+    board_type: request.board_type || '개발팀',
+    assignees: [],
+    assignee_user_ids: [],
+    teams: request.request_team ? [request.request_team] : [],
+    related_items: [],
+    comments: [],
+    creator_profile: null,
+  });
+
   let detailItem = detailItemId ? projectItems.find(i => i.id === detailItemId) : null;
   let detailProject = detailItem ? projects.find(p => p.items.some(i => i.id === detailItemId)) : null;
 
@@ -592,6 +613,18 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
         id: 'personal-memo',
         title: '개인 메모장',
         board_type: 'personal',
+      };
+    }
+  }
+
+  if (!detailItem && detailItemId) {
+    const requestDoc = requestDocs.find(doc => doc.id === detailItemId);
+    if (requestDoc) {
+      detailItem = getRequestDetailItem(requestDoc);
+      detailProject = {
+        id: 'request-docs',
+        title: '요청',
+        board_type: '개발팀',
       };
     }
   }
@@ -627,6 +660,22 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
       await updateGeneralDocument(itemId, updates);
       return;
     }
+    if (detailEntityContext?.type === ENTITY_TYPES.REQUEST) {
+      const nextUpdates = { ...updates };
+      if (Object.prototype.hasOwnProperty.call(nextUpdates, 'teams')) {
+        const nextTeams = Array.isArray(nextUpdates.teams) ? nextUpdates.teams : [];
+        nextUpdates.request_team = nextTeams[0] || null;
+        delete nextUpdates.teams;
+      }
+      delete nextUpdates.assignees;
+      delete nextUpdates.assignee_user_ids;
+      delete nextUpdates.related_items;
+      delete nextUpdates.tags;
+      delete nextUpdates.start_date;
+      delete nextUpdates.end_date;
+      await updateRequestDocument(itemId, nextUpdates);
+      return;
+    }
     await updateItem(projectId, itemId, updates);
   };
 
@@ -637,6 +686,10 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
     }
     if (detailEntityContext?.collection === 'general') {
       await deleteGeneralDocument(itemId);
+      return;
+    }
+    if (detailEntityContext?.type === ENTITY_TYPES.REQUEST) {
+      await deleteRequestDocument(itemId);
       return;
     }
     await deleteItem(projectId, itemId);
@@ -800,6 +853,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
               )}
               <NotificationsInbox
                 user={user}
+                userId={user?.id}
                 onOpenNotification={handleOpenNotification}
                 onShowToast={showToast}
               />
@@ -831,10 +885,21 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
 
             {/* Separate Board Sections */}
             {(activeView === 'roadmap' ? ['main'] : TEAM_BOARDS).map(boardName => {
-              const boardProjects = filteredProjects.filter(p => (p.board_type || 'main') === boardName.toLowerCase() && !p.is_completed);
-              const completedProjects = filteredProjects.filter(p => (p.board_type || 'main') === boardName.toLowerCase() && p.is_completed);
-              const boardDisplayName = boardName === 'main' ? '전사 로드맵' : `${boardName} 보드`;
-              const boardIcon = boardName === 'main' ? '🗺️' : boardName === '개발팀' ? '⚙️' : '📂';
+              const boardProjects = filteredProjects.filter(p => (p.board_type || 'main') === boardName.toLowerCase());
+              const completedProjects = boardProjects.filter((project) => project.is_completed);
+              const isCompletedGrouped = groupedCompletedBoards.has(boardName);
+              const visibleProjects = isCompletedGrouped
+                ? boardProjects.filter((project) => !project.is_completed)
+                : boardProjects;
+              const boardVisuals = {
+                main: { label: '전사 로드맵', icon: '🗺️' },
+                개발팀: { label: '개발팀 보드', icon: '⚙️' },
+                AI팀: { label: 'AI팀 보드', icon: '🤖' },
+                지원팀: { label: '지원팀 보드', icon: '📂' },
+              };
+              const boardVisual = boardVisuals[boardName] || { label: `${boardName} 보드`, icon: '📂' };
+              const boardDisplayName = boardVisual.label;
+              const boardIcon = boardVisual.icon;
 
               // 새 아이템 알림 (이미 호출된 훅에서 가져오기)
               const { newItems, markAsRead } = newItemsMap[boardName] || { newItems: [], markAsRead: () => {} };
@@ -920,10 +985,30 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                             );
                           }}
                           className="px-5 py-2.5 bg-gray-50 dark:bg-bg-elevated text-gray-500 dark:text-text-secondary rounded-xl text-sm font-bold hover:bg-gray-100 dark:hover:bg-bg-hover border border-dashed border-gray-300 dark:border-border-strong transition-all flex items-center gap-2 group/add cursor-pointer hover:shadow-md"
-                        >
-                          <span className="text-xl group-hover/add:text-brand-500 transition-colors">+</span>
-                          새 프로젝트 추가
-                        </button>
+                          >
+                            <span className="text-xl group-hover/add:text-brand-500 transition-colors">+</span>
+                            새 프로젝트 추가
+                          </button>
+                        {completedProjects.length > 0 && (
+                          <button
+                            onClick={() => setGroupedCompletedBoards(prev => {
+                              const next = new Set(prev);
+                              next.has(boardName) ? next.delete(boardName) : next.add(boardName);
+                              return next;
+                            })}
+                            className={`px-5 py-2.5 rounded-xl text-sm font-bold border transition-all flex items-center gap-2 cursor-pointer ${
+                              isCompletedGrouped
+                                ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800/40 hover:bg-green-200 dark:hover:bg-green-900/30'
+                                : 'bg-gray-50 dark:bg-bg-elevated text-gray-500 dark:text-text-secondary hover:bg-gray-100 dark:hover:bg-bg-hover border-gray-200 dark:border-border-strong hover:shadow-md'
+                            }`}
+                          >
+                            <CheckCircle2 size={16} strokeWidth={2.2} />
+                            <span>{isCompletedGrouped ? '완료 모아보기 해제' : '완료 프로젝트 모아보기'}</span>
+                            <span className="px-2 py-0.5 rounded-full bg-white/70 dark:bg-black/20 text-xs font-black tabular-nums">
+                              {completedProjects.length}
+                            </span>
+                          </button>
+                        )}
                         <button
                           onClick={() => {
                             showPrompt(
@@ -954,18 +1039,17 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                       isReadOnly={isReadOnly}
                       onSave={(updates) => updateTeamBoard(boardName.toLowerCase(), updates)}
                       onOpenDetail={handleOpenDetail}
-                      generalDocs={generalDocs.filter(doc => (doc.board_type || 'main') === boardName.toLowerCase())}
+                      generalDocs={generalDocs.filter(doc => (doc.board_type || 'main') === boardName.toLowerCase() && !isLegacyRequestDoc(doc))}
                       pinnedDocIds={team_boards?.[boardName.toLowerCase()]?.pinned_doc_ids ?? []}
                     />
                   )}
 
                   {(() => {
-                    const standaloneProjects = boardProjects.filter(p => !p.section_id);
                     const boardSections = sections
                       .filter(s => s.board_type === boardName.toLowerCase())
                       .sort((a, b) => a.order_index - b.order_index);
-                    const boardGeneralDocs = generalDocs.filter(doc => (doc.board_type || 'main') === boardName.toLowerCase());
-                    const isEmpty = boardProjects.length === 0 && boardSections.length === 0 && boardGeneralDocs.length === 0;
+                    const boardGeneralDocs = generalDocs.filter(doc => (doc.board_type || 'main') === boardName.toLowerCase() && !isLegacyRequestDoc(doc));
+                    const isEmpty = boardProjects.length === 0 && boardSections.length === 0 && boardGeneralDocs.length === 0 && requestDocs.length === 0;
                     const projectColumnProps = {
                       onAddItem: addItem, onUpdateItem: updateItem, onDeleteItem: deleteItem,
                       onUpdateProject: updateProject, onDeleteProject: deleteProject,
@@ -978,6 +1062,52 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
 
                     return (
                       <div className="flex flex-col gap-8">
+                          {boardName === '개발팀' && (
+                            <RequestBoardSection
+                              requests={requestDocs}
+                              isReadOnly={isReadOnly}
+                              onOpenRequest={handleOpenDetail}
+                              onAddRequest={() => {
+                              showPrompt(
+                                '새 요청 문서 추가',
+                                '요청 문서 제목을 입력하세요',
+                                (title) => {
+                                  if (title) {
+                                    addRequestDocument('개발팀', title.trim(), user?.id)
+                                      .then(() => {
+                                        showToast(`'${title}' 요청 문서가 생성되었습니다.`);
+                                        setPrompt(null);
+                                      })
+                                      .catch((error) => {
+                                        showToast(`요청 문서 생성 실패: ${error.message}`, 'error');
+                                      });
+                                  }
+                                }
+                              );
+                            }}
+                            onDeleteRequest={(requestId) => {
+                              const request = requestDocs.find((entry) => entry.id === requestId);
+                              if (!request) return;
+
+                              showConfirm(
+                                '삭제',
+                                `"${request.title}"을(를) 삭제하시겠습니까?`,
+                                async (confirmed) => {
+                                  if (confirmed) {
+                                    try {
+                                      await deleteRequestDocument(requestId);
+                                      showToast('삭제되었습니다.', 'success');
+                                    } catch (error) {
+                                      showToast(`삭제 실패: ${error.message}`, 'error');
+                                    }
+                                  }
+                                },
+                                'delete'
+                              );
+                            }}
+                          />
+                        )}
+
                         {isEmpty ? (
                           <div className="flex-1 flex items-center justify-center border-2 border-dashed border-gray-100 dark:border-border-subtle rounded-3xl py-24 bg-gray-50/40 dark:bg-bg-elevated/40 transition-colors duration-200">
                             <div className="flex flex-col items-center text-center animate-fade-in">
@@ -1151,7 +1281,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                                   <BoardSection
                                     key={section.id}
                                     section={section}
-                                    projects={boardProjects.filter(p => p.section_id === section.id)}
+                                    projects={visibleProjects.filter(p => p.section_id === section.id)}
                                     isCollapsed={!expandedSections.has(section.id)}
                                     onToggleCollapse={() => setExpandedSections(prev => {
                                       const next = new Set(prev);
@@ -1168,68 +1298,61 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                               </SortableContext>
                             )}
 
-                            {standaloneProjects.length > 0 && (
+                            {visibleProjects.filter(p => !p.section_id).length > 0 && (
                               <div className="flex gap-12 overflow-x-auto py-3 pb-6 custom-scrollbar min-h-[350px] px-2">
-                                <SortableContext items={standaloneProjects.map(p => p.id)} strategy={horizontalListSortingStrategy}>
-                                  {standaloneProjects.map((project, idx) => (
+                                <SortableContext items={visibleProjects.filter(p => !p.section_id).map(p => p.id)} strategy={horizontalListSortingStrategy}>
+                                  {visibleProjects.filter(p => !p.section_id).map((project, idx) => (
                                     <ProjectColumn key={project.id} project={project} projectIndex={idx + 1} {...projectColumnProps} />
                                   ))}
                                 </SortableContext>
                               </div>
                             )}
 
-                            {completedProjects.length > 0 && (
-                              <div className="mt-2">
-                                <button
-                                  className="flex items-center gap-2 px-2 py-2 text-sm font-bold text-gray-500 dark:text-text-secondary hover:text-gray-900 dark:hover:text-text-primary transition-colors cursor-pointer"
-                                  onClick={() => setExpandedCompletedBoards(prev => {
-                                    const next = new Set(prev);
-                                    next.has(boardName) ? next.delete(boardName) : next.add(boardName);
-                                    return next;
-                                  })}
-                                >
-                                  <ChevronRight
-                                    size={14}
-                                    className={`transition-transform duration-200 ${expandedCompletedBoards.has(boardName) ? 'rotate-90' : ''}`}
-                                  />
-                                  <span>완료된 프로젝트</span>
-                                  <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full text-xs font-bold tabular-nums">
-                                    {completedProjects.length}
-                                  </span>
-                                </button>
-
-                                {expandedCompletedBoards.has(boardName) && (
-                                  <div className="flex flex-wrap gap-3 px-2 mt-3">
-                                    {completedProjects.map(project => (
-                                      <div key={project.id} className="flex flex-col gap-2">
-                                        <button
-                                          className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-bg-elevated border border-gray-200 dark:border-border-subtle rounded-xl hover:border-green-300 dark:hover:border-green-700 transition-colors cursor-pointer"
-                                          onClick={() => setExpandedCompletedPhases(prev => {
-                                            const next = new Set(prev);
-                                            next.has(project.id) ? next.delete(project.id) : next.add(project.id);
-                                            return next;
-                                          })}
-                                        >
-                                          <CheckCircle2 size={14} className="text-green-500 shrink-0" />
-                                          <span className="text-sm font-bold text-gray-600 dark:text-text-secondary">{project.title}</span>
-                                          <span className="text-xs text-gray-400 dark:text-text-tertiary tabular-nums">{project.items.length}개</span>
-                                          <ChevronDown
-                                            size={12}
-                                            className={`text-gray-400 dark:text-text-tertiary transition-transform duration-200 ${expandedCompletedPhases.has(project.id) ? 'rotate-180' : ''}`}
-                                          />
-                                        </button>
-                                        {expandedCompletedPhases.has(project.id) && (
-                                          <ProjectColumn
-                                            project={project}
-                                            projectIndex={-1}
-                                            {...projectColumnProps}
-                                            isCompletedView={true}
-                                          />
-                                        )}
-                                      </div>
-                                    ))}
+                            {isCompletedGrouped && completedProjects.length > 0 && (
+                              <div className="mt-2 rounded-[28px] border border-green-200/70 bg-green-50/40 px-4 py-4 shadow-sm dark:border-green-900/30 dark:bg-green-950/10">
+                                <div className="flex items-center justify-between gap-2 px-2">
+                                  <div className="flex items-center gap-2">
+                                    <CheckCircle2 size={15} className="text-green-500 shrink-0" />
+                                    <span className="text-sm font-black text-gray-900 dark:text-text-primary">완료된 프로젝트</span>
+                                    <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-bold tabular-nums text-green-700 dark:bg-green-500/15 dark:text-green-200">
+                                      {completedProjects.length}
+                                    </span>
                                   </div>
-                                )}
+                                  <span className="text-xs font-bold uppercase tracking-[0.18em] text-green-600/80 dark:text-green-300/70">
+                                    grouped
+                                  </span>
+                                </div>
+
+                                <div className="flex flex-wrap gap-3 px-2 mt-3">
+                                  {completedProjects.map(project => (
+                                    <div key={project.id} className="flex flex-col gap-2">
+                                      <button
+                                        className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-bg-elevated border border-gray-200 dark:border-border-subtle rounded-xl hover:border-green-300 dark:hover:border-green-700 transition-colors cursor-pointer"
+                                        onClick={() => setExpandedCompletedPhases(prev => {
+                                          const next = new Set(prev);
+                                          next.has(project.id) ? next.delete(project.id) : next.add(project.id);
+                                          return next;
+                                        })}
+                                      >
+                                        <CheckCircle2 size={14} className="text-green-500 shrink-0" />
+                                        <span className="text-sm font-bold text-gray-600 dark:text-text-secondary">{project.title}</span>
+                                        <span className="text-xs text-gray-400 dark:text-text-tertiary tabular-nums">{project.items.length}개</span>
+                                        <ChevronDown
+                                          size={12}
+                                          className={`text-gray-400 dark:text-text-tertiary transition-transform duration-200 ${expandedCompletedPhases.has(project.id) ? 'rotate-180' : ''}`}
+                                        />
+                                      </button>
+                                      {expandedCompletedPhases.has(project.id) && (
+                                        <ProjectColumn
+                                          project={project}
+                                          projectIndex={-1}
+                                          {...projectColumnProps}
+                                          isCompletedView={true}
+                                        />
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             )}
 
@@ -1561,25 +1684,27 @@ function DocumentButton({ doc, onOpenDetail, onTogglePin, isReadOnly, isPinned =
     <div className="relative">
       <button
         onClick={() => onOpenDetail(doc.id)}
-        className={`text-xs px-2 py-1.5 border rounded-lg transition-colors font-medium flex items-center gap-1.5 max-w-xs group ${bgClass}`}
+        className={`text-xs px-2 py-1.5 border rounded-lg transition-colors font-medium flex items-center gap-1.5 max-w-xs group ${bgClass} pr-8`}
       >
         <span>{isPinned ? '📌' : '📄'}</span>
         <span className="truncate">{doc.title}</span>
-        {!isReadOnly && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowMenu(!showMenu);
-            }}
-            className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-white/50 dark:hover:bg-bg-elevated rounded"
-            title="메뉴"
-          >
-            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
-            </svg>
-          </button>
-        )}
       </button>
+      {!isReadOnly && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowMenu(!showMenu);
+          }}
+          className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-white/50 dark:hover:bg-bg-elevated rounded"
+          title="메뉴"
+          aria-label={`${doc.title} 메뉴`}
+        >
+          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
+          </svg>
+        </button>
+      )}
       {showMenu && (
         <div className="absolute top-full right-0 mt-1 bg-white dark:bg-bg-elevated border border-gray-200 dark:border-border-subtle rounded-lg shadow-lg z-10">
           <button

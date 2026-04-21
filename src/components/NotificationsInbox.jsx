@@ -38,7 +38,7 @@ function getNotificationMessage(notification) {
   return `${actorName}님이 "${entityTitle}"와 관련된 알림을 보냈습니다.`;
 }
 
-export default function NotificationsInbox({ user, onOpenNotification, onShowToast }) {
+export default function NotificationsInbox({ user, userId, onOpenNotification, onShowToast }) {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -50,7 +50,9 @@ export default function NotificationsInbox({ user, onOpenNotification, onShowToa
   const visibleNotifications = useMemo(() => notifications.slice(0, 12), [notifications]);
 
   const loadNotifications = useCallback(async ({ silent = false } = {}) => {
-    if (!user?.id) {
+    const resolvedUserId = userId || user?.id;
+
+    if (!resolvedUserId) {
       setNotifications([]);
       setUnreadCount(0);
       return;
@@ -58,7 +60,7 @@ export default function NotificationsInbox({ user, onOpenNotification, onShowToa
 
     if (!silent) setLoading(true);
     try {
-      const result = await API.getNotifications(20);
+      const result = await API.getNotifications(20, resolvedUserId);
       setNotifications(result.notifications || []);
       setUnreadCount(result.unreadCount || 0);
     } catch (error) {
@@ -68,7 +70,7 @@ export default function NotificationsInbox({ user, onOpenNotification, onShowToa
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [onShowToast, user?.id]);
+  }, [onShowToast, user?.id, userId]);
 
   useEffect(() => {
     if (!open) return undefined;

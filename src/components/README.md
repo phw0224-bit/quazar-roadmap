@@ -34,6 +34,7 @@
 | `FilterBar.jsx` | 필터/정렬/그룹 UI |
 | `SearchModal.jsx` | Ctrl+K 전역 검색 모달. 담당자 이름 검색 지원 |
 | `ReleaseNotesModal.jsx` | 현재 릴리즈의 변경사항을 자동/수동으로 보여주는 내부용 업데이트 내역 모달 |
+| `RequestTemplatePanel.jsx` | 개발팀 요청 섹션 상단의 임시 요청명세 템플릿 표시 패널 |
 | `CommentSection.jsx` | 댓글 목록 (ItemDetailPanel 내부) |
 | `Comment.jsx` | 단일 댓글 (수정/삭제 포함) |
 | `FileUploadButton.jsx` | 파일 첨부 드래그앤드롭 UI |

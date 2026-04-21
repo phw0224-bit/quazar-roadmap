@@ -17,6 +17,8 @@ function GeneralDocumentSection({
   onTogglePinDocument,
   pinnedDocIds = [],
   isReadOnly = false,
+  emptyMessage = '아직 일반 문서가 없습니다',
+  variant = 'general',
 }) {
   // 각 문서별 펼침 상태 (폴더 같은 구조)
   const [expandedDocs, setExpandedDocs] = useState(new Set());
@@ -24,6 +26,7 @@ function GeneralDocumentSection({
   const [openMenuId, setOpenMenuId] = useState(null);
   // 메뉴 컨테이너 참조
   const menuContainerRef = useRef(null);
+  const isRequestVariant = variant === 'request';
 
   // 외부 클릭 시 드롭다운 닫기
   useEffect(() => {
@@ -59,11 +62,11 @@ function GeneralDocumentSection({
   }, [documents]);
 
   const renderMenu = (doc) => (
-    <div className="absolute left-0 top-full z-20 mt-2 min-w-[188px] overflow-hidden rounded-xl border border-gray-200/90 bg-white shadow-[0_12px_28px_rgba(15,23,42,0.12)] dark:border-white/8 dark:bg-[#151515] dark:shadow-[0_16px_32px_rgba(0,0,0,0.45)]">
+    <div className={`absolute left-0 top-full z-20 mt-2 min-w-[188px] overflow-hidden rounded-xl border shadow-[0_12px_28px_rgba(15,23,42,0.12)] dark:shadow-[0_16px_32px_rgba(0,0,0,0.45)] ${isRequestVariant ? 'border-amber-200/90 bg-amber-50 dark:border-amber-900/40 dark:bg-[#171008]' : 'border-gray-200/90 bg-white dark:border-white/8 dark:bg-[#151515]'}`}>
       {doc.page_type === 'folder' ? (
         <button
           type="button"
-          className="block w-full px-3 py-2.5 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:text-zinc-200 dark:hover:bg-white/5"
+          className={`block w-full px-3 py-2.5 text-left text-sm font-medium transition-colors ${isRequestVariant ? 'text-amber-900 hover:bg-amber-100 dark:text-amber-100 dark:hover:bg-amber-950/35' : 'text-gray-700 hover:bg-gray-50 dark:text-zinc-200 dark:hover:bg-white/5'}`}
           onClick={() => {
             onAddDocumentToFolder?.(doc.id);
             setOpenMenuId(null);
@@ -74,7 +77,7 @@ function GeneralDocumentSection({
       ) : (
         <button
           type="button"
-          className="block w-full px-3 py-2.5 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:text-zinc-200 dark:hover:bg-white/5"
+          className={`block w-full px-3 py-2.5 text-left text-sm font-medium transition-colors ${isRequestVariant ? 'text-amber-900 hover:bg-amber-100 dark:text-amber-100 dark:hover:bg-amber-950/35' : 'text-gray-700 hover:bg-gray-50 dark:text-zinc-200 dark:hover:bg-white/5'}`}
           onClick={() => {
             onTogglePinDocument?.(doc.id, !pinnedDocIds.includes(doc.id));
             setOpenMenuId(null);
@@ -87,7 +90,7 @@ function GeneralDocumentSection({
       {doc.page_type !== 'folder' && (
         <button
           type="button"
-          className="block w-full px-3 py-2.5 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:text-zinc-200 dark:hover:bg-white/5"
+          className={`block w-full px-3 py-2.5 text-left text-sm font-medium transition-colors ${isRequestVariant ? 'text-amber-900 hover:bg-amber-100 dark:text-amber-100 dark:hover:bg-amber-950/35' : 'text-gray-700 hover:bg-gray-50 dark:text-zinc-200 dark:hover:bg-white/5'}`}
           onClick={() => {
             onMoveToFolder?.(doc.id);
             setOpenMenuId(null);
@@ -99,7 +102,7 @@ function GeneralDocumentSection({
 
       <button
         type="button"
-        className="block w-full px-3 py-2.5 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"
+        className={`block w-full px-3 py-2.5 text-left text-sm font-medium transition-colors ${isRequestVariant ? 'text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20' : 'text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20'}`}
         onClick={() => {
           onDeleteDocument?.(doc.id);
           setOpenMenuId(null);
@@ -117,7 +120,9 @@ function GeneralDocumentSection({
         className={`group relative flex items-center rounded-xl border px-2.5 py-2 transition-all duration-150 ${
             doc.page_type === 'folder'
               ? 'border-amber-200/80 bg-amber-50/75 dark:border-amber-500/20 dark:bg-[#171411]'
-              : 'border-gray-200/90 bg-white/90 hover:border-gray-300 hover:bg-gray-50/90 dark:border-white/8 dark:bg-[#161616] dark:hover:border-white/12 dark:hover:bg-[#1b1b1b]'
+              : isRequestVariant
+                ? 'border-amber-200/80 bg-amber-50/85 hover:border-amber-300 hover:bg-amber-50 dark:border-amber-900/30 dark:bg-[#1b1207] dark:hover:border-amber-700/40 dark:hover:bg-[#20150a]'
+                : 'border-gray-200/90 bg-white/90 hover:border-gray-300 hover:bg-gray-50/90 dark:border-white/8 dark:bg-[#161616] dark:hover:border-white/12 dark:hover:bg-[#1b1b1b]'
           }`}
           style={{ marginLeft: `${depth * 1.1}rem` }}
         >
@@ -178,7 +183,7 @@ function GeneralDocumentSection({
               )}
             </div>
           ) : (
-            <div className="document-link flex min-w-0 flex-1 items-center text-sm text-gray-700 dark:text-zinc-100">
+            <div className={`document-link flex min-w-0 flex-1 items-center text-sm ${isRequestVariant ? 'text-amber-950 dark:text-amber-50' : 'text-gray-700 dark:text-zinc-100'}`}>
               <a
                 href={`?item=${doc.id}`}
                 className="flex min-w-0 items-center text-inherit no-underline hover:text-inherit"
@@ -193,7 +198,7 @@ function GeneralDocumentSection({
               </a>
 
               {pinnedDocIds.includes(doc.id) && (
-                <span className="ml-2 shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                <span className={`ml-2 shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${isRequestVariant ? 'bg-amber-200 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'}`}>
                   고정
                 </span>
               )}
@@ -235,8 +240,8 @@ function GeneralDocumentSection({
   return (
     <div className="general-documents-container rounded-2xl border border-gray-200/90 bg-white p-2.5 shadow-sm dark:border-white/8 dark:bg-[#0f0f0f]">
       {documents.length === 0 ? (
-        <p className="empty-message rounded-xl border border-dashed border-gray-200 px-3 py-6 text-sm text-gray-500 dark:border-white/8 dark:text-zinc-500">
-          아직 일반 문서가 없습니다
+        <p className={`empty-message rounded-xl border border-dashed px-3 py-6 text-sm ${isRequestVariant ? 'border-amber-200 bg-amber-50/60 text-amber-700 dark:border-amber-900/30 dark:bg-amber-950/10 dark:text-amber-200' : 'border-gray-200 text-gray-500 dark:border-white/8 dark:text-zinc-500'}`}>
+          {emptyMessage}
         </p>
       ) : (
         <div className="general-doc-list space-y-2">

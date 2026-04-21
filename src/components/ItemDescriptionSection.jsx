@@ -54,11 +54,18 @@ export default function ItemDescriptionSection({
   const [summaryError, setSummaryError] = useState(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [isEditorFocused, setIsEditorFocused] = useState(false);
+  const [isAutosaving, setIsAutosaving] = useState(false);
+  const [hasPendingAutosave, setHasPendingAutosave] = useState(false);
   const linkCallbackRef = useRef(null);
   const descriptionRef = useRef(null);
+  const dirtyDescriptionRef = useRef(false);
+  const lastItemIdRef = useRef(item?.id ?? null);
+  const autosaveTimerRef = useRef(null);
+  const autosaveGenerationRef = useRef(0);
   const itemId = item?.id ?? null;
 
   const isMemo = entityContext?.type === ENTITY_TYPES.MEMO;
+  const isRequest = entityContext?.type === ENTITY_TYPES.REQUEST;
 
   useEffect(() => {
     setDescriptionMode(getInitialDescriptionMode({
@@ -67,12 +74,34 @@ export default function ItemDescriptionSection({
     }));
     setSummaryError(null);
     setIsEditorFocused(false);
+    setIsAutosaving(false);
+    setHasPendingAutosave(false);
   }, [isReadOnly, itemId]);
 
   useEffect(() => {
-    setDescription(normalizeDescriptionSource(item?.description || ''));
+    const nextDescription = normalizeDescriptionSource(item?.description || '');
     setAiSummary(item?.ai_summary || null);
-  }, [item?.description, item?.ai_summary, itemId]);
+
+    if (lastItemIdRef.current !== itemId) {
+      lastItemIdRef.current = itemId;
+      dirtyDescriptionRef.current = false;
+      setHasPendingAutosave(false);
+      setDescription(nextDescription);
+      return;
+    }
+
+    if (dirtyDescriptionRef.current) {
+      if (nextDescription === description) {
+        dirtyDescriptionRef.current = false;
+        setHasPendingAutosave(false);
+      }
+      return;
+    }
+
+    if (nextDescription !== description) {
+      setDescription(nextDescription);
+    }
+  }, [description, item?.ai_summary, item?.description, itemId]);
 
   useEffect(() => {
     if (!descriptionRef.current) return;
@@ -84,12 +113,77 @@ export default function ItemDescriptionSection({
     });
   }, [description, descriptionMode]);
 
-  const showEditorPane = !isReadOnly && (descriptionMode === 'live' || descriptionMode === 'source');
-  const showPreviewPane = isReadOnly || descriptionMode === 'preview';
+  useEffect(() => () => {
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+    autosaveGenerationRef.current += 1;
+  }, []);
+
+  const saveDescription = useCallback(async (nextDescription) => {
+    const normalizedNext = normalizeDescriptionSource(nextDescription);
+    const originalDescription = normalizeDescriptionSource(item?.description || '');
+
+    if (normalizedNext === originalDescription) {
+      dirtyDescriptionRef.current = false;
+      setHasPendingAutosave(false);
+      return;
+    }
+
+    const saveGeneration = ++autosaveGenerationRef.current;
+    setIsAutosaving(true);
+
+    try {
+      await onUpdateItem(projectId, item.id, { description: nextDescription });
+      if (saveGeneration === autosaveGenerationRef.current) {
+        dirtyDescriptionRef.current = false;
+        setHasPendingAutosave(false);
+      }
+    } catch (error) {
+      if (saveGeneration !== autosaveGenerationRef.current) return;
+      onShowToast?.(`본문 자동 저장 실패: ${error.message}`, 'error');
+    } finally {
+      if (saveGeneration === autosaveGenerationRef.current) {
+        setIsAutosaving(false);
+      }
+    }
+  }, [item?.description, item.id, onShowToast, onUpdateItem, projectId]);
 
   useEffect(() => {
+    const showEditorPane = !isReadOnly && (descriptionMode === 'live' || descriptionMode === 'source');
+    if (!showEditorPane || !dirtyDescriptionRef.current) return undefined;
+
+    const normalizedCurrent = normalizeDescriptionSource(description);
+    const normalizedOriginal = normalizeDescriptionSource(item?.description || '');
+
+    if (normalizedCurrent === normalizedOriginal) {
+      dirtyDescriptionRef.current = false;
+      setHasPendingAutosave(false);
+      return undefined;
+    }
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    autosaveTimerRef.current = window.setTimeout(() => {
+      autosaveTimerRef.current = null;
+      void saveDescription(description);
+    }, 3500);
+
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
+    };
+  }, [description, descriptionMode, isReadOnly, item?.description, saveDescription]);
+
+  useEffect(() => {
+    const showEditorPane = !isReadOnly && (descriptionMode === 'live' || descriptionMode === 'source');
     onEditingChange?.(showEditorPane && isEditorFocused);
-  }, [isEditorFocused, onEditingChange, showEditorPane]);
+  }, [descriptionMode, isEditorFocused, isReadOnly, onEditingChange]);
 
   useEffect(() => () => {
     onEditingChange?.(false);
@@ -97,8 +191,19 @@ export default function ItemDescriptionSection({
 
   const handleDescriptionBlur = async () => {
     const originalDescription = normalizeDescriptionSource(item.description || '');
-    if (description === originalDescription) return;
-    await onUpdateItem(projectId, item.id, { description });
+    if (description === originalDescription) {
+      dirtyDescriptionRef.current = false;
+      setHasPendingAutosave(false);
+      return;
+    }
+    dirtyDescriptionRef.current = true;
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+
+    await saveDescription(description);
   };
 
   const handleLinkExistingPage = useCallback((callback) => {
@@ -189,11 +294,15 @@ export default function ItemDescriptionSection({
     setDescription((prev) => {
       const next = toggleMarkdownTaskItem(prev || '', taskIndex, checked);
       if (next !== prev) {
-        onUpdateItem(projectId, item.id, { description: next });
+        dirtyDescriptionRef.current = true;
+        setHasPendingAutosave(true);
+        onUpdateItem(projectId, item.id, { description: next }).catch((error) => {
+          onShowToast?.(`본문 업데이트 실패: ${error.message}`, 'error');
+        });
       }
       return next;
     });
-  }, [isReadOnly, item.id, onUpdateItem, projectId]);
+  }, [isReadOnly, item.id, onShowToast, onUpdateItem, projectId]);
 
   const linkModalPhases = useMemo(
     () => [{ title: '전체 아이템', items: allItems }],
@@ -201,16 +310,23 @@ export default function ItemDescriptionSection({
   );
 
   const matchedTemplateType = useMemo(
-    () => [...(item?.tags || [])]
-      .reverse()
-      .map((tagName) => TAG_CATALOG_BY_NAME.get(tagName)?.templateType)
-      .find(Boolean),
-    [item?.tags],
+    () => {
+      if (isRequest) return 'request';
+      return [...(item?.tags || [])]
+        .reverse()
+        .map((tagName) => TAG_CATALOG_BY_NAME.get(tagName)?.templateType)
+        .find(Boolean);
+    },
+    [isRequest, item?.tags],
   );
 
   const descriptionPlaceholder = useMemo(
-    () => (description.trim() ? '' : '내용을 입력하세요...'),
-    [description],
+    () => {
+      if (description.trim()) return '';
+      if (isRequest) return '요청 본문을 입력하세요...';
+      return '내용을 입력하세요...';
+    },
+    [description, isRequest],
   );
 
   const templateInlinePlaceholders = useMemo(
@@ -230,6 +346,24 @@ export default function ItemDescriptionSection({
           </div>
 
           <div className="flex items-center gap-2">
+            {!isReadOnly && (
+              <span className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${
+                isAutosaving
+                  ? 'border-sky-200 bg-sky-50 text-sky-600 dark:border-sky-800/40 dark:bg-sky-900/20 dark:text-sky-300'
+                  : hasPendingAutosave
+                    ? 'border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-300'
+                    : 'border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-800/40 dark:bg-emerald-900/20 dark:text-emerald-300'
+              }`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${
+                  isAutosaving ? 'bg-sky-500 animate-pulse' : hasPendingAutosave ? 'bg-amber-500' : 'bg-emerald-500'
+                }`} />
+                {isAutosaving
+                  ? '동기화 중'
+                  : hasPendingAutosave
+                    ? '저장 대기'
+                    : '동기화 완료'}
+              </span>
+            )}
             {!isReadOnly && (
               <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-border-subtle dark:bg-bg-elevated">
                 <button
@@ -339,13 +473,17 @@ export default function ItemDescriptionSection({
         )}
 
         <div className="grid grid-cols-1 gap-4">
-          {showEditorPane && (
+          {(!isReadOnly && (descriptionMode === 'live' || descriptionMode === 'source')) && (
             <MarkdownEditor
               key={`editor-${item.id}`}
               content={description}
               placeholder={descriptionPlaceholder}
               inlinePlaceholders={templateInlinePlaceholders}
-              onChange={setDescription}
+              onChange={(next) => {
+                dirtyDescriptionRef.current = true;
+                setHasPendingAutosave(true);
+                setDescription(next);
+              }}
               editable={!isReadOnly}
               mode={descriptionMode === 'live' ? 'live' : 'source'}
               containerRef={descriptionRef}
@@ -363,7 +501,7 @@ export default function ItemDescriptionSection({
             />
           )}
 
-          {showPreviewPane && (
+          {(isReadOnly || descriptionMode === 'preview') && (
             <MarkdownPreview
               content={description}
               containerRef={descriptionRef}

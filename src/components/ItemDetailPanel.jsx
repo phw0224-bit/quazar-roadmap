@@ -27,6 +27,7 @@ import AssigneePicker from './AssigneePicker';
 import { TEAMS, STATUS_MAP, PRIORITY_MAP } from '../lib/constants';
 import { TAG_CATALOG } from '../lib/tagCatalog';
 import { getTemplateScaffold } from '../lib/itemTemplates';
+import { DEV_REQUEST_STATUSES } from '../lib/devRequestBoard';
 import { usePresenceContext } from '../hooks/usePresenceContext';
 import ItemViewers from './ItemViewers';
 import { ENTITY_TYPES, getEntityLabel } from '../lib/entityModel';
@@ -80,11 +81,14 @@ function ItemDetailPanel({
   const contextLabel = getEntityLabel(entityContext || {});
   const isProjectLike = entityContext?.type === ENTITY_TYPES.PROJECT || item.page_type === 'project';
   const isMemo = entityContext?.type === ENTITY_TYPES.MEMO;
+  const isRequest = entityContext?.type === ENTITY_TYPES.REQUEST;
   const itemProjectId = item?.project_id ?? phase?.id ?? null;
   const phaseId = phase?.id ?? null;
   const canCreateProjectChildPage = entityContext?.collection === 'project' && Boolean(itemProjectId);
   const sectionLabel = entityContext?.collection === 'general'
     ? `📚 ${contextLabel}`
+    : entityContext?.collection === 'request'
+      ? `📝 ${contextLabel}`
     : entityContext?.type === ENTITY_TYPES.MEMO
       ? '📝 개인 메모장'
       : `🧭 ${phase?.title}`;
@@ -94,8 +98,23 @@ function ItemDetailPanel({
     : item.status === 'in-progress'
     ? 'bg-blue-500'
     : 'bg-gray-400';
-  const assigneeCount = (item.assignees || []).length;
-  const teamCount = (item.teams || []).length;
+  const requestStatusLabel = item.status || '접수됨';
+  const requestStatusTone = requestStatusLabel === '완료'
+    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200'
+    : requestStatusLabel === '진행중'
+    ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200'
+    : requestStatusLabel === '검토중'
+    ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-200'
+    : 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-200';
+  const requestStatusDotColor = requestStatusLabel === '완료'
+    ? 'bg-emerald-500'
+    : requestStatusLabel === '진행중'
+    ? 'bg-amber-500'
+    : requestStatusLabel === '검토중'
+    ? 'bg-violet-500'
+    : 'bg-sky-500';
+  const assigneeCount = isRequest ? 0 : (item.assignees || []).length;
+  const teamCount = isRequest ? (item.request_team ? 1 : 0) : (item.teams || []).length;
   const headerIconButtonClass = 'p-1.5 rounded-lg text-gray-400 hover:text-gray-900 dark:text-text-tertiary dark:hover:text-text-primary hover:bg-gray-100 dark:hover:bg-bg-hover transition-colors cursor-pointer';
   const headerToggleButtonClass = 'p-1.5 rounded-lg transition-colors cursor-pointer';
 
@@ -199,7 +218,7 @@ function ItemDetailPanel({
     if (view) {
       editorViewRef.current = view;
       const offset = view.state.selection.main.head;
-      setCurrentEditorOffset(offset);
+      setCurrentEditorOffset((current) => (current === offset ? current : offset));
     }
   };
 
@@ -292,10 +311,17 @@ function ItemDetailPanel({
   };
 
   const handleToggleTeam = async (team) => {
+    if (isRequest) {
+      const isAdding = item.request_team !== team;
+      await onUpdateItem(itemProjectId, item.id, { request_team: isAdding ? team : null });
+      onShowToast?.(`${team} ${isAdding ? '지정' : '해제'}됨`);
+      return;
+    }
+
     const currentTeams = item.teams || [];
     const isAdding = !currentTeams.includes(team);
-    const updated = currentTeams.includes(team) 
-      ? currentTeams.filter(t => t !== team) 
+    const updated = currentTeams.includes(team)
+      ? currentTeams.filter(t => t !== team)
       : [...currentTeams, team];
     await onUpdateItem(itemProjectId, item.id, { teams: updated });
     onShowToast?.(`${team} ${isAdding ? '추가' : '제외'}됨`);
@@ -393,6 +419,170 @@ function ItemDetailPanel({
   );
 
   if (!item) return null;
+
+  if (isRequest) {
+    return (
+      <div className="flex flex-col h-full bg-white dark:bg-bg-base relative animate-slide-in">
+        <div className="bg-white/80 dark:bg-bg-base/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-border-subtle">
+          <div className="px-6 py-2.5 flex items-center gap-3">
+            <div className="flex items-center gap-1 shrink-0">
+              <button onClick={onClose} className={headerIconButtonClass}>
+                <X size={17} strokeWidth={2.4} />
+              </button>
+              <button
+                onClick={onToggleFullscreen}
+                className={headerIconButtonClass}
+                aria-label={isFullscreen ? '사이드바로 전환' : '전체화면으로 전환'}
+                title={isFullscreen ? '사이드바로 전환' : '전체화면으로 전환'}
+              >
+                {isFullscreen ? <ChevronsRight size={17} strokeWidth={2.4} /> : <Maximize2 size={17} strokeWidth={2.4} />}
+              </button>
+              {!isReadOnly && (
+                <button
+                  onClick={() => {
+                    onShowConfirm('요청 문서 삭제', '정말로 이 요청 문서를 삭제하시겠습니까?', async () => {
+                      await onDeleteItem(itemProjectId, item.id);
+                      onClose();
+                    }, 'danger');
+                  }}
+                  className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
+                  title="삭제"
+                >
+                  <Trash2 size={17} strokeWidth={2.4} />
+                </button>
+              )}
+            </div>
+
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <nav className="flex items-center gap-1.5 text-xs font-semibold min-w-0 overflow-hidden whitespace-nowrap">
+                <button
+                  onClick={() => onBreadcrumbNavigate?.('board', { boardType })}
+                  className="bg-gray-100 dark:bg-bg-hover px-2 py-0.5 rounded-md text-gray-500 dark:text-text-secondary shrink-0 hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-colors border border-transparent hover:border-gray-200 dark:hover:border-border-strong"
+                >
+                  📂 {boardLabel}
+                </button>
+                <ChevronRight size={11} strokeWidth={2.6} className="text-gray-300 dark:text-text-tertiary shrink-0" />
+                <button
+                  onClick={() => onBreadcrumbNavigate?.('board', { boardType })}
+                  className="bg-gray-100 dark:bg-bg-hover px-2 py-0.5 rounded-md text-gray-500 dark:text-text-secondary shrink-0 hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-colors border border-transparent hover:border-gray-200 dark:hover:border-border-strong"
+                >
+                  {sectionLabel}
+                </button>
+                <ChevronRight size={11} strokeWidth={2.6} className="text-gray-300 dark:text-text-tertiary shrink-0" />
+                <span className="text-gray-900 dark:text-text-primary truncate font-semibold min-w-0">{item.title || item.content}</span>
+              </nav>
+            </div>
+
+            <div className="hidden md:flex items-center gap-1.5 shrink-0">
+              <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-semibold border border-white/20 dark:border-black/10 transition-colors ${requestStatusTone}`}>
+                <span className={`w-2 h-2 rounded-full shrink-0 ${requestStatusDotColor}`}></span>
+                {requestStatusLabel}
+              </span>
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-50 dark:bg-bg-hover text-gray-500 dark:text-text-secondary border border-gray-200 dark:border-border-subtle tabular-nums">
+                요청팀 {teamCount}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex flex-col gap-8">
+              <div className="flex items-start gap-4">
+                <input
+                  autoFocus
+                  className="text-display text-gray-900 dark:text-text-primary bg-gray-50 dark:bg-bg-hover rounded-2xl p-2 -ml-2 w-full border-none focus:ring-4 focus:ring-brand-500/10"
+                  value={titleInput}
+                  onChange={(e) => setTitleInput(e.target.value)}
+                  onBlur={handleSaveTitle}
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      await handleSaveTitle();
+                    }
+                    if (e.key === 'Escape') setIsEditingTitle(false);
+                  }}
+                />
+              </div>
+
+              <div className="bg-gray-50/50 dark:bg-bg-elevated/30 rounded-3xl p-6 border border-gray-100 dark:border-border-subtle flex flex-col gap-4">
+                <div className="flex items-center min-h-[48px] group">
+                  <div className="w-48 flex items-center gap-3 text-gray-400 dark:text-text-tertiary shrink-0">
+                    <Clock size={18} strokeWidth={2.5} />
+                    <span className="text-[13px] font-black uppercase tracking-widest">현재 상태</span>
+                  </div>
+                  <div className="flex-1 px-3 py-2 rounded-xl hover:shadow-sm hover:ring-1 hover:ring-gray-100 dark:hover:ring-border-subtle transition-all relative">
+                    <select
+                      disabled={isReadOnly}
+                      className="bg-transparent dark:bg-transparent border-none outline-none p-0 text-sm font-black text-gray-800 dark:text-text-primary focus:ring-0 cursor-pointer appearance-none w-full relative z-10"
+                      value={item.status || '접수됨'}
+                      onChange={(e) => onUpdateItem(itemProjectId, item.id, { status: e.target.value })}
+                    >
+                      {DEV_REQUEST_STATUSES?.map((status) => <option key={status} value={status}>{status}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-start min-h-[48px] group">
+                  <div className="w-48 flex items-center gap-3 text-gray-400 dark:text-text-tertiary shrink-0 pt-2.5">
+                    <Building2 size={18} strokeWidth={2.5} />
+                    <span className="text-[13px] font-black uppercase tracking-widest">요청팀</span>
+                  </div>
+                  <div className="flex-1 px-3 py-2 rounded-xl hover:bg-white dark:hover:bg-bg-hover transition-all flex flex-wrap gap-2 min-h-[40px] items-center">
+                    {TEAMS.map((team) => (
+                      <button
+                        key={team.name}
+                        disabled={isReadOnly}
+                        onClick={() => handleToggleTeam(team.name)}
+                        className={`px-3.5 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest transition-all border ${(item.request_team === team.name) ? 'bg-gray-900 border-gray-900 text-white dark:bg-white dark:border-white dark:text-gray-900 shadow-md scale-105' : 'bg-white dark:bg-bg-base border-gray-200 dark:border-border-subtle text-gray-400 dark:text-text-tertiary hover:border-gray-400 dark:hover:border-border-strong cursor-pointer'} disabled:opacity-40 disabled:cursor-not-allowed`}
+                      >
+                        {team.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center min-h-[48px] group">
+                  <div className="w-48 flex items-center gap-3 text-gray-400 dark:text-text-tertiary shrink-0">
+                    <Flag size={18} strokeWidth={2.5} />
+                    <span className="text-[13px] font-black uppercase tracking-widest">우선순위</span>
+                  </div>
+                  <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white dark:hover:bg-bg-hover hover:shadow-sm hover:ring-1 hover:ring-gray-100 dark:hover:ring-border-subtle transition-all">
+                    <select
+                      disabled={isReadOnly}
+                      value={item.priority || '중간'}
+                      onChange={(e) => onUpdateItem(itemProjectId, item.id, { priority: e.target.value })}
+                      className="bg-transparent border-none p-0 text-sm font-black text-gray-800 dark:text-text-primary focus:ring-0 cursor-pointer appearance-none w-full dark:color-scheme-dark disabled:cursor-default"
+                    >
+                      {['높음', '중간', '낮음'].map((value) => (
+                        <option key={value} value={value}>{value}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <ItemDescriptionSection
+                item={item}
+                projectId={itemProjectId}
+                allItems={allItems}
+                isReadOnly={isReadOnly}
+                entityContext={entityContext}
+                onEditingChange={setIsEditingDescription}
+                onOpenDetail={onOpenDetail}
+                onShowToast={onShowToast}
+                onUpdateItem={onUpdateItem}
+                onAddChildPage={null}
+                onShowPrompt={onShowPrompt}
+                editorViewRef={editorViewRef}
+                onEditorUpdate={handleEditorUpdate}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-bg-base relative animate-slide-in">
@@ -597,11 +787,12 @@ function ItemDetailPanel({
             </div>
 
             {/* Assignees */}
-            <div className="flex items-center min-h-[48px] group">
-              <div className="w-48 flex items-center gap-3 text-gray-400 dark:text-text-tertiary shrink-0">
-                <Users size={18} strokeWidth={2.5} />
-                <span className="text-[13px] font-black uppercase tracking-widest">담당 인원</span>
-              </div>
+            {!isRequest && (
+              <div className="flex items-center min-h-[48px] group">
+                <div className="w-48 flex items-center gap-3 text-gray-400 dark:text-text-tertiary shrink-0">
+                  <Users size={18} strokeWidth={2.5} />
+                  <span className="text-[13px] font-black uppercase tracking-widest">담당 인원</span>
+                </div>
               <div 
                 className={`flex-1 px-3 py-2 rounded-xl transition-all min-h-[40px] flex items-center ${!isReadOnly ? 'hover:bg-white dark:hover:bg-bg-hover hover:shadow-sm hover:ring-1 hover:ring-gray-100 dark:hover:ring-border-subtle cursor-pointer' : ''} ${isEditingAssignees ? 'bg-white dark:bg-bg-hover ring-2 ring-brand-500/15 border-brand-400/30 shadow-md' : ''}`}
                 onClick={() => !isReadOnly && setIsEditingAssignees(true)}
@@ -625,29 +816,30 @@ function ItemDetailPanel({
                        className="w-full"
                      />
                    </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Teams */}
-            <div className="flex items-start min-h-[48px] group">
-              <div className="w-48 flex items-center gap-3 text-gray-400 dark:text-text-tertiary shrink-0 pt-2.5">
-                <Building2 size={18} strokeWidth={2.5} />
-                <span className="text-[13px] font-black uppercase tracking-widest">관련 팀</span>
+              <div className="flex items-start min-h-[48px] group">
+                <div className="w-48 flex items-center gap-3 text-gray-400 dark:text-text-tertiary shrink-0 pt-2.5">
+                  <Building2 size={18} strokeWidth={2.5} />
+                  <span className="text-[13px] font-black uppercase tracking-widest">{isRequest ? '요청팀' : '관련 팀'}</span>
+                </div>
+                <div className="flex-1 px-3 py-2 rounded-xl hover:bg-white dark:hover:bg-bg-hover transition-all flex flex-wrap gap-2 min-h-[40px] items-center">
+                  {TEAMS.map(team => (
+                    <button
+                      key={team.name}
+                      disabled={isReadOnly}
+                      onClick={() => handleToggleTeam(team.name)}
+                      className={`px-3.5 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest transition-all border ${(isRequest ? item.request_team === team.name : item.teams?.includes(team.name)) ? 'bg-gray-900 border-gray-900 text-white dark:bg-white dark:border-white dark:text-gray-900 shadow-md scale-105' : 'bg-white dark:bg-bg-base border-gray-200 dark:border-border-subtle text-gray-400 dark:text-text-tertiary hover:border-gray-400 dark:hover:border-border-strong cursor-pointer'} disabled:opacity-40 disabled:cursor-not-allowed`}
+                    >
+                      {team.name}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="flex-1 px-3 py-2 rounded-xl hover:bg-white dark:hover:bg-bg-hover transition-all flex flex-wrap gap-2 min-h-[40px] items-center">
-                {TEAMS.map(team => (
-                  <button
-                    key={team.name}
-                    disabled={isReadOnly}
-                    onClick={() => handleToggleTeam(team.name)}
-                    className={`px-3.5 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest transition-all border ${item.teams?.includes(team.name) ? 'bg-gray-900 border-gray-900 text-white dark:bg-white dark:border-white dark:text-gray-900 shadow-md scale-105' : 'bg-white dark:bg-bg-base border-gray-200 dark:border-border-subtle text-gray-400 dark:text-text-tertiary hover:border-gray-400 dark:hover:border-border-strong cursor-pointer'} disabled:opacity-40 disabled:cursor-not-allowed`}
-                  >
-                    {team.name}
-                  </button>
-                ))}
-              </div>
-            </div>
 
             {/* Tags */}
             <div className="flex items-start min-h-[48px] group">

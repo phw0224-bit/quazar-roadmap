@@ -11,6 +11,8 @@ import { useMemo } from 'react';
 
 export function usePageTree(projects, sections, generalDocs = []) {
   return useMemo(() => {
+    const isLegacyRequestDoc = (doc) => doc?.entity_type === 'request' || (Array.isArray(doc?.tags) && doc.tags.includes('request'));
+
     // 1. 모든 items 수집 (page_type 무관)
     const allItems = projects.flatMap(p => p.items || []);
 
@@ -49,7 +51,7 @@ export function usePageTree(projects, sections, generalDocs = []) {
     const boardTypes = [...new Set([
       ...projectsWithTree.map(p => p.board_type),
       ...sections.filter(s => s.board_type !== 'main').map(s => s.board_type),
-      ...generalDocs.filter(d => (d.board_type || 'main') !== 'main').map(d => d.board_type)
+      ...generalDocs.filter(d => (d.board_type || 'main') !== 'main' && !isLegacyRequestDoc(d)).map(d => d.board_type)
     ])].filter(Boolean);
 
     const boards = boardTypes.map(boardType => {
@@ -68,7 +70,7 @@ export function usePageTree(projects, sections, generalDocs = []) {
         .sort((a, b) => a.order_index - b.order_index);
 
       const boardGeneralDocs = buildGeneralDocTree(
-        generalDocs.filter((d) => (d.board_type || 'main') === boardType)
+        generalDocs.filter((d) => (d.board_type || 'main') === boardType && !isLegacyRequestDoc(d))
       );
 
       return {

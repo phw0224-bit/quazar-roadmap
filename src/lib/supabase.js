@@ -8,3 +8,19 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+let authReadQueue = Promise.resolve();
+
+function runSerializedAuthRead(readFn) {
+  const next = authReadQueue.then(readFn, readFn);
+  authReadQueue = next.catch(() => {});
+  return next;
+}
+
+const wrapAuthReadMethod = (methodName) => {
+  const original = supabase.auth[methodName].bind(supabase.auth);
+  supabase.auth[methodName] = (...args) => runSerializedAuthRead(() => original(...args));
+};
+
+wrapAuthReadMethod('getSession');
+wrapAuthReadMethod('getUser');

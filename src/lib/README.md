@@ -12,6 +12,7 @@
 | 파일 | 역할 | 주요 의존성 |
 |------|------|------------|
 | `constants.js` | TEAMS, GLOBAL_TAGS, STATUS_MAP, PRIORITY_MAP, PROJECT_TINTS 정의 | - |
+| `devRequestBoard.js` | 개발팀 요청 섹션, 임시 요청명세 템플릿, 라벨/안내 문구 정의 | - |
 | `releaseNotes.js` | **핵심.** 현재 릴리즈 노트 데이터와 `kanban-release-notes-last-seen` key 정의 | - |
 | `supabase.js` | `createClient(url, key)` 결과를 export. `.env` 환경변수 필요 | @supabase/supabase-js |
 

@@ -9,7 +9,7 @@
  * - sections: 컬럼 그룹. projects와 별도 관리.
  * - page_type='page' 아이템은 SET_DATA에서 projects에서 제거됨 (사이드바 전용).
  */
-import { useEffect, useReducer, useCallback } from 'react';
+import { useEffect, useReducer, useCallback, useRef } from 'react';
 import API, { createChildPage } from '../api/kanbanAPI';
 import { supabase } from '../lib/supabase';
 import { normalizeProfileCustomization } from '../lib/profileAppearance';
@@ -23,6 +23,7 @@ const INITIAL_STATE = {
   projects: [],
   sections: [],
   generalDocs: [],  // project_id=null, page_type='page' 문서들 (팀별 분리)
+  requestDocs: [],  // 별도 요청 테이블(team_requests)
   team_boards: {},  // { [boardType]: description }
   loading: true,
   error: null,
@@ -52,6 +53,7 @@ const kanbanReducer = (state, action) => {
         projects: action.payload.projects,
         sections: action.payload.sections,
         generalDocs: action.payload.generalDocs || [],  // 신규: 일반 문서 추가
+        requestDocs: action.payload.requestDocs || [],
         loading: false
       };
     case 'ADD_SECTION':
@@ -134,6 +136,36 @@ const kanbanReducer = (state, action) => {
       const [movingDoc] = newDocs.splice(movingIdx, 1);
       newDocs.splice(newIndex, 0, movingDoc);
       return { ...state, generalDocs: newDocs };
+    }
+    case 'ADD_REQUEST_DOC':
+      return {
+        ...state,
+        requestDocs: [...state.requestDocs, action.payload].sort((a, b) => a.order_index - b.order_index)
+      };
+    case 'UPDATE_REQUEST_DOC':
+      return {
+        ...state,
+        requestDocs: state.requestDocs.map(request =>
+          request.id === action.payload.requestId
+            ? { ...request, ...action.payload.updates }
+            : request
+        ).sort((a, b) => a.order_index - b.order_index)
+      };
+    case 'DELETE_REQUEST_DOC':
+      return {
+        ...state,
+        requestDocs: state.requestDocs.filter(request => request.id !== action.payload)
+      };
+    case 'MOVE_REQUEST_DOC': {
+      const { requestId, newIndex } = action.payload;
+      const newRequests = [...state.requestDocs];
+      const movingIdx = newRequests.findIndex(request => request.id === requestId);
+      const [movingRequest] = newRequests.splice(movingIdx, 1);
+      newRequests.splice(newIndex, 0, movingRequest);
+      return {
+        ...state,
+        requestDocs: newRequests.map((request, index) => ({ ...request, order_index: index })),
+      };
     }
     case 'SET_BOARD_TYPE':
       return { ...state, currentBoardType: action.payload };
@@ -274,8 +306,11 @@ const kanbanReducer = (state, action) => {
 
 export const useKanbanData = () => {
   const [state, dispatch] = useReducer(kanbanReducer, INITIAL_STATE);
+  const fetchRequestIdRef = useRef(0);
 
   const fetchData = useCallback(async () => {
+    const requestId = ++fetchRequestIdRef.current;
+
     try {
       const data = await API.getBoardData();
 
@@ -289,12 +324,15 @@ export const useKanbanData = () => {
       );
       const teamBoardsConfig = Object.fromEntries(configEntries);
 
+      if (requestId !== fetchRequestIdRef.current) return;
+
       dispatch({
         type: 'SET_DATA',
         payload: {
-        projects: data.projects,
+          projects: data.projects,
           sections: data.sections,
           generalDocs: data.generalDocs,  // 신규: 일반 문서 포함
+          requestDocs: data.requestDocs || [],
         }
       });
       dispatch({
@@ -302,6 +340,7 @@ export const useKanbanData = () => {
         payload: teamBoardsConfig
       });
     } catch (err) {
+      if (requestId !== fetchRequestIdRef.current) return;
       dispatch({ type: 'SET_ERROR', payload: err.message });
     }
   }, []);
@@ -338,6 +377,10 @@ export const useKanbanData = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'roadmap_items' }, () => fetchData())
       .subscribe();
 
+    const requestDocsChannel = supabase.channel('team-requests-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'team_requests' }, () => fetchData())
+      .subscribe();
+
     const commentsChannel = supabase.channel('comments-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, async (payload) => {
         if (payload.eventType === 'INSERT') {
@@ -366,7 +409,9 @@ export const useKanbanData = () => {
       .subscribe();
 
     return () => {
+      fetchRequestIdRef.current += 1;
       supabase.removeChannel(itemsChannel);
+      supabase.removeChannel(requestDocsChannel);
       supabase.removeChannel(commentsChannel);
       supabase.removeChannel(projectsChannel);
       supabase.removeChannel(profileCustomizationChannel);
@@ -576,6 +621,26 @@ export const useKanbanData = () => {
     await API.moveGeneralDocument(itemId, newIndex, boardType);
   };
 
+  const addRequestDocument = async (boardType, title, createdBy = null, updates = {}) => {
+    const newRequest = await API.createTeamRequest(boardType, title, createdBy, updates);
+    dispatch({ type: 'ADD_REQUEST_DOC', payload: newRequest });
+  };
+
+  const updateRequestDocument = async (requestId, updates) => {
+    const updated = await API.updateTeamRequest(requestId, updates);
+    dispatch({ type: 'UPDATE_REQUEST_DOC', payload: { requestId, updates: updated } });
+  };
+
+  const deleteRequestDocument = async (requestId) => {
+    await API.deleteTeamRequest(requestId);
+    dispatch({ type: 'DELETE_REQUEST_DOC', payload: requestId });
+  };
+
+  const moveRequestDocument = async (requestId, newIndex) => {
+    dispatch({ type: 'MOVE_REQUEST_DOC', payload: { requestId, newIndex } });
+    await API.moveTeamRequest(requestId, newIndex);
+  };
+
   const setBoardType = (boardType) => {
     dispatch({ type: 'SET_BOARD_TYPE', payload: boardType });
   };
@@ -640,6 +705,7 @@ export const useKanbanData = () => {
         projects: state.projects,
     sections: state.sections,
     generalDocs: state.generalDocs,  // 신규: 일반 문서 (팀별 분리)
+    requestDocs: state.requestDocs,  // 신규: 개발팀 요청 테이블
     team_boards: state.team_boards,  // 신규: 팀 보드 설정 (보드 하단 설명)
     currentBoardType: state.currentBoardType,  // 신규: 현재 보드 타입
     loading: state.loading,
@@ -666,6 +732,10 @@ export const useKanbanData = () => {
     updateGeneralDocument,
     deleteGeneralDocument,
     moveGeneralDocument,
+    addRequestDocument,
+    updateRequestDocument,
+    deleteRequestDocument,
+    moveRequestDocument,
     updateTeamBoard,  // 신규: 팀 보드 설정 업데이트
     setBoardType,
     moveSidebarItem,

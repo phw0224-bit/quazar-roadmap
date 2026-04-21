@@ -13,6 +13,7 @@ import { supabase } from '../lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 import { buildProjectMovePlan } from './projectMove';
 import { syncGitHubIssueStatus } from './githubAPI';
+import { createDevRequestTemplateData, DEV_REQUEST_TABLE } from '../lib/devRequestBoard';
 import {
   DEFAULT_PROFILE_CUSTOMIZATION,
   REACTION_TYPES,
@@ -22,6 +23,7 @@ import {
 
 const API_SERVER_URL = '';
 const normalizeNameKey = (value) => (value || '').trim().toLowerCase();
+const requestsTable = () => DEV_REQUEST_TABLE;
 
 const itemsTable = (boardType) => boardType === 'main' ? 'roadmap_items' : 'items';
 const projectsTable = (boardType) => boardType === 'main' ? 'roadmap_projects' : 'projects';
@@ -208,10 +210,11 @@ const normalizePersonalMemo = (memo) => ({
 
 const supabaseAPI = {
   /**
-   * @description 전체 보드 데이터를 단일 조회로 로드. projects + items(with comments) + sections + generalDocs.
+   * @description 전체 보드 데이터를 단일 조회로 로드. projects + items(with comments) + sections + generalDocs + requestDocs.
    * page_type='page' 아이템은 포함됨 (useKanbanData reducer에서 필터링).
    * generalDocs: project_id=null && page_type='page'인 문서들 (팀별 분리).
-   * @returns {Promise<{ projects: Array, sections: Array, generalDocs: Array }>}
+   * requestDocs: 별도 요청 테이블(team_requests).
+   * @returns {Promise<{ projects: Array, sections: Array, generalDocs: Array, requestDocs: Array }>}
    * projects: 각 project에 items 배열 내장, items에 comments(with profiles) 배열 내장
    */
   getBoardData: async () => {
@@ -344,10 +347,30 @@ const supabaseAPI = {
         .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
     }));
 
+    let formattedRequestDocs = [];
+    try {
+      const { data: teamRequestDocs, error: requestDocError } = await supabase
+        .from(requestsTable())
+        .select('*')
+        .order('order_index', { ascending: true });
+      if (requestDocError) throw requestDocError;
+
+      formattedRequestDocs = (teamRequestDocs || []).map((request) => ({
+        ...request,
+        template_data: request.template_data || createDevRequestTemplateData(),
+        creator_profile: request.created_by ? profilesById.get(request.created_by) || null : null,
+      }));
+    } catch (requestError) {
+      if (requestError?.code !== '42P01') {
+        throw requestError;
+      }
+    }
+
     return {
       projects: formattedProjects,
       sections: sections || [],
-      generalDocs: formattedGeneralDocs
+      generalDocs: formattedGeneralDocs,
+      requestDocs: formattedRequestDocs,
     };
   },
 
@@ -1106,13 +1129,9 @@ const supabaseAPI = {
     return supabaseAPI.getProfileReactionSummary(targetUserId);
   },
 
-  getNotifications: async (limit = 20) => {
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-    if (userError) throw userError;
-    if (!user) {
+  getNotifications: async (limit = 20, userId = null) => {
+    const resolvedUserId = `${userId || ''}`.trim();
+    if (!resolvedUserId) {
       return { notifications: [], unreadCount: 0 };
     }
 
@@ -1423,7 +1442,13 @@ export async function deletePersonalMemo(memoId) {
  * @param {string} parentFolderId - 부모 폴더 ID (선택사항)
  * @returns {Promise<Object>} 생성된 일반 문서/폴더 아이템
  */
-export async function createGeneralDocument(boardType, title, type = 'document', parentFolderId = null, createdBy = null) {
+export async function createGeneralDocument(
+  boardType,
+  title,
+  type = 'document',
+  parentFolderId = null,
+  createdBy = null,
+) {
   const pageType = type === 'folder' ? 'folder' : 'page';
 
   const { data, error } = await supabase
@@ -1434,6 +1459,8 @@ export async function createGeneralDocument(boardType, title, type = 'document',
         project_id: null,  // ← 일반 문서/폴더는 프로젝트 미배정
         title: title.trim(),
         page_type: pageType,  // ← 'page' 또는 'folder'
+        entity_type: 'document',
+        tags: [],
         status: 'none',
         order_index: 0,
         parent_item_id: parentFolderId,  // ← 부모 폴더 지정 (선택사항)
@@ -1443,6 +1470,124 @@ export async function createGeneralDocument(boardType, title, type = 'document',
     .select('*')
     .single();
 
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * @description 개발팀 요청 문서를 생성합니다. 일반 문서와 별도 테이블(team_requests)에 저장됩니다.
+ * @param {string} boardType - 기본값 '개발팀'
+ * @param {string} title - 요청 제목
+ * @param {string|null} createdBy - 작성자 UUID
+ * @param {Object} updates - 추가 필드
+ * @returns {Promise<Object>} 생성된 요청 레코드
+ */
+export async function createTeamRequest(boardType, title, createdBy = null, updates = {}) {
+  let existingRows;
+  try {
+    const { data, error: orderError } = await supabase
+      .from(requestsTable())
+      .select('order_index')
+      .eq('board_type', boardType)
+      .order('order_index', { ascending: false })
+      .limit(1);
+    if (orderError) throw orderError;
+    existingRows = data;
+  } catch (error) {
+    if (error?.code === '42P01') {
+      throw new Error('팀 요청 테이블이 아직 생성되지 않았습니다. `docs/DEV_REQUEST_BOARD_2026-04-21.sql`을 먼저 실행하세요.');
+    }
+    throw error;
+  }
+
+  const nextOrder = existingRows?.[0] ? existingRows[0].order_index + 1 : 0;
+
+  const { data, error } = await supabase
+    .from(requestsTable())
+    .insert([{
+      board_type: boardType,
+      title: title.trim(),
+      description: updates.description || '',
+      request_team: updates.request_team || null,
+      status: updates.status || '접수됨',
+      priority: updates.priority || '중간',
+      template_data: updates.template_data || createDevRequestTemplateData(),
+      order_index: nextOrder,
+      created_by: createdBy,
+    }])
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * @description 개발팀 요청 문서를 업데이트합니다.
+ * @param {string} requestId - 요청 레코드 ID
+ * @param {Object} updates - 변경할 필드
+ * @returns {Promise<Object>} 업데이트된 요청 레코드
+ */
+export async function updateTeamRequest(requestId, updates) {
+  const { data, error } = await supabase
+    .from(requestsTable())
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', requestId)
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * @description 개발팀 요청 문서를 삭제합니다.
+ * @param {string} requestId - 요청 레코드 ID
+ * @returns {Promise<void>}
+ */
+export async function deleteTeamRequest(requestId) {
+  const { error } = await supabase
+    .from(requestsTable())
+    .delete()
+    .eq('id', requestId);
+
+  if (error) throw error;
+}
+
+/**
+ * @description 개발팀 요청 문서를 다시 정렬합니다.
+ * @param {string} requestId - 요청 레코드 ID
+ * @param {number} newIndex - 새 순서
+ * @param {string} boardType - 보드 타입
+ * @returns {Promise<Array>|null}
+ */
+export async function moveTeamRequest(requestId, newIndex, boardType = '개발팀') {
+  const { data: rows, error: listError } = await supabase
+    .from(requestsTable())
+    .select('id, order_index')
+    .eq('board_type', boardType)
+    .order('order_index', { ascending: true });
+  if (listError) throw listError;
+
+  const requests = (rows || []).filter((request) => request.id !== requestId);
+  const moving = (rows || []).find((request) => request.id === requestId);
+  if (!moving) return null;
+
+  const clampedIndex = Math.max(0, Math.min(newIndex, requests.length));
+  requests.splice(clampedIndex, 0, moving);
+
+  const payload = requests.map((request, index) => ({
+    id: request.id,
+    order_index: index,
+  }));
+
+  const { data, error } = await supabase
+    .from(requestsTable())
+    .upsert(payload, { onConflict: 'id' })
+    .select('*');
   if (error) throw error;
   return data;
 }
@@ -1497,4 +1642,8 @@ export default {
   createGeneralDocument,
   deleteGeneralDocument,
   moveGeneralDocument,
+  createTeamRequest,
+  updateTeamRequest,
+  deleteTeamRequest,
+  moveTeamRequest,
 };

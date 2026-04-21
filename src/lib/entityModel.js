@@ -11,14 +11,16 @@ export const ENTITY_TYPES = {
   FOLDER: 'folder',
   MEMO: 'memo',
   PROJECT: 'project',
+  REQUEST: 'request',
 };
 
 /**
  * @param {Object|null|undefined} item
- * @returns {'task'|'document'|'folder'|'memo'|'project'}
+ * @returns {'task'|'document'|'folder'|'memo'|'project'|'request'}
  */
 export function resolveEntityType(item) {
   if (!item) return ENTITY_TYPES.TASK;
+  if (item.entity_type === ENTITY_TYPES.REQUEST) return ENTITY_TYPES.REQUEST;
   if (item.page_type === 'project') return ENTITY_TYPES.PROJECT;
   if (item.entity_type === ENTITY_TYPES.MEMO || item.is_private) return ENTITY_TYPES.MEMO;
   if (item.page_type === 'folder') return ENTITY_TYPES.FOLDER;
@@ -29,9 +31,9 @@ export function resolveEntityType(item) {
 /**
  * @param {{ item: Object|null|undefined, project?: Object|null, phase?: Object|null }} params
  * @returns {{
- *   type: 'task'|'document'|'folder'|'memo'|'project',
+ *   type: 'task'|'document'|'folder'|'memo'|'project'|'request',
  *   boardType: string,
- *   collection: 'project'|'general'|'personal',
+ *   collection: 'project'|'general'|'personal'|'request',
  * }}
  */
 export function buildEntityContext({ item, project = null, phase = project }) {
@@ -43,6 +45,8 @@ export function buildEntityContext({ item, project = null, phase = project }) {
     collection = item?.project_id ? 'project' : 'general';
   } else if (type === ENTITY_TYPES.MEMO) {
     collection = 'personal';
+  } else if (type === ENTITY_TYPES.REQUEST) {
+    collection = 'request';
   }
 
   return { type, boardType, collection };
@@ -54,6 +58,7 @@ export function buildEntityContext({ item, project = null, phase = project }) {
  */
 export function getEntityLabel(context) {
   if (context?.type === ENTITY_TYPES.PROJECT) return '프로젝트';
+  if (context?.type === ENTITY_TYPES.REQUEST) return '요청 문서';
   if (context?.type === ENTITY_TYPES.MEMO) return '개인 메모';
   if (context?.type === ENTITY_TYPES.FOLDER) return '일반 폴더';
   if (context?.type === ENTITY_TYPES.DOCUMENT) {
