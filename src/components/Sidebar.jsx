@@ -14,6 +14,13 @@ import { useNewItems } from '../hooks/useNewItems';
 import ProfileAvatar from './ProfileAvatar';
 import SidebarTree from './SidebarTree';
 import { getDropTypeFromRelativeY, getRelativeY } from './sidebarDropZones';
+import {
+  MAIN_BOARD_TYPE,
+  TEAM_BOARD_TYPES,
+  getBoardSectionLabel,
+  getDefaultBoardType,
+  normalizeBoardType,
+} from '../lib/boardNavigation.js';
 
 const stopProp = (e) => e.stopPropagation();
 
@@ -64,6 +71,7 @@ export default function Sidebar({
   onOpenProfileSettings,
   profileCustomization,
   onOpenSearch,
+  currentBoardType,
 }) {
   const [expandedIds, setExpandedIds] = useState(() => {
     try {
@@ -87,6 +95,10 @@ export default function Sidebar({
       activationConstraint: { distance: 5 },
     })
   );
+  const defaultBoardType = getDefaultBoardType(user);
+  const selectedBoardType = normalizeBoardType(currentBoardType) === MAIN_BOARD_TYPE ? defaultBoardType : normalizeBoardType(currentBoardType);
+  const isMyTeamBoardActive = selectedBoardType === defaultBoardType;
+  const isBoardViewActive = activeView === 'board';
 
   useEffect(() => {
     localStorage.setItem('sidebar-expanded', JSON.stringify([...expandedIds]));
@@ -142,15 +154,25 @@ export default function Sidebar({
     });
   }, [onAddChildPage, onShowPrompt]);
 
+  const handleSelectBoardType = useCallback((boardType, { syncUrl = true } = {}) => {
+    const normalized = normalizeBoardType(boardType);
+    if (normalized === MAIN_BOARD_TYPE) {
+      onNavigate?.('roadmap');
+      return;
+    }
+    onSetBoardType?.(normalized, { syncUrl });
+    onNavigate?.('board');
+  }, [onNavigate, onSetBoardType]);
+
   // 보드 토글 시 board type 업데이트
   const handleBoardToggle = useCallback((id) => {
     handleToggle(id);
     // board id format: 'board-main', 'board-개발팀' 등
     if (id?.startsWith('board-')) {
       const boardType = id.replace('board-', '');
-      onSetBoardType?.(boardType);
+      handleSelectBoardType(boardType);
     }
-  }, [handleToggle, onSetBoardType]);
+  }, [handleSelectBoardType, handleToggle]);
 
   const handleDragStart = useCallback((event) => {
     const draggedProject = projects.find(p => p.id === event.active.id);
@@ -436,6 +458,71 @@ export default function Sidebar({
             );
           })}
         </nav>
+
+        {/* Board switcher */}
+        <div className="flex-shrink-0 px-2 pb-2">
+          <div className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--color-text-tertiary)]">
+            보드 전환
+          </div>
+          <div className="space-y-1">
+            <button
+              type="button"
+              className={`w-full flex items-center justify-between gap-2 px-2 py-[5px] rounded-md text-[13px] font-medium transition-colors duration-100 cursor-pointer text-left ${
+                isBoardViewActive && isMyTeamBoardActive
+                  ? 'bg-[color:var(--color-bg-hover)] text-[color:var(--color-text-primary)]'
+                  : 'text-[color:var(--color-text-secondary)] hover:bg-[color:var(--color-bg-hover)] hover:text-[color:var(--color-text-primary)]'
+              }`}
+              onClick={() => handleSelectBoardType(defaultBoardType)}
+              onPointerDown={stopProp}
+            >
+              <span className="truncate">내 팀 보드</span>
+              <span className="shrink-0 text-[11px] font-semibold text-[color:var(--color-text-tertiary)]">
+                {defaultBoardType === MAIN_BOARD_TYPE ? '통합' : defaultBoardType}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className={`w-full flex items-center justify-between gap-2 px-2 py-[5px] rounded-md text-[13px] font-medium transition-colors duration-100 cursor-pointer text-left ${
+                activeView === 'roadmap'
+                  ? 'bg-[color:var(--color-bg-hover)] text-[color:var(--color-text-primary)]'
+                  : 'text-[color:var(--color-text-secondary)] hover:bg-[color:var(--color-bg-hover)] hover:text-[color:var(--color-text-primary)]'
+              }`}
+              onClick={() => onNavigate?.('roadmap')}
+              onPointerDown={stopProp}
+            >
+              <span className="truncate">통합 팀 보드</span>
+              <span className="shrink-0 text-[11px] font-semibold text-[color:var(--color-text-tertiary)]">
+                전사
+              </span>
+            </button>
+
+            <div className="px-2 pt-2 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--color-text-tertiary)]">
+              개별 팀
+            </div>
+            {TEAM_BOARD_TYPES.map((boardType) => {
+              const isActive = isBoardViewActive && selectedBoardType === boardType;
+              return (
+                <button
+                  key={boardType}
+                  type="button"
+                  className={`w-full flex items-center justify-between gap-2 px-2 py-[5px] rounded-md text-[13px] font-medium transition-colors duration-100 cursor-pointer text-left ${
+                    isActive
+                      ? 'bg-[color:var(--color-bg-hover)] text-[color:var(--color-text-primary)]'
+                      : 'text-[color:var(--color-text-secondary)] hover:bg-[color:var(--color-bg-hover)] hover:text-[color:var(--color-text-primary)]'
+                  }`}
+                  onClick={() => handleSelectBoardType(boardType)}
+                  onPointerDown={stopProp}
+                >
+                  <span className="truncate">{getBoardSectionLabel(boardType)}</span>
+                  <span className="shrink-0 text-[11px] font-semibold text-[color:var(--color-text-tertiary)]">
+                    팀
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         {/* Divider */}
         <div className="flex-shrink-0 mx-3 border-t border-[color:var(--color-border-subtle)]" />

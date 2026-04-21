@@ -57,11 +57,18 @@ import FilterBar from './FilterBar';
 import AppLayout from './AppLayout';
 import { useFilterState, applyFilterSort } from '../hooks/useFilterState';
 import { DEFAULT_PROFILE_CUSTOMIZATION, normalizeProfileCustomization } from '../lib/profileAppearance';
+import {
+  MAIN_BOARD_TYPE,
+  getBoardSectionLabel,
+  getDefaultBoardType,
+  normalizeBoardType,
+  TEAM_BOARD_TYPES,
+  resolveBoardTypeForBoardView,
+} from '../lib/boardNavigation.js';
 
 import { Toast, ConfirmModal, InputModal } from './UI/Feedback';
 
-const TEAM_BOARDS = ['개발팀', 'AI팀', '지원팀'];
-const DISPLAY_BOARDS = ['main', ...TEAM_BOARDS];
+const DISPLAY_BOARDS = ['main', ...TEAM_BOARD_TYPES];
 const isLegacyRequestDoc = (doc) => doc?.entity_type === 'request' || (Array.isArray(doc?.tags) && doc.tags.includes('request'));
 const ItemDetailPanel = lazy(() => import('./ItemDetailPanel'));
 const PeopleBoard = lazy(() => import('./PeopleBoard'));
@@ -91,7 +98,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
     moveSidebarItem,
     moveSidebarProject,
     // 신규: 일반 문서
-    generalDocs, addGeneralDocument, updateGeneralDocument, deleteGeneralDocument, setBoardType,
+    generalDocs, addGeneralDocument, updateGeneralDocument, deleteGeneralDocument, setBoardType, currentBoardType,
     requestDocs, addRequestDocument, updateRequestDocument, deleteRequestDocument,
     // 신규: 팀 보드 설정
     team_boards, updateTeamBoard,
@@ -127,6 +134,10 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
   const [mounted, setMounted] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showNewPanelMap, setShowNewPanelMap] = useState({}); // {boardName: boolean}
+  const defaultBoardType = getDefaultBoardType(user);
+  const selectedTeamBoardType = resolveBoardTypeForBoardView(urlState.boardType, defaultBoardType);
+  const visibleBoardType = activeView === 'roadmap' ? MAIN_BOARD_TYPE : selectedTeamBoardType;
+  const visibleBoardLabel = getBoardSectionLabel(visibleBoardType);
 
   // 모든 보드의 새 아이템 훅 호출 (Rules of Hooks 준수)
   const mainNewItems = useNewItems(projects, 'main', isReadOnly);
@@ -140,6 +151,17 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
     'AI팀': aiTeamNewItems,
     '지원팀': supportTeamNewItems,
   }), [mainNewItems, devTeamNewItems, aiTeamNewItems, supportTeamNewItems]);
+
+  useEffect(() => {
+    if (loading) return;
+
+    const nextBoardType = selectedTeamBoardType;
+
+    if (normalizeBoardType(urlState.boardType) !== nextBoardType) {
+      replaceUrlState({ boardType: nextBoardType });
+    }
+    setBoardType(nextBoardType);
+  }, [activeView, loading, replaceUrlState, selectedTeamBoardType, setBoardType, urlState.boardType]);
 
   useEffect(() => setMounted(true), []);
 
@@ -235,6 +257,15 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
   const handleOpenProfileModal = () => {
     setProfileModalSeed((prev) => prev + 1);
     setIsProfileModalOpen(true);
+  };
+
+  const handleSetBoardType = (boardType, options = {}) => {
+    const normalized = normalizeBoardType(boardType);
+    setBoardType(normalized);
+
+    if (options.syncUrl === false) return;
+    if (normalizeBoardType(urlState.boardType) === normalized) return;
+    replaceUrlState({ boardType: normalized });
   };
 
   const handleConnectGitHub = async () => {
@@ -766,11 +797,13 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
 
   const handleOpenNotification = async (notification) => {
     const targetView = notification.payload?.board_type === 'main' ? 'roadmap' : 'board';
+    const targetBoardType = normalizeBoardType(notification.payload?.board_type) || defaultBoardType;
     const entityTable = notification.entity_table;
     const entityId = notification.entity_id;
 
     setUrlState({
       view: targetView,
+      boardType: targetView === 'board' ? targetBoardType : urlState.boardType || targetBoardType,
       itemId: entityTable?.includes('items') ? entityId : null,
       fullscreen: entityTable?.includes('items'),
     });
@@ -804,7 +837,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
       mounted={mounted}
       onToggleTheme={() => setTheme((resolvedTheme ?? theme) === 'dark' ? 'light' : 'dark')}
       onLogout={logout}
-      onSetBoardType={setBoardType}
+      onSetBoardType={handleSetBoardType}
       generalDocs={generalDocs}
       onShowToast={showToast}
       onMoveSidebarItem={moveSidebarItem}
@@ -812,6 +845,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
       onOpenProfileSettings={handleOpenProfileModal}
       profileCustomization={profileCustomization}
       onOpenSearch={() => setShowSearch(true)}
+      currentBoardType={currentBoardType}
     >
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="w-full h-full bg-white dark:bg-bg-base font-sans flex overflow-hidden transition-colors duration-200">
@@ -828,7 +862,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                 {activeView === 'roadmap'
                   ? '전사 로드맵'
                   : activeView === 'board'
-                    ? '팀 보드'
+                    ? visibleBoardLabel
                     : activeView === 'timeline'
                       ? '타임라인'
                       : activeView === 'personal'
@@ -884,7 +918,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
             >
 
             {/* Separate Board Sections */}
-            {(activeView === 'roadmap' ? ['main'] : TEAM_BOARDS).map(boardName => {
+            {[visibleBoardType].map(boardName => {
               const boardProjects = filteredProjects.filter(p => (p.board_type || 'main') === boardName.toLowerCase());
               const completedProjects = boardProjects.filter((project) => project.is_completed);
               const isCompletedGrouped = groupedCompletedBoards.has(boardName);

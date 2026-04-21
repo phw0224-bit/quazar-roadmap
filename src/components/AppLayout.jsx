@@ -32,6 +32,7 @@ export default function AppLayout({
   onOpenProfileSettings,
   profileCustomization,
   onOpenSearch,
+  currentBoardType,
 }) {
   const {
     isOpen,
@@ -87,6 +88,7 @@ export default function AppLayout({
     onOpenProfileSettings,
     profileCustomization,
     onOpenSearch,
+    currentBoardType,
   };
 
   const collapsedNavItems = [

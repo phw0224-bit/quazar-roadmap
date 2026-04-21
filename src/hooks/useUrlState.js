@@ -3,6 +3,7 @@
  *
  * 지원 파라미터:
  * - view: 'board'|'timeline'|'people'|'personal'|'roadmap'|'repositories' (기본값: 'board')
+ * - boardType: 'main'|'개발팀'|'AI팀'|'지원팀' (팀 보드 선택 상태)
  * - item: 선택된 아이템 UUID (ItemDetailPanel 열림)
  * - repo: 선택된 레포 full name
  * - fullscreen: '1' (ItemDetailPanel 전체화면)
@@ -51,6 +52,7 @@ function parseUrlState() {
   const rawView = params.get('view') || 'board';
   return {
     view: VALID_VIEWS.includes(rawView) ? rawView : 'board',
+    boardType: params.get('boardType') || null,
     itemId: params.get('item') || null,
     repoFullName: params.get('repo') || null,
     fullscreen: params.get('fullscreen') === '1',
@@ -64,6 +66,7 @@ function parseUrlState() {
 function buildSearch(state) {
   const params = new URLSearchParams();
   if (state.view && state.view !== 'board') params.set('view', state.view);
+  if (state.boardType) params.set('boardType', state.boardType);
   if (state.itemId) params.set('item', state.itemId);
   if (state.repoFullName) params.set('repo', state.repoFullName);
   if (state.fullscreen) params.set('fullscreen', '1');
