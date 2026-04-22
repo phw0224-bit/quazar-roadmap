@@ -1,6 +1,7 @@
 export const MAIN_BOARD_TYPE = 'main';
+export const TEAM_OVERVIEW_BOARD_TYPE = 'team-overview';
 export const TEAM_BOARD_TYPES = ['개발팀', 'AI팀', '지원팀'];
-export const ALL_BOARD_TYPES = [MAIN_BOARD_TYPE, ...TEAM_BOARD_TYPES];
+export const ALL_BOARD_TYPES = [MAIN_BOARD_TYPE, TEAM_OVERVIEW_BOARD_TYPE, ...TEAM_BOARD_TYPES];
 
 export function normalizeBoardType(boardType) {
   if (typeof boardType !== 'string') return MAIN_BOARD_TYPE;
@@ -21,6 +22,7 @@ export function isTeamBoard(boardType) {
 
 export function resolveBoardTypeForBoardView(boardType, fallbackBoardType) {
   const normalized = normalizeBoardType(boardType);
+  if (normalized === TEAM_OVERVIEW_BOARD_TYPE) return normalized;
   if (isTeamBoard(normalized)) return normalized;
   return normalizeBoardType(fallbackBoardType);
 }
@@ -28,6 +30,6 @@ export function resolveBoardTypeForBoardView(boardType, fallbackBoardType) {
 export function getBoardSectionLabel(boardType) {
   const normalized = normalizeBoardType(boardType);
   if (normalized === MAIN_BOARD_TYPE) return '전사 로드맵';
+  if (normalized === TEAM_OVERVIEW_BOARD_TYPE) return '통합 팀 보드';
   return `${normalized} 보드`;
 }
-

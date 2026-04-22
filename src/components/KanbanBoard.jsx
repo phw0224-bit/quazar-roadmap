@@ -59,12 +59,14 @@ import { useFilterState, applyFilterSort } from '../hooks/useFilterState';
 import { DEFAULT_PROFILE_CUSTOMIZATION, normalizeProfileCustomization } from '../lib/profileAppearance';
 import {
   MAIN_BOARD_TYPE,
+  TEAM_OVERVIEW_BOARD_TYPE,
   getBoardSectionLabel,
   getDefaultBoardType,
   normalizeBoardType,
   TEAM_BOARD_TYPES,
   resolveBoardTypeForBoardView,
 } from '../lib/boardNavigation.js';
+import { createDevRequestDescriptionScaffold } from '../lib/devRequestBoard.js';
 
 import { Toast, ConfirmModal, InputModal } from './UI/Feedback';
 
@@ -138,6 +140,9 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
   const selectedTeamBoardType = resolveBoardTypeForBoardView(urlState.boardType, defaultBoardType);
   const visibleBoardType = activeView === 'roadmap' ? MAIN_BOARD_TYPE : selectedTeamBoardType;
   const visibleBoardLabel = getBoardSectionLabel(visibleBoardType);
+  const visibleBoardTypes = activeView === 'board' && visibleBoardType === TEAM_OVERVIEW_BOARD_TYPE
+    ? TEAM_BOARD_TYPES
+    : [visibleBoardType];
 
   // 모든 보드의 새 아이템 훅 호출 (Rules of Hooks 준수)
   const mainNewItems = useNewItems(projects, 'main', isReadOnly);
@@ -932,8 +937,8 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
             >
 
             {/* Separate Board Sections */}
-            {[visibleBoardType].map(boardName => {
-              const boardProjects = filteredProjects.filter(p => (p.board_type || 'main') === boardName.toLowerCase());
+            {visibleBoardTypes.map(boardName => {
+              const boardProjects = filteredProjects.filter(p => (p.board_type || 'main') === boardName);
               const completedProjects = boardProjects.filter((project) => project.is_completed);
               const isCompletedGrouped = groupedCompletedBoards.has(boardName);
               const visibleProjects = isCompletedGrouped
@@ -1012,7 +1017,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                     {user && (
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => showPrompt('새 섹션 추가', '섹션 이름을 입력하세요', (title) => { if (title) { addSection(boardName.toLowerCase(), title); showToast(`'${title}' 섹션이 생성되었습니다.`); setPrompt(null); } })}
+                          onClick={() => showPrompt('새 섹션 추가', '섹션 이름을 입력하세요', (title) => { if (title) { addSection(boardName, title); showToast(`'${title}' 섹션이 생성되었습니다.`); setPrompt(null); } })}
                           className="px-5 py-2.5 bg-gray-50 dark:bg-bg-elevated text-gray-400 dark:text-text-tertiary rounded-xl text-sm font-bold hover:bg-gray-100 dark:hover:bg-bg-hover border border-dashed border-gray-200 dark:border-border-strong transition-all flex items-center gap-2 cursor-pointer hover:text-gray-600 dark:hover:text-text-secondary"
                         >
                           <span className="text-xl">+</span>
@@ -1025,7 +1030,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                               '새 프로젝트의 이름을 입력하세요',
                               (title) => {
                                 if (title) {
-                                  addProject(title, boardName.toLowerCase());
+                                  addProject(title, boardName);
                                   showToast(`'${title}' 프로젝트가 생성되었습니다.`);
                                   setPrompt(null);
                                 }
@@ -1064,7 +1069,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                               '문서 제목을 입력하세요',
                               (title) => {
                                 if (title) {
-                                  addGeneralDocument(boardName.toLowerCase(), title.trim(), undefined, undefined, user?.id);
+                                  addGeneralDocument(boardName, title.trim(), undefined, undefined, user?.id);
                                   showToast(`'${title}' 문서가 생성되었습니다.`);
                                   setPrompt(null);
                                 }
@@ -1081,23 +1086,24 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                   </div>
 
                   {/* 보드 타이틀 바로 아래 설명 영역 */}
-                  {(team_boards?.[boardName.toLowerCase()]?.description || !isReadOnly) && (
+                  {(team_boards?.[boardName]?.description || !isReadOnly) && (
                     <BoardDescription
-                      description={team_boards?.[boardName.toLowerCase()]?.description ?? ''}
+                      description={team_boards?.[boardName]?.description ?? ''}
                       isReadOnly={isReadOnly}
-                      onSave={(updates) => updateTeamBoard(boardName.toLowerCase(), updates)}
+                      onSave={(updates) => updateTeamBoard(boardName, updates)}
                       onOpenDetail={handleOpenDetail}
-                      generalDocs={generalDocs.filter(doc => (doc.board_type || 'main') === boardName.toLowerCase() && !isLegacyRequestDoc(doc))}
-                      pinnedDocIds={team_boards?.[boardName.toLowerCase()]?.pinned_doc_ids ?? []}
+                      generalDocs={generalDocs.filter(doc => (doc.board_type || 'main') === boardName && !isLegacyRequestDoc(doc))}
+                      pinnedDocIds={team_boards?.[boardName]?.pinned_doc_ids ?? []}
                     />
                   )}
 
                   {(() => {
                     const boardSections = sections
-                      .filter(s => s.board_type === boardName.toLowerCase())
+                      .filter(s => s.board_type === boardName)
                       .sort((a, b) => a.order_index - b.order_index);
-                    const boardGeneralDocs = generalDocs.filter(doc => (doc.board_type || 'main') === boardName.toLowerCase() && !isLegacyRequestDoc(doc));
-                    const isEmpty = boardProjects.length === 0 && boardSections.length === 0 && boardGeneralDocs.length === 0 && requestDocs.length === 0;
+                    const boardGeneralDocs = generalDocs.filter(doc => (doc.board_type || 'main') === boardName && !isLegacyRequestDoc(doc));
+                    const boardRequestDocs = boardName === '개발팀' ? requestDocs : [];
+                    const isEmpty = boardProjects.length === 0 && boardSections.length === 0 && boardGeneralDocs.length === 0 && boardRequestDocs.length === 0;
                     const projectColumnProps = {
                       onAddItem: addItem, onUpdateItem: updateItem, onDeleteItem: deleteItem,
                       onUpdateProject: updateProject, onDeleteProject: deleteProject,
@@ -1124,21 +1130,18 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                                     if (!requestTitle) return;
 
                                     try {
+                                      const requestDescription = `${requestForm?.description || ''}`.trim()
+                                        || createDevRequestDescriptionScaffold();
                                       const newRequest = await addRequestDocument('개발팀', requestTitle, user?.id, {
-                                        description: `${requestForm?.description || ''}`.trim(),
-                                        request_team: `${requestForm?.request_team || ''}`.trim() || null,
+                                        description: requestDescription,
+                                        request_team: `${user?.user_metadata?.department || ''}`.trim() || null,
                                         priority: `${requestForm?.priority || '중간'}`.trim(),
                                       });
-                                      const submitted = await submitRequestDocument(newRequest.id);
                                       handleOpenDetail(newRequest.id);
-                                      showToast(
-                                        submitted?.notified_at
-                                          ? `'${requestTitle}' 요청을 개발팀에 보냈습니다.`
-                                          : `'${requestTitle}' 요청은 저장됐지만 Google Chat 웹훅이 없어 알림은 건너뛰었습니다.`
-                                      );
+                                      showToast(`'${requestTitle}' 요청 문서를 만들었습니다. 본문 템플릿을 채운 뒤 전송하세요.`);
                                       setPrompt(null);
                                     } catch (error) {
-                                      showToast(`요청 문서 전송 실패: ${error.message}`, 'error');
+                                      showToast(`요청 문서 생성 실패: ${error.message}`, 'error');
                                     }
                                   }
                                 );
@@ -1173,7 +1176,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                               <p className="text-gray-400 dark:text-text-tertiary font-black text-xl mb-6 tracking-tight">이 보드에는 아직 프로젝트가 없습니다.</p>
                               {user && (
                                 <button
-                                  onClick={() => showPrompt(`${boardDisplayName} 첫 프로젝트 만들기`, '첫 번째 프로젝트의 이름을 입력하세요', (title) => { if (title) { addProject(title, boardName.toLowerCase()); showToast(`'${title}' 프로젝트가 생성되었습니다.`); setPrompt(null); } })}
+                                  onClick={() => showPrompt(`${boardDisplayName} 첫 프로젝트 만들기`, '첫 번째 프로젝트의 이름을 입력하세요', (title) => { if (title) { addProject(title, boardName); showToast(`'${title}' 프로젝트가 생성되었습니다.`); setPrompt(null); } })}
                                   className="text-sm font-black text-brand-500 dark:text-brand-400 bg-white dark:bg-bg-elevated px-8 py-3.5 rounded-2xl shadow-lg border border-brand-100 dark:border-brand-800/30 hover:bg-brand-50 dark:hover:bg-bg-hover transition-all flex items-center gap-2 hover:scale-105 active:scale-95 cursor-pointer uppercase tracking-widest"
                                 >
                                   + 첫 번째 프로젝트 추가하기
@@ -1216,7 +1219,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                                             '문서 제목을 입력하세요',
                                             (title) => {
                                               if (title) {
-                                                addGeneralDocument(boardName.toLowerCase(), title.trim(), 'document', undefined, user?.id);
+                                                addGeneralDocument(boardName, title.trim(), 'document', undefined, user?.id);
                                                 showToast(`'${title}' 문서가 생성되었습니다.`);
                                                 setPrompt(null);
                                               }
@@ -1236,7 +1239,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                                             '폴더 이름을 입력하세요',
                                             (title) => {
                                               if (title) {
-                                                addGeneralDocument(boardName.toLowerCase(), title.trim(), 'folder', undefined, user?.id);
+                                                addGeneralDocument(boardName, title.trim(), 'folder', undefined, user?.id);
                                                 showToast(`'${title}' 폴더가 생성되었습니다.`);
                                                 setPrompt(null);
                                               }
@@ -1307,7 +1310,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                                           '문서 제목을 입력하세요',
                                           (title) => {
                                             if (title) {
-                                              addGeneralDocument(boardName.toLowerCase(), title.trim(), 'document', folderId, user?.id);
+                                              addGeneralDocument(boardName, title.trim(), 'document', folderId, user?.id);
                                               showToast(`'${title}' 문서가 생성되었습니다.`);
                                               setPrompt(null);
                                             }
@@ -1315,17 +1318,17 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                                         );
                                       }}
                                       onTogglePinDocument={(docId, isPinned) => {
-                                        const currentPinned = team_boards?.[boardName.toLowerCase()]?.pinned_doc_ids ?? [];
+                                        const currentPinned = team_boards?.[boardName]?.pinned_doc_ids ?? [];
                                         const newPinned = isPinned
                                           ? [...currentPinned, docId]
                                           : currentPinned.filter(id => id !== docId);
-                                        updateTeamBoard(boardName.toLowerCase(), {
-                                          description: team_boards?.[boardName.toLowerCase()]?.description ?? '',
+                                        updateTeamBoard(boardName, {
+                                          description: team_boards?.[boardName]?.description ?? '',
                                           pinned_doc_ids: newPinned
                                         });
                                         showToast(isPinned ? '보드 안내에 고정되었습니다.' : '고정이 해제되었습니다.', 'success');
                                       }}
-                                      pinnedDocIds={team_boards?.[boardName.toLowerCase()]?.pinned_doc_ids ?? []}
+                                      pinnedDocIds={team_boards?.[boardName]?.pinned_doc_ids ?? []}
                                       isReadOnly={isReadOnly}
                                     />
                                   </div>

@@ -5,7 +5,6 @@ function normalizeText(value) {
 const REQUIRED_FIELDS = Object.freeze([
   ['title', '제목'],
   ['description', '본문'],
-  ['request_team', '요청팀'],
   ['priority', '우선순위'],
 ]);
 

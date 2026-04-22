@@ -56,3 +56,13 @@ export const DEV_REQUEST_TEMPLATE = Object.freeze({
 export const createDevRequestTemplateData = () => (
   Object.fromEntries(DEV_REQUEST_TEMPLATE.fields.map((field) => [field.key, '']))
 );
+
+export const createDevRequestDescriptionScaffold = () => (
+  `${DEV_REQUEST_TEMPLATE.fields.map((field) => `## [${field.label}]`).join('\n\n')}\n`
+);
+
+export const createDevRequestInlinePlaceholders = () => (
+  Object.fromEntries(
+    DEV_REQUEST_TEMPLATE.fields.map((field) => [`## [${field.label}]`, `- ${field.hint}`]),
+  )
+);

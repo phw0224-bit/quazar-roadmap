@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { CheckCircle2, AlertCircle, X, Info, Trash2 } from 'lucide-react';
-import { TEAMS } from '../../lib/constants';
+import {
+  DEV_REQUEST_TEMPLATE,
+  createDevRequestDescriptionScaffold,
+} from '../../lib/devRequestBoard.js';
 
 /**
  * Toast Notification System
@@ -67,8 +70,7 @@ export function InputModal({ title, placeholder, defaultValue = '', confirmText 
   const [value, setValue] = useState(defaultValue);
   const [requestForm, setRequestForm] = useState({
     title: '',
-    description: '',
-    request_team: '',
+    description: createDevRequestDescriptionScaffold(),
     priority: '중간',
   });
   const isRequestDocumentFlow = /요청 문서/i.test(title || '');
@@ -83,12 +85,10 @@ export function InputModal({ title, placeholder, defaultValue = '', confirmText 
     : '입력';
   const flowCopy = isCreateFlow
     ? (isRequestDocumentFlow
-      ? '제목, 본문, 요청팀, 우선순위를 작성하면 개발팀에 바로 요청을 보냅니다.'
+      ? '템플릿에 맞춰 본문을 채운 뒤 요청 문서를 만듭니다.'
       : '제목만 입력하면 바로 생성됩니다.')
     : '값을 입력한 뒤 확인을 누르세요.';
   const canSubmitRequest = requestForm.title.trim()
-    && requestForm.description.trim()
-    && requestForm.request_team.trim()
     && requestForm.priority.trim();
   const updateRequestField = (field, nextValue) => {
     setRequestForm((current) => ({ ...current, [field]: nextValue }));
@@ -98,7 +98,7 @@ export function InputModal({ title, placeholder, defaultValue = '', confirmText 
     return (
       <div className="fixed inset-0 z-[1100] flex items-center justify-center p-6">
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={onCancel} />
-        <div className="relative w-full max-w-[560px] rounded-2xl border border-gray-200 bg-white p-7 shadow-none animate-scale-in dark:border-border-subtle dark:bg-bg-elevated transition-colors duration-200">
+        <div className="relative max-h-[calc(100vh-48px)] w-full max-w-[860px] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-7 shadow-none animate-scale-in dark:border-border-subtle dark:bg-bg-elevated transition-colors duration-200">
           <div className="flex items-center gap-3">
             <div className="h-2.5 w-2.5 rounded-full bg-gray-900 dark:bg-white" />
             <span className="text-[11px] font-black uppercase tracking-[0.24em] text-gray-400 dark:text-text-tertiary">
@@ -128,34 +128,40 @@ export function InputModal({ title, placeholder, defaultValue = '', confirmText 
               />
             </label>
 
-            <label className="grid gap-1.5">
-              <span className="text-xs font-black uppercase tracking-widest text-gray-400 dark:text-text-tertiary">본문</span>
-              <textarea
-                className="min-h-[150px] w-full resize-y rounded-lg border border-gray-200 bg-white px-4 py-3 text-[15px] font-semibold leading-6 text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-gray-300 dark:border-border-subtle dark:bg-bg-base dark:text-text-primary dark:placeholder:text-text-tertiary"
-                placeholder="요청 배경, 원하는 결과, 검수 기준을 적어주세요."
-                value={requestForm.description}
-                onChange={(event) => updateRequestField('description', event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Escape') onCancel();
-                }}
-              />
-            </label>
-
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
               <label className="grid gap-1.5">
-                <span className="text-xs font-black uppercase tracking-widest text-gray-400 dark:text-text-tertiary">요청팀</span>
-                <select
-                  className="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-[15px] font-semibold text-gray-900 outline-none transition-colors focus:border-gray-300 dark:border-border-subtle dark:bg-bg-base dark:text-text-primary"
-                  value={requestForm.request_team}
-                  onChange={(event) => updateRequestField('request_team', event.target.value)}
-                >
-                  <option value="">선택</option>
-                  {TEAMS.map((team) => (
-                    <option key={team.name} value={team.name}>{team.name}</option>
-                  ))}
-                </select>
+                <span className="text-xs font-black uppercase tracking-widest text-gray-400 dark:text-text-tertiary">본문 템플릿</span>
+                <textarea
+                  className="min-h-[360px] w-full resize-y rounded-lg border border-gray-200 bg-white px-4 py-3 font-mono text-[14px] font-semibold leading-7 text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-gray-300 dark:border-border-subtle dark:bg-bg-base dark:text-text-primary dark:placeholder:text-text-tertiary"
+                  placeholder="요청 내용을 템플릿에 맞춰 작성하세요."
+                  value={requestForm.description}
+                  onChange={(event) => updateRequestField('description', event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') onCancel();
+                  }}
+                />
               </label>
 
+              <div className="rounded-lg border border-gray-100 bg-gray-50/70 p-4 dark:border-border-subtle dark:bg-bg-base/70">
+                <p className="text-xs font-black uppercase tracking-widest text-gray-400 dark:text-text-tertiary">
+                  작성 가이드
+                </p>
+                <div className="mt-3 grid gap-3">
+                  {DEV_REQUEST_TEMPLATE.fields.map((field) => (
+                    <div key={field.key} className="min-w-0">
+                      <p className="text-sm font-black text-gray-900 dark:text-text-primary">
+                        [{field.label}]
+                      </p>
+                      <p className="mt-1 text-xs font-semibold leading-5 text-gray-500 dark:text-text-secondary">
+                        {field.hint}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
               <label className="grid gap-1.5">
                 <span className="text-xs font-black uppercase tracking-widest text-gray-400 dark:text-text-tertiary">우선순위</span>
                 <select
@@ -183,7 +189,7 @@ export function InputModal({ title, placeholder, defaultValue = '', confirmText 
               onClick={() => onConfirm(requestForm)}
               className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-black text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 cursor-pointer"
             >
-              개발팀에 요청 보내기
+              요청 문서 만들기
             </button>
           </div>
         </div>

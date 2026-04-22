@@ -16,6 +16,7 @@ import SidebarTree from './SidebarTree';
 import { getDropTypeFromRelativeY, getRelativeY } from './sidebarDropZones';
 import {
   MAIN_BOARD_TYPE,
+  TEAM_OVERVIEW_BOARD_TYPE,
   TEAM_BOARD_TYPES,
   getBoardSectionLabel,
   getDefaultBoardType,
@@ -96,8 +97,10 @@ export default function Sidebar({
     })
   );
   const defaultBoardType = getDefaultBoardType(user);
-  const selectedBoardType = normalizeBoardType(currentBoardType) === MAIN_BOARD_TYPE ? defaultBoardType : normalizeBoardType(currentBoardType);
+  const normalizedCurrentBoardType = normalizeBoardType(currentBoardType);
+  const selectedBoardType = normalizedCurrentBoardType === MAIN_BOARD_TYPE ? defaultBoardType : normalizedCurrentBoardType;
   const isMyTeamBoardActive = selectedBoardType === defaultBoardType;
+  const isIntegratedTeamBoardActive = selectedBoardType === TEAM_OVERVIEW_BOARD_TYPE;
   const isBoardViewActive = activeView === 'board';
 
   useEffect(() => {
@@ -484,16 +487,16 @@ export default function Sidebar({
             <button
               type="button"
               className={`w-full flex items-center justify-between gap-2 px-2 py-[5px] rounded-md text-[13px] font-medium transition-colors duration-100 cursor-pointer text-left ${
-                activeView === 'roadmap'
+                isBoardViewActive && isIntegratedTeamBoardActive
                   ? 'bg-[color:var(--color-bg-hover)] text-[color:var(--color-text-primary)]'
                   : 'text-[color:var(--color-text-secondary)] hover:bg-[color:var(--color-bg-hover)] hover:text-[color:var(--color-text-primary)]'
               }`}
-              onClick={() => onNavigate?.('roadmap')}
+              onClick={() => handleSelectBoardType(TEAM_OVERVIEW_BOARD_TYPE)}
               onPointerDown={stopProp}
             >
               <span className="truncate">통합 팀 보드</span>
               <span className="shrink-0 text-[11px] font-semibold text-[color:var(--color-text-tertiary)]">
-                전사
+                3팀
               </span>
             </button>
 

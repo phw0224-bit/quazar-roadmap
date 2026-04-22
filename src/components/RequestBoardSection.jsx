@@ -117,7 +117,7 @@ function RequestBoardSection({
           </div>
         ) : (
           requests.map((request) => {
-            const requestTeam = request.request_team || '요청팀 미지정';
+            const requestTeam = request.request_team || '요청한 팀 미지정';
             const status = request.status || '접수됨';
             const priority = request.priority || '중간';
             const isNotified = Boolean(request.notified_at);

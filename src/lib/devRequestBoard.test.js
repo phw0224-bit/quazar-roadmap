@@ -6,6 +6,8 @@ import {
   DEV_REQUEST_STATUSES,
   DEV_REQUEST_TABLE,
   DEV_REQUEST_TEMPLATE,
+  createDevRequestDescriptionScaffold,
+  createDevRequestInlinePlaceholders,
   createDevRequestTemplateData,
 } from './devRequestBoard.js';
 
@@ -39,4 +41,12 @@ test('dev request template exposes the expected placeholder fields', () => {
     links: '',
     acceptance: '',
   });
+  assert.equal(
+    createDevRequestDescriptionScaffold(),
+    '## [요청 배경]\n\n## [목표]\n\n## [영향 범위]\n\n## [우선순위]\n\n## [희망 일정]\n\n## [참고 링크]\n\n## [검수 기준]\n',
+  );
+  assert.equal(
+    createDevRequestInlinePlaceholders()['## [요청 배경]'],
+    '- 왜 지금 이 요청이 필요한지 한두 문장으로 적습니다.',
+  );
 });

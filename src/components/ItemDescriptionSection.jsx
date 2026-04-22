@@ -4,7 +4,7 @@
  * 라이브/원문/미리보기 모드, AI 요약, 위키링크 열기, 기존 페이지 연결 모달을 한 곳에서 관리해
  * ItemDetailPanel이 본문 편집 구현 세부사항을 직접 들고 있지 않도록 분리한다.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
   Code2,
   Eye,
@@ -29,7 +29,7 @@ import { ENTITY_TYPES } from '../lib/entityModel';
 import { TAG_CATALOG_BY_NAME } from '../lib/tagCatalog';
 import { getTemplateInlinePlaceholders } from '../lib/itemTemplates';
 
-export default function ItemDescriptionSection({
+const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
   item,
   projectId,
   allItems = [],
@@ -43,7 +43,7 @@ export default function ItemDescriptionSection({
   onShowPrompt,
   editorViewRef,
   onEditorUpdate,
-}) {
+}, ref) {
   const [description, setDescription] = useState(normalizeDescriptionSource(item?.description || ''));
   const [descriptionMode, setDescriptionMode] = useState(() => getInitialDescriptionMode({
     isReadOnly,
@@ -128,7 +128,7 @@ export default function ItemDescriptionSection({
     if (normalizedNext === originalDescription) {
       dirtyDescriptionRef.current = false;
       setHasPendingAutosave(false);
-      return;
+      return true;
     }
 
     const saveGeneration = ++autosaveGenerationRef.current;
@@ -140,9 +140,11 @@ export default function ItemDescriptionSection({
         dirtyDescriptionRef.current = false;
         setHasPendingAutosave(false);
       }
+      return true;
     } catch (error) {
-      if (saveGeneration !== autosaveGenerationRef.current) return;
+      if (saveGeneration !== autosaveGenerationRef.current) return false;
       onShowToast?.(`본문 자동 저장 실패: ${error.message}`, 'error');
+      return false;
     } finally {
       if (saveGeneration === autosaveGenerationRef.current) {
         setIsAutosaving(false);
@@ -194,7 +196,7 @@ export default function ItemDescriptionSection({
     if (description === originalDescription) {
       dirtyDescriptionRef.current = false;
       setHasPendingAutosave(false);
-      return;
+      return true;
     }
     dirtyDescriptionRef.current = true;
 
@@ -203,8 +205,29 @@ export default function ItemDescriptionSection({
       autosaveTimerRef.current = null;
     }
 
-    await saveDescription(description);
+    return saveDescription(description);
   };
+
+  useImperativeHandle(ref, () => ({
+    flushPendingSave: async () => {
+      if (isReadOnly) return true;
+
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
+
+      const normalizedCurrent = normalizeDescriptionSource(description);
+      const normalizedOriginal = normalizeDescriptionSource(item?.description || '');
+      if (!dirtyDescriptionRef.current && normalizedCurrent === normalizedOriginal) {
+        setHasPendingAutosave(false);
+        return true;
+      }
+
+      dirtyDescriptionRef.current = true;
+      return saveDescription(description);
+    },
+  }), [description, isReadOnly, item?.description, saveDescription]);
 
   const handleLinkExistingPage = useCallback((callback) => {
     linkCallbackRef.current = callback;
@@ -525,4 +548,6 @@ export default function ItemDescriptionSection({
       )}
     </>
   );
-}
+});
+
+export default ItemDescriptionSection;

@@ -14,7 +14,7 @@ test('getDevRequestSubmissionMissingFields reports required request fields', () 
       request_team: null,
       priority: '높음',
     }),
-    ['본문', '요청팀']
+    ['본문']
   );
 });
 

@@ -17,7 +17,7 @@ export function buildDevRequestDetailUrl(requestId) {
 
 export function buildDevRequestChatMessage({ request, creatorName }) {
   const title = normalizeText(request?.title, '제목 없음');
-  const requestTeam = normalizeText(request?.request_team, '요청팀 미지정');
+  const requestTeam = normalizeText(request?.request_team, '요청한 팀 미지정');
   const status = normalizeText(request?.status, '접수됨');
   const priority = normalizeText(request?.priority, '중간');
   const author = normalizeText(creatorName, '알 수 없음');
@@ -28,7 +28,7 @@ export function buildDevRequestChatMessage({ request, creatorName }) {
     '개발팀 요청이 제출되었습니다.',
     '',
     `제목: ${title}`,
-    `요청팀: ${requestTeam}`,
+    `요청한 팀: ${requestTeam}`,
     `상태: ${status}`,
     `우선순위: ${priority}`,
     `작성자: ${author}`,

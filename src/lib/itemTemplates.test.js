@@ -30,6 +30,14 @@ test('returns inline guidance placeholders separate from scaffold content', () =
   assert.equal(placeholders['## [결과]'], '- 완료 내용, 현재 상태, 남은 액션, 참고 링크');
 });
 
+test('returns request scaffold with bracketed editable sections', () => {
+  const scaffold = getTemplateScaffold('request');
+  const placeholders = getTemplateInlinePlaceholders('request');
+
+  assert.match(scaffold, /## \[요청 배경\]\n\n## \[목표\]/);
+  assert.equal(placeholders['## [검수 기준]'], '- 완료 여부를 판단할 수 있는 조건을 적습니다.');
+});
+
 test('returns empty values for unknown template types', () => {
   assert.equal(getTemplateScaffold('unknown'), '');
   assert.deepEqual(getTemplateInlinePlaceholders('unknown'), {});

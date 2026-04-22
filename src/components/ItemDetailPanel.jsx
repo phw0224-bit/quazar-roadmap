@@ -117,12 +117,12 @@ function ItemDetailPanel({
   const assigneeCount = isRequest ? 0 : (item.assignees || []).length;
   const teamCount = isRequest ? (item.request_team ? 1 : 0) : (item.teams || []).length;
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  const descriptionSectionRef = useRef(null);
   const headerIconButtonClass = 'p-1.5 rounded-lg text-gray-400 hover:text-gray-900 dark:text-text-tertiary dark:hover:text-text-primary hover:bg-gray-100 dark:hover:bg-bg-hover transition-colors cursor-pointer';
   const headerToggleButtonClass = 'p-1.5 rounded-lg transition-colors cursor-pointer';
   const missingRequestFields = [
     [item.title || item.content, '제목'],
     [item.description, '본문'],
-    [item.request_team, '요청팀'],
     [item.priority, '우선순위'],
   ].filter(([value]) => !`${value || ''}`.trim()).map(([, label]) => label);
   const isRequestNotified = Boolean(item.notified_at);
@@ -238,16 +238,34 @@ function ItemDetailPanel({
 
     if (nextTitle === currentTitle) {
       setIsEditingTitle(false);
-      return;
+      return true;
     }
 
     try {
       await onUpdateItem(itemProjectId, item.id, { title: nextTitle });
       onShowToast?.('제목이 업데이트되었습니다.');
       setIsEditingTitle(false);
+      return true;
     } catch (error) {
       onShowToast?.(`제목 업데이트 실패: ${error.message}`, 'error');
+      return false;
     }
+  };
+
+  const handleClose = async () => {
+    if (isReadOnly) {
+      onClose();
+      return;
+    }
+
+    const titleSaved = await handleSaveTitle();
+    const descriptionSaved = await descriptionSectionRef.current?.flushPendingSave?.();
+
+    if (titleSaved === false || descriptionSaved === false) {
+      return;
+    }
+
+    onClose();
   };
 
   const handleSaveAssignees = async (updatedAssignees, updatedUserIds) => {
@@ -457,7 +475,7 @@ function ItemDetailPanel({
         <div className="bg-white/80 dark:bg-bg-base/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 dark:border-border-subtle">
           <div className="px-6 py-2.5 flex items-center gap-3">
             <div className="flex items-center gap-1 shrink-0">
-              <button onClick={onClose} className={headerIconButtonClass}>
+              <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={handleClose} className={headerIconButtonClass}>
                 <X size={17} strokeWidth={2.4} />
               </button>
               <button
@@ -510,7 +528,7 @@ function ItemDetailPanel({
                 {requestStatusLabel}
               </span>
               <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-50 dark:bg-bg-hover text-gray-500 dark:text-text-secondary border border-gray-200 dark:border-border-subtle tabular-nums">
-                요청팀 {teamCount}
+                요청한 팀 {teamCount}
               </span>
             </div>
           </div>
@@ -550,7 +568,7 @@ function ItemDetailPanel({
                       <p className="mt-1 text-xs font-semibold text-amber-800/75 dark:text-amber-200/75">
                         {missingRequestFields.length > 0
                           ? `필수 입력: ${missingRequestFields.join(', ')}`
-                          : '제목, 본문, 요청팀, 우선순위가 저장된 뒤 전송할 수 있습니다.'}
+                          : '제목, 본문, 우선순위가 저장된 뒤 전송할 수 있습니다.'}
                       </p>
                     </div>
                     <button
@@ -595,7 +613,7 @@ function ItemDetailPanel({
                 <div className="flex items-start min-h-[48px] group">
                   <div className="w-48 flex items-center gap-3 text-gray-400 dark:text-text-tertiary shrink-0 pt-2.5">
                     <Building2 size={18} strokeWidth={2.5} />
-                    <span className="text-[13px] font-black uppercase tracking-widest">요청팀</span>
+                    <span className="text-[13px] font-black uppercase tracking-widest">요청한 팀</span>
                   </div>
                   <div className="flex-1 px-3 py-2 rounded-xl hover:bg-white dark:hover:bg-bg-hover transition-all flex flex-wrap gap-2 min-h-[40px] items-center">
                     {TEAMS.map((team) => (
@@ -632,6 +650,7 @@ function ItemDetailPanel({
               </div>
 
               <ItemDescriptionSection
+                ref={descriptionSectionRef}
                 item={item}
                 projectId={itemProjectId}
                 allItems={allItems}
@@ -660,7 +679,7 @@ function ItemDetailPanel({
         <ItemViewers itemId={item.id} />
         <div className="px-6 py-2.5 flex items-center gap-3">
           <div className="flex items-center gap-1 shrink-0">
-            <button onClick={onClose} className={headerIconButtonClass}>
+            <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={handleClose} className={headerIconButtonClass}>
               <X size={17} strokeWidth={2.4} />
             </button>
             <button
@@ -894,7 +913,7 @@ function ItemDetailPanel({
               <div className="flex items-start min-h-[48px] group">
                 <div className="w-48 flex items-center gap-3 text-gray-400 dark:text-text-tertiary shrink-0 pt-2.5">
                   <Building2 size={18} strokeWidth={2.5} />
-                  <span className="text-[13px] font-black uppercase tracking-widest">{isRequest ? '요청팀' : '관련 팀'}</span>
+                  <span className="text-[13px] font-black uppercase tracking-widest">{isRequest ? '요청한 팀' : '관련 팀'}</span>
                 </div>
                 <div className="flex-1 px-3 py-2 rounded-xl hover:bg-white dark:hover:bg-bg-hover transition-all flex flex-wrap gap-2 min-h-[40px] items-center">
                   {TEAMS.map(team => (
@@ -1259,6 +1278,7 @@ function ItemDetailPanel({
 
           {/* Description Section */}
           <ItemDescriptionSection
+            ref={descriptionSectionRef}
             item={item}
                 projectId={itemProjectId}
             allItems={allItems}

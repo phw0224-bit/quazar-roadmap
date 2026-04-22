@@ -52,6 +52,6 @@ return data;
 - `getPersonalMemos()` 계열은 더 이상 `roadmap_items.is_private`에 의존하지 않고 전용 `personal_memos` 저장소를 사용한다.
 - 담당자 저장은 `assignees` 표시 이름 배열과 `assignee_user_ids` 식별자 배열을 함께 동기화한다.
 - 담당자 변경 알림은 `updateItem()` / `updateProject()`에서 assignee diff를 계산한 뒤 `POST /api/notifications/assignments`로 전달한다.
-- 개발팀 요청 알림은 `createTeamRequest()`가 insert 성공 후 `POST /api/notifications/dev-requests`를 호출해 Google Chat incoming webhook으로 전달한다.
+- 개발팀 요청 알림은 작성 폼 제출 후 `submitTeamRequest()`가 `POST /api/notifications/dev-requests`를 호출해 Google Chat incoming webhook으로 전달한다.
 - 알림 저장소는 `notifications` 테이블을 기준으로 설계하며, 쓰기는 Express 서버의 service-role 경로를 통하고 읽기 권한은 수신자 본인으로 제한한다.
 - 클라이언트 알림함은 `getNotifications()`, `markNotificationsAsRead()`, `markAllNotificationsAsRead()`로 최근 알림 조회와 읽음 처리를 수행한다.
