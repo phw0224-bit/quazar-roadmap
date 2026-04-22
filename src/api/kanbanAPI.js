@@ -281,50 +281,48 @@ const supabaseAPI = {
    * projects: 각 project에 items 배열 내장, items에 comments(with profiles) 배열 내장
    */
   getBoardData: async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const isAuthenticated = Boolean(user);
-
-    // 1+2: projects, roadmap_projects, items, roadmap_items 병렬 조회
-    const [
-      { data: teamProjects, error: pError },
-      { data: mainProjects, error: rpError },
-      { data: teamItems, error: iError },
-      { data: mainItemsData, error: riError },
-    ] = await Promise.all([
+    const sessionPromise = supabase.auth.getSession();
+    const coreDataPromise = Promise.all([
       supabase.from('projects').select('*').order('order_index', { ascending: true }),
       supabase.from('roadmap_projects').select('*').order('order_index', { ascending: true }),
       supabase.from('items').select(`*, comments (*, profiles (name, department))`).order('order_index', { ascending: true }),
       supabase.from('roadmap_items').select('*').order('order_index', { ascending: true }),
+      supabase.from('items').select(`*, comments (*, profiles (name, department))`).is('project_id', null).in('page_type', ['page', 'folder']).order('board_type', { ascending: true }).order('order_index', { ascending: true }),
+      supabase.from('roadmap_items').select('*').is('project_id', null).in('page_type', ['page', 'folder']).order('order_index', { ascending: true }),
+      supabase.from('profiles').select('id, name, department'),
+      supabase.from('sections').select('*').order('order_index', { ascending: true }),
     ]);
+
+    const [
+      {
+        data: { session },
+      },
+      [
+        { data: teamProjects, error: pError },
+        { data: mainProjects, error: rpError },
+        { data: teamItems, error: iError },
+        { data: mainItemsData, error: riError },
+        { data: teamGeneralDocs, error: docError },
+        { data: mainGeneralDocs, error: rdocError },
+        { data: profiles, error: profileError },
+        { data: sections, error: sError },
+      ],
+    ] = await Promise.all([sessionPromise, coreDataPromise]);
+    const isAuthenticated = Boolean(session?.user);
+
     if (pError) throw pError;
     if (rpError) throw rpError;
     if (iError) throw iError;
     if (riError) throw riError;
+    if (docError) throw docError;
+    if (rdocError) throw rdocError;
+    if (profileError) throw profileError;
+    if (sError) throw sError;
 
     const allProjects = [...(mainProjects || []), ...(teamProjects || [])];
     const mainProjectIds = new Set((mainProjects || []).map((project) => project.id));
 
-    // 2.5 일반 문서 + 폴더 가져오기 (project_id=null, page_type='page'|'folder')
-    // 최상위 + 자식 문서/폴더 모두 포함 (GeneralDocumentSection에서 트리 구조 생성)
-    const [
-      { data: teamGeneralDocs, error: docError },
-      { data: mainGeneralDocs, error: rdocError },
-    ] = await Promise.all([
-      supabase.from('items').select(`*, comments (*, profiles (name, department))`).is('project_id', null).in('page_type', ['page', 'folder']).order('board_type', { ascending: true }).order('order_index', { ascending: true }),
-      supabase.from('roadmap_items').select('*').is('project_id', null).in('page_type', ['page', 'folder']).order('order_index', { ascending: true }),
-    ]);
-    if (docError) throw docError;
-    if (rdocError) throw rdocError;
-
     const generalDocItems = [...(mainGeneralDocs || []), ...(teamGeneralDocs || [])];
-
-    const { data: profiles, error: profileError } = await supabase
-      .from('profiles')
-      .select('id, name, department');
-
-    if (profileError) throw profileError;
 
     let customizationRows = [];
     if (isAuthenticated) {
@@ -337,13 +335,6 @@ const supabaseAPI = {
         customizationRows = customizationData || [];
       }
     }
-
-    // 3. 섹션 가져오기
-    const { data: sections, error: sError } = await supabase
-      .from('sections')
-      .select('*')
-      .order('order_index', { ascending: true });
-    if (sError) throw sError;
 
     const customizationsByUserId = new Map(
       customizationRows.map((row) => [row.user_id, normalizeProfileCustomization(row)])
@@ -419,13 +410,13 @@ const supabaseAPI = {
       if (requestDocError) throw requestDocError;
 
       formattedRequestDocs = (teamRequestDocs || []).map((request) => ({
-        ...request,
-        template_data: request.template_data || createDevRequestTemplateData(),
-        creator_profile: request.created_by ? profilesById.get(request.created_by) || null : null,
-      }));
+          ...request,
+          template_data: request.template_data || createDevRequestTemplateData(),
+          creator_profile: request.created_by ? profilesById.get(request.created_by) || null : null,
+        }));
     } catch (requestError) {
       if (requestError?.code !== '42P01') {
-        throw requestError;
+        console.warn('[getBoardData] team_requests 조회 실패:', requestError.message);
       }
     }
 
@@ -963,6 +954,30 @@ const supabaseAPI = {
       description: data?.description ?? '',
       pinned_doc_ids: data?.pinned_doc_ids ?? [],
     };
+  },
+
+  getTeamBoardConfigs: async (boardTypes = []) => {
+    const defaults = Object.fromEntries(
+      boardTypes.map((boardType) => [boardType, { description: '', pinned_doc_ids: [] }])
+    );
+
+    const { data, error } = await supabase
+      .from('team_boards')
+      .select('board_type, description, pinned_doc_ids')
+      .in('board_type', boardTypes);
+
+    if (error) {
+      console.warn('[getTeamBoardConfigs] team_boards 조회 실패:', error.message);
+      return defaults;
+    }
+
+    return (data || []).reduce((configs, row) => {
+      configs[row.board_type] = {
+        description: row.description ?? '',
+        pinned_doc_ids: row.pinned_doc_ids ?? [],
+      };
+      return configs;
+    }, defaults);
   },
 
   upsertTeamBoardConfig: async (boardType, updates) => {

@@ -30,6 +30,8 @@ const INITIAL_STATE = {
   currentBoardType: 'main',  // 현재 선택된 팀별 보드
 };
 
+const BOARD_TYPES = ['main', '개발팀', 'AI팀', '기획팀', '지원팀', '감정팀'];
+
 /**
  * @description 칸반 보드의 모든 상태 변경을 처리하는 순수 함수.
  *
@@ -311,21 +313,23 @@ export const useKanbanData = () => {
   const [state, dispatch] = useReducer(kanbanReducer, INITIAL_STATE);
   const fetchRequestIdRef = useRef(0);
 
+  const fetchTeamBoardConfigs = useCallback(async () => {
+    try {
+      const configs = await API.getTeamBoardConfigs(BOARD_TYPES);
+      dispatch({
+        type: 'SET_TEAM_BOARDS',
+        payload: configs,
+      });
+    } catch (err) {
+      console.warn('[useKanbanData] 팀 보드 설정 조회 실패:', err.message);
+    }
+  }, []);
+
   const fetchData = useCallback(async () => {
     const requestId = ++fetchRequestIdRef.current;
 
     try {
       const data = await API.getBoardData();
-
-      // team_boards 설정 병렬 로드
-      const boardTypes = ['main', '개발팀', 'AI팀', '기획팀', '지원팀', '감정팀'];
-      const configEntries = await Promise.all(
-        boardTypes.map(async (bt) => {
-          const config = await API.getTeamBoardConfig(bt);
-          return [bt, { description: config.description, pinned_doc_ids: config.pinned_doc_ids }];
-        })
-      );
-      const teamBoardsConfig = Object.fromEntries(configEntries);
 
       if (requestId !== fetchRequestIdRef.current) return;
 
@@ -338,10 +342,6 @@ export const useKanbanData = () => {
           requestDocs: data.requestDocs || [],
         }
       });
-      dispatch({
-        type: 'SET_TEAM_BOARDS',
-        payload: teamBoardsConfig
-      });
     } catch (err) {
       if (requestId !== fetchRequestIdRef.current) return;
       dispatch({ type: 'SET_ERROR', payload: err.message });
@@ -350,6 +350,7 @@ export const useKanbanData = () => {
 
   useEffect(() => {
     fetchData();
+    fetchTeamBoardConfigs();
 
     const fetchCommentWithProfile = async (commentId) => {
       const { data, error } = await supabase
@@ -419,7 +420,7 @@ export const useKanbanData = () => {
       supabase.removeChannel(projectsChannel);
       supabase.removeChannel(profileCustomizationChannel);
     };
-  }, [fetchData]);
+  }, [fetchData, fetchTeamBoardConfigs]);
 
   /**
    * @description 새 칸반 컬럼(프로젝트)을 추가. order_index는 현재 최대값+1 자동 계산.
