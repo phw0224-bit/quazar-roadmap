@@ -8,7 +8,7 @@
 
 ## 프로젝트 개요
 
-**목적**  
+**목적**
 5개 팀(감정/개발/AI/기획/지원)의 협업 로드맵 관리 시스템
 
 **주요 특징**
@@ -123,10 +123,13 @@ Google Chat Bot (:3002)
 
 ## 배포
 
-**Supabase 마이그레이션:**  
+**Supabase 마이그레이션:**
 Supabase 대시보드 SQL Editor에서 직접 실행
 
-**Google Chat Bot:**  
+**로컬 Supabase 이전:**
+[docs/LOCAL_SUPABASE_MIGRATION.md](./docs/LOCAL_SUPABASE_MIGRATION.md)에 Cloud Supabase 덤프, Docker 로컬 Supabase 시작, 데이터 복원 절차를 정리
+
+**Google Chat Bot:**
 ngrok 또는 Cloudflare Tunnel로 외부 노출 필요
 
 ---

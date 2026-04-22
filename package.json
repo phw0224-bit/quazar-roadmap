@@ -11,7 +11,13 @@
     "preview": "vite preview --port 1234",
     "server": "node server/index.js",
     "dev:all": "concurrently --names \"WEB,SRV\" --prefix-colors \"cyan,yellow\" --kill-others-on-fail \"yarn dev\" \"yarn server\"",
-    "prod:all": "yarn build && concurrently --names \"WEB,SRV\" --prefix-colors \"cyan,yellow\" --kill-others-on-fail \"yarn preview\" \"yarn server\""
+    "prod:all": "yarn build && concurrently --names \"WEB,SRV\" --prefix-colors \"cyan,yellow\" --kill-others-on-fail \"yarn preview\" \"yarn server\"",
+    "supabase:selfhost:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-supabase-selfhost.ps1",
+    "supabase:selfhost:up": "docker compose --env-file infra/supabase-selfhost/.env -f infra/supabase-selfhost/docker-compose.yml up -d",
+    "supabase:selfhost:down": "docker compose --env-file infra/supabase-selfhost/.env -f infra/supabase-selfhost/docker-compose.yml down",
+    "supabase:selfhost:ps": "docker compose --env-file infra/supabase-selfhost/.env -f infra/supabase-selfhost/docker-compose.yml ps",
+    "supabase:export": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/export-supabase-cloud.ps1",
+    "supabase:restore": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/restore-local-supabase.ps1"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",

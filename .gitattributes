@@ -1,0 +1,5 @@
+infra/supabase-selfhost/**/*.sh text eol=lf
+infra/supabase-selfhost/**/*.sql text eol=lf
+infra/supabase-selfhost/**/*.yml text eol=lf
+infra/supabase-selfhost/**/*.yaml text eol=lf
+infra/supabase-selfhost/volumes/api/envoy/*.yaml text eol=lf

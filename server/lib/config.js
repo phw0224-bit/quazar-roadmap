@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.join(__dirname, '..', '..');
 
-function loadEnvFile(filePath) {
+function loadEnvFile(filePath, { override = false } = {}) {
   if (!fs.existsSync(filePath)) return;
 
   const content = fs.readFileSync(filePath, 'utf8');
@@ -18,7 +18,7 @@ function loadEnvFile(filePath) {
     if (equalIndex === -1) continue;
 
     const key = line.slice(0, equalIndex).trim();
-    if (!key || process.env[key] !== undefined) continue;
+    if (!key || (!override && process.env[key] !== undefined)) continue;
 
     let value = line.slice(equalIndex + 1).trim();
     if (
@@ -33,7 +33,7 @@ function loadEnvFile(filePath) {
 }
 
 loadEnvFile(path.join(ROOT_DIR, '.env'));
-loadEnvFile(path.join(ROOT_DIR, '.env.local'));
+loadEnvFile(path.join(ROOT_DIR, '.env.local'), { override: true });
 
 export const PORT = 3001;
 export const APP_BASE_URL = process.env.APP_BASE_URL || 'http://localhost:5173';

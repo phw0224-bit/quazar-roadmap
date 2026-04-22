@@ -24,6 +24,7 @@ dist-ssr
 *.sw?
 
 .env
+!.env.local.example
 node_modules/
 .bkit/
 .gemini/
