@@ -66,6 +66,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
 
   const isMemo = entityContext?.type === ENTITY_TYPES.MEMO;
   const isRequest = entityContext?.type === ENTITY_TYPES.REQUEST;
+  const isEditorMode = descriptionMode === 'live' || descriptionMode === 'source';
 
   useEffect(() => {
     setDescriptionMode(getInitialDescriptionMode({
@@ -135,7 +136,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
     setIsAutosaving(true);
 
     try {
-      await onUpdateItem(projectId, item.id, { description: nextDescription });
+      await onUpdateItem(projectId, item.id, { description: normalizedNext });
       if (saveGeneration === autosaveGenerationRef.current) {
         dirtyDescriptionRef.current = false;
         setHasPendingAutosave(false);
@@ -153,8 +154,8 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
   }, [item?.description, item.id, onShowToast, onUpdateItem, projectId]);
 
   useEffect(() => {
-    const showEditorPane = !isReadOnly && (descriptionMode === 'live' || descriptionMode === 'source');
-    if (!showEditorPane || !dirtyDescriptionRef.current) return undefined;
+    const showEditorPane = !isReadOnly && isEditorMode;
+    if (!dirtyDescriptionRef.current) return undefined;
 
     const normalizedCurrent = normalizeDescriptionSource(description);
     const normalizedOriginal = normalizeDescriptionSource(item?.description || '');
@@ -167,6 +168,12 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
 
     if (autosaveTimerRef.current) {
       clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+
+    if (!showEditorPane) {
+      void saveDescription(description);
+      return undefined;
     }
 
     autosaveTimerRef.current = window.setTimeout(() => {
@@ -180,12 +187,12 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
         autosaveTimerRef.current = null;
       }
     };
-  }, [description, descriptionMode, isReadOnly, item?.description, saveDescription]);
+  }, [description, isEditorMode, isReadOnly, item?.description, saveDescription]);
 
   useEffect(() => {
-    const showEditorPane = !isReadOnly && (descriptionMode === 'live' || descriptionMode === 'source');
+    const showEditorPane = !isReadOnly && isEditorMode;
     onEditingChange?.(showEditorPane && isEditorFocused);
-  }, [descriptionMode, isEditorFocused, isReadOnly, onEditingChange]);
+  }, [isEditorFocused, isEditorMode, isReadOnly, onEditingChange]);
 
   useEffect(() => () => {
     onEditingChange?.(false);
@@ -496,7 +503,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
         )}
 
         <div className="grid grid-cols-1 gap-4">
-          {(!isReadOnly && (descriptionMode === 'live' || descriptionMode === 'source')) && (
+          {(!isReadOnly && isEditorMode) && (
             <MarkdownEditor
               key={`editor-${item.id}`}
               content={description}

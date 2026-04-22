@@ -304,7 +304,7 @@ const supabaseAPI = {
     if (riError) throw riError;
 
     const allProjects = [...(mainProjects || []), ...(teamProjects || [])];
-    const allItems = [...(mainItemsData || []), ...(teamItems || [])];
+    const mainProjectIds = new Set((mainProjects || []).map((project) => project.id));
 
     // 2.5 일반 문서 + 폴더 가져오기 (project_id=null, page_type='page'|'folder')
     // 최상위 + 자식 문서/폴더 모두 포함 (GeneralDocumentSection에서 트리 구조 생성)
@@ -363,7 +363,7 @@ const supabaseAPI = {
       ...project,
       assignees: Array.isArray(project.assignees) ? project.assignees : [],
       assignee_user_ids: Array.isArray(project.assignee_user_ids) ? project.assignee_user_ids : [],
-      items: allItems
+      items: (mainProjectIds.has(project.id) ? (mainItemsData || []) : (teamItems || []))
         .filter(item => item.project_id === project.id)
         .sort((a, b) => a.order_index - b.order_index)
         .map(item => ({
@@ -575,6 +575,9 @@ const supabaseAPI = {
       .maybeSingle();
 
     if (existingError) throw existingError;
+    if (!existingProject) {
+      throw new Error(`프로젝트를 찾지 못해 업데이트하지 못했습니다. (${tableName}:${projectId})`);
+    }
 
     const normalizedUpdates = await resolveAssigneeFields(updates);
     const { data, error } = await supabase
@@ -739,10 +742,14 @@ const supabaseAPI = {
       .from(tableName)
       .update(normalizedUpdates)
       .eq('id', itemId)
-      .select();
+      .select()
+      .maybeSingle();
     
     if (error) throw error;
-    const updatedItem = data[0];
+    if (!data) {
+      throw new Error(`아이템을 찾지 못해 업데이트하지 못했습니다. (${tableName}:${itemId})`);
+    }
+    const updatedItem = data;
 
     if (Object.prototype.hasOwnProperty.call(normalizedUpdates, 'assignee_user_ids') && updatedItem) {
       const addedAssigneeUserIds = diffAddedAssigneeUserIds(
