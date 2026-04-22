@@ -9,6 +9,78 @@ export const RELEASE_NOTES_STORAGE_KEY = 'kanban-release-notes-last-seen';
 
 export const RELEASE_NOTES = [
   {
+    id: '2026-04-22-editor-light-theme',
+    version: 'v0.10.4',
+    title: '상세내용 라이트 모드 가독성 개선',
+    description: 'Markdown 라이브 프리뷰 에디터가 라이트 모드에서도 자연스럽게 보이도록 색상 체계를 분리했습니다.',
+    sections: [
+      {
+        title: '변경',
+        items: [
+          'CodeMirror 에디터가 현재 테마를 따라 라이트/다크 테마를 선택하도록 변경',
+          '라이브 프리뷰 헤딩, 강조, 링크, 인라인 코드, 하이라이트 색상을 라이트 모드에 맞게 재정의',
+          '콜아웃, 테이블, Mermaid wrapper 배경/테두리를 라이트 모드와 다크 모드로 분리',
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026-04-22-github-issue-creation-flow',
+    version: 'v0.10.3',
+    title: 'GitHub 이슈 생성 흐름 정리',
+    description: '아이템 상세에서 GitHub 영역을 기본 노출하지 않고, 필요한 순간에만 모달로 레포를 선택해 이슈를 만들도록 정리했습니다.',
+    sections: [
+      {
+        title: '변경',
+        items: [
+          '아이템 속성 박스의 빈 GitHub 영역 제거',
+          '제목 아래 보조 액션 버튼에서 GitHub 이슈 생성 모달을 열도록 변경',
+          '모달에서 GitHub 연결 상태, App 설치 상태, 레포지토리 드롭다운, 기존 연결 이슈를 한 번에 확인',
+          '이미 연결된 이슈가 있는 아이템은 속성 박스 안에 GitHub 이슈 링크를 표시',
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026-04-22-relation-search-scope',
+    version: 'v0.10.2',
+    title: '연관 업무 검색 범위 조정',
+    description: '아이템 연관 업무 연결 시 전사 로드맵 전용 테이블 데이터가 후보에 섞이지 않도록 검색 범위를 제한했습니다.',
+    sections: [
+      {
+        title: '변경',
+        items: [
+          '연관 업무 검색 후보를 팀 보드 아이템/팀 문서/개인 메모로 제한',
+          'roadmap_items, roadmap_projects 기반 전사 로드맵 데이터는 연관 업무 신규 연결 후보에서 제외',
+          '기존에 연결된 항목 표시와 백링크 조회는 그대로 유지',
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026-04-22-self-hosted-supabase-and-logs',
+    version: 'v0.10.1',
+    title: 'Self-host Supabase 운영 준비',
+    description: 'Cloud Supabase에서 Docker 기반 self-host Supabase로 이전하기 위한 스크립트와 운영 문서를 추가하고, 서버 인증 로그를 정리했습니다.',
+    sections: [
+      {
+        title: '추가',
+        items: [
+          'Docker Compose 기반 self-host Supabase 구성 추가',
+          'Cloud Supabase dump/export 및 local restore 스크립트 추가',
+          '서버 배포용 self-host Supabase 운영 절차 문서화',
+        ],
+      },
+      {
+        title: '변경',
+        items: [
+          'Express 인증 성공 로그 반복 출력 제거',
+          'Supabase 환경변수를 self-host API 도메인 기준으로 운영할 수 있도록 예시 정리',
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-04-21-dev-request-board',
     version: 'v0.10.0',
     title: '개발팀 요청 보드',

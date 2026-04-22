@@ -1,6 +1,6 @@
 # Quazar Roadmap — Project Map
 
-> AI/MCP 세션이 빠르게 컨텍스트를 파악하기 위한 프로젝트 지도 (2026-04-03)
+> AI/MCP 세션이 빠르게 컨텍스트를 파악하기 위한 프로젝트 지도 (2026-04-22)
 
 ---
 
@@ -15,6 +15,8 @@
 - 이중 아이템: 칸반 카드(`page_type=null`) + 문서 페이지(`page_type='page'`)
 - 비로그인 공개 읽기 (`isReadOnly=true` → 편집 UI 숨김)
 - Ollama 로컬 AI 요약 (없으면 503)
+- GitHub App/OAuth 연동: 레포 대시보드 + 아이템 기준 이슈 생성
+- Docker self-host Supabase 운영 (Cloud Supabase 덤프/복원 스크립트 포함)
 - 한국어 우선 UI
 
 ---
@@ -28,13 +30,19 @@ Browser (React 19, Vite 8, :5173)
        ├── KanbanBoard (뷰 오케스트레이터: board/timeline/people)
        │    ├── BoardSection → ProjectColumn → KanbanCard
        │    ├── TimelineView, PeopleBoard
-       │    ├── ItemDetailPanel → Editor (Tiptap)
+       │    ├── ItemDetailPanel → Editor (CodeMirror Markdown live preview)
        │    └── FilterBar, SearchModal, PresenceAvatars
        └── useKanbanData/usePresence → kanbanAPI (Supabase)
 
 Express (:3001)
   ├── POST /upload/:itemId (multer → uploads/)
-  └── POST /api/summarize (Ollama 프록시)
+  ├── POST /api/summarize (Ollama 프록시)
+  └── /api/github/*, /api/notifications/* (GitHub/알림 서버 경로)
+
+Supabase self-host (Docker)
+  ├── Kong/API (:8000)
+  ├── Studio (:3000)
+  └── Postgres (:5432, 외부 공개 금지)
 
 Google Chat Bot (:3002) → 웹훅 → Ollama NLU → Supabase
 ```
@@ -51,9 +59,9 @@ Google Chat Bot (:3002) → 웹훅 → Ollama NLU → Supabase
 | React 19 | Concurrent features |
 | Vite 8 | HMR, Tailwind v4 플러그인 |
 | Tailwind v4 | Utility-first, dark: 다크모드 |
-| Tiptap v3 | ProseMirror, 확장 커스텀 용이 |
+| CodeMirror 6 | Markdown source + live preview 상세내용 편집 |
 | @dnd-kit | 접근성 고려 DnD |
-| Supabase | PostgreSQL + Realtime |
+| Self-host Supabase | PostgreSQL + Realtime |
 | Ollama | 로컬 LLM (qwen2.5:14b) |
 
 ---
@@ -70,6 +78,11 @@ items          -- 카드 또는 페이지
   └── created_by (auth.users.id)
 comments       -- 댓글 (item_id, user_id, content)
 profiles       -- 사용자 프로필 (name, department)
+roadmap_projects -- 전사 로드맵 전용 프로젝트 테이블
+roadmap_items    -- 전사 로드맵 전용 아이템/문서 테이블
+personal_memos   -- 개인 메모 전용 저장소
+team_requests    -- 개발팀 요청 문서
+item_github_issues, github_repository_settings -- GitHub 이슈/레포 티켓 설정
 ```
 
 **핵심 필드:**
@@ -77,8 +90,10 @@ profiles       -- 사용자 프로필 (name, department)
 - `assignees`: profiles.name 직접 저장, 미매칭 시 'name:{값}'
 - `is_completed`: true → 보드 하단 완료 영역 분리
 - `ai_summary`: { summary, blocks: [{ id, summary }], generatedAt }
+- `roadmap_items`/`roadmap_projects`: 전사 로드맵 뷰 전용, 팀 보드 관계 검색 후보에서는 제외
+- `item_github_issues`: 아이템과 GitHub 이슈 연결 정보, 이미 연결된 이슈는 상세 속성 박스에 표시
 
-[상세: docs/DATA_MODEL.md]
+상세 데이터 모델은 이 섹션과 `src/api/kanbanAPI.js`를 기준으로 유지한다.
 
 ---
 
@@ -89,9 +104,11 @@ profiles       -- 사용자 프로필 (name, department)
 - **order_index:** 이동 시 배열 전체 재계산 (0부터 연속)
 - **완료 프로젝트:** pre_completion_section_id/order_index에 복귀 위치 저장
 - **related_items:** 양방향 목표 (현재 단방향 + 하위 페이지 생성 시만 양방향)
+- **연관 업무 검색:** 팀 보드 아이템/팀 문서/개인 메모만 신규 연결 후보로 사용하고 전사 로드맵 테이블은 제외
+- **GitHub 이슈 생성:** 상세 제목 아래 보조 액션 → 모달에서 레포 선택 → 이슈 생성, 기존 연결 이슈가 있으면 속성 박스에만 표시
 - **Sidebar:** main 보드 제외, parent_item_id/project_id/order_index 함께 갱신
 
-[상세: docs/BUSINESS_RULES.md]
+상세 비즈니스 규칙은 이 섹션과 관련 API/컴포넌트 JSDoc을 기준으로 유지한다.
 
 ---
 
@@ -116,7 +133,12 @@ profiles       -- 사용자 프로필 (name, department)
 - Editor HTML → Ollama → { summary, blocks } → items.ai_summary
 - [N] 클릭 → #ai-block-N 스크롤
 
-[상세: docs/FLOWS.md]
+**GitHub 이슈 생성:**
+- ItemDetailPanel에서 GitHub 액션 버튼 클릭 → 생성 모달
+- 연결 상태/App 설치 상태 확인 → 레포 드롭다운 선택 → Express `/api/github/issues`
+- 생성 성공 시 `item_github_issues` 링크 추가, 기존 이슈는 속성 박스 GitHub 행에 표시
+
+상세 플로우는 이 섹션과 `src/hooks/useKanbanData.js`, `src/components/KanbanBoard.jsx`를 기준으로 유지한다.
 
 ---
 
@@ -129,7 +151,7 @@ components/
   ├── ItemDetailPanel, ItemDescriptionSection
   ├── FilterBar, SearchModal, TimelineView, PeopleBoard
   ├── Sidebar, SidebarTree, ReleaseNotesModal
-  └── editor/ (Editor, extensions/)
+  └── editor/ (CodeMirror Markdown Editor, toolbar, live preview utils)
 
 hooks/
   ├── useKanbanData (전체 상태)
@@ -143,7 +165,7 @@ api/
   └── summarizeAPI
 
 lib/
-  ├── constants, releaseNotes, supabase
+  ├── constants, releaseNotes, supabase, boardNavigation
 ```
 
 **핵심 Props:**
@@ -174,11 +196,13 @@ lib/
 
 ## 9. Dev Guide
 
-**실행:** `yarn dev:all` (프론트 5173 + Express 3001)  
-**환경변수:** VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY  
-**파일 경로:** uploads/{itemId}/ → public/uploads/{itemId}/  
-**Supabase 마이그레이션:** 대시보드 SQL 직접 실행  
-**Google Chat Bot:** .env (SUPABASE_URL, SERVICE_KEY, OLLAMA_URL), ngrok 외부 노출
+**실행:** `yarn dev:all` (프론트 5173 + Express 3001)
+**환경변수:** VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY
+**파일 경로:** uploads/{itemId}/ → public/uploads/{itemId}/
+**Supabase self-host:** `yarn supabase:selfhost:setup`, `yarn supabase:selfhost:up`, `yarn supabase:restore`
+**Cloud dump:** `SUPABASE_CLOUD_DB_URL` 설정 후 `yarn supabase:export`
+**운영 노출:** Postgres 포트는 외부 공개 금지, Supabase API(Kong)와 앱/API만 HTTPS 도메인 연결
+**Google Chat Bot:** .env (SUPABASE_URL, SERVICE_KEY, OLLAMA_URL), ngrok/Cloudflare Tunnel 외부 노출
 
 ---
 
@@ -187,7 +211,7 @@ lib/
 - **Phase 6:** @멘션 + Google Chat 알림 (Express /api/notify)
 - **Phase 7:** 커스텀 속성 시스템 (item_properties, item_property_values)
 
-[상세: docs/ROADMAP.md]
+로드맵은 이 섹션과 릴리즈 노트(`src/lib/releaseNotes.js`)를 기준으로 유지한다.
 
 ---
 
@@ -204,4 +228,4 @@ lib/
 - DB 변경 → Section 4 + API @param
 - 비즈니스 규칙 → Section 5 + @description
 
-[상세: docs/DOCUMENTATION_GUIDE.md]
+문서 작성 규칙은 이 섹션의 3-레이어 구조를 기준으로 유지한다.

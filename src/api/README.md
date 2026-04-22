@@ -7,6 +7,7 @@
 - Express 서버 파일 업로드/삭제 호출
 - Ollama AI 요약 호출 (Express 프록시)
 - 개발팀 요청 생성 후 Google Chat webhook 알림 호출
+- GitHub OAuth/App/이슈/레포 대시보드 서버 API 호출
 - 순서 재계산, 완료 프로젝트 복귀 위치 저장 같은 DB 반영 규칙 캡슐화
 
 ## 주요 파일
@@ -16,6 +17,7 @@
 | `kanbanAPI.js` | **핵심.** boards/items/comments/sections/projects 전체 CRUD와 일반 문서/개인 메모 API. 개인 메모는 `personal_memos` 테이블을 사용 | supabase |
 | `fileAPI.js` | 파일 업로드/삭제 (POST/DELETE to Express :3001). 클라이언트 측 MIME 검증 | axios |
 | `summarizeAPI.js` | AI 요약 (POST /api/summarize). HTML → Ollama JSON 요약 | fetch |
+| `githubAPI.js` | GitHub 연결 상태, 레포 목록, 이슈 생성, 레포 대시보드 조회/링크 API | fetch, supabase |
 
 ## 패턴 & 규칙
 
@@ -50,8 +52,10 @@ return data;
 - `completeProject()`는 완료 시 원래 위치(`pre_completion_*`)를 저장하고, 복귀 시 복원한다.
 - `moveItem()`은 칸반 보드뿐 아니라 Sidebar 트리 이동도 지원하도록 `targetParentId`를 받을 수 있다.
 - `getPersonalMemos()` 계열은 더 이상 `roadmap_items.is_private`에 의존하지 않고 전용 `personal_memos` 저장소를 사용한다.
+- `getBoardData()`는 팀 보드(`projects`/`items`)와 전사 로드맵(`roadmap_projects`/`roadmap_items`)을 함께 읽지만, 신규 연관 업무 검색 후보는 컴포넌트 레이어에서 팀 보드/개인 메모 범위로 제한한다.
 - 담당자 저장은 `assignees` 표시 이름 배열과 `assignee_user_ids` 식별자 배열을 함께 동기화한다.
 - 담당자 변경 알림은 `updateItem()` / `updateProject()`에서 assignee diff를 계산한 뒤 `POST /api/notifications/assignments`로 전달한다.
 - 개발팀 요청 알림은 작성 폼 제출 후 `submitTeamRequest()`가 `POST /api/notifications/dev-requests`를 호출해 Google Chat incoming webhook으로 전달한다.
 - 알림 저장소는 `notifications` 테이블을 기준으로 설계하며, 쓰기는 Express 서버의 service-role 경로를 통하고 읽기 권한은 수신자 본인으로 제한한다.
 - 클라이언트 알림함은 `getNotifications()`, `markNotificationsAsRead()`, `markAllNotificationsAsRead()`로 최근 알림 조회와 읽음 처리를 수행한다.
+- GitHub 이슈 생성은 `createGitHubIssue(itemId, repoFullName)`로 Express `/api/github/issues`에 위임하며, 연결 결과는 `item_github_issues`에서 조회한다.

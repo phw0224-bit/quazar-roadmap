@@ -40,6 +40,7 @@ import {
 
 function ItemDetailPanel({
   item, project = null, phase = project, entityContext = null, allItems = [], onClose, onUpdateItem, onUpdateProject, onUpdatePhase = onUpdateProject, isReadOnly,
+  relationItems = allItems,
   isFullscreen = false, onToggleFullscreen,
   onBreadcrumbNavigate,
   onAddComment, onUpdateComment, onDeleteComment, onOpenDetail,
@@ -69,6 +70,7 @@ function ItemDetailPanel({
   const [githubRepos, setGitHubRepos] = useState([]);
   const [githubIssues, setGitHubIssues] = useState([]);
   const [selectedGitHubRepo, setSelectedGitHubRepo] = useState('');
+  const [showGitHubIssueCreator, setShowGitHubIssueCreator] = useState(false);
   const [isGitHubLoading, setIsGitHubLoading] = useState(false);
   const [isGitHubSubmitting, setIsGitHubSubmitting] = useState(false);
   const [gitHubError, setGitHubError] = useState('');
@@ -134,6 +136,7 @@ function ItemDetailPanel({
     setRelationSearchQuery('');
     setIsEditingTitle(false);
     setIsEditingDescription(false);
+    setShowGitHubIssueCreator(false);
     setGitHubError('');
     setIssuedTicket({
       key: item?.ticket_key || '',
@@ -151,6 +154,7 @@ function ItemDetailPanel({
           setGitHubRepos([]);
           setGitHubIssues([]);
           setSelectedGitHubRepo('');
+          setShowGitHubIssueCreator(false);
         }
         return;
       }
@@ -398,6 +402,7 @@ function ItemDetailPanel({
       if (result?.issue) {
         setGitHubIssues((current) => [result.issue, ...current]);
       }
+      setShowGitHubIssueCreator(false);
       if (result?.itemStatus === 'in-progress' && (item?.status || 'none') === 'none') {
         await onUpdateItem(itemProjectId, item.id, { status: 'in-progress' });
       }
@@ -465,6 +470,15 @@ function ItemDetailPanel({
     githubStatus?.connected
       && githubStatus?.app?.configured
       && !githubStatus?.app?.installed
+  );
+  const relationSearchItems = useMemo(
+    () => relationItems
+      .filter(candidate => candidate.id !== item?.id && !(item?.related_items || []).includes(candidate.id))
+      .filter(candidate => {
+        if (!relationSearchQuery) return true;
+        return (candidate.title || candidate.content || '').toLowerCase().includes(relationSearchQuery.toLowerCase());
+      }),
+    [item?.id, item?.related_items, relationItems, relationSearchQuery],
   );
 
   if (!item) return null;
@@ -842,6 +856,21 @@ function ItemDetailPanel({
                 }}
               />
             )}
+            {!isReadOnly && !isMemo && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGitHubError('');
+                    setShowGitHubIssueCreator(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-black text-gray-600 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:border-border-subtle dark:bg-bg-elevated dark:text-text-secondary dark:hover:border-border-strong dark:hover:bg-bg-hover dark:hover:text-text-primary"
+                >
+                  <Github size={14} strokeWidth={2.5} />
+                  {hasExistingGitHubIssue ? 'GitHub 이슈 보기' : 'GitHub 이슈 생성하기'}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Notion Properties Style - 메모일 때는 숨김 */}
@@ -1051,10 +1080,7 @@ function ItemDetailPanel({
                       />
                     </div>
                     <div className="absolute top-full left-0 w-full max-h-60 overflow-y-auto bg-white dark:bg-bg-elevated border border-gray-200 dark:border-border-subtle rounded-2xl shadow-2xl z-[100] mt-2 p-2 custom-scrollbar animate-in zoom-in-95 duration-200">
-                      {allItems
-                        .filter(i => i.id !== item.id && !(item.related_items || []).includes(i.id))
-                        .filter(i => !relationSearchQuery || (i.title || i.content).toLowerCase().includes(relationSearchQuery.toLowerCase()))
-                        .map(searchItem => (
+                      {relationSearchItems.map(searchItem => (
                           <div 
                             key={searchItem.id}
                             onClick={() => handleAddRelation(searchItem.id)}
@@ -1069,7 +1095,7 @@ function ItemDetailPanel({
                             <Plus size={14} className="opacity-0 group-hover/searchitem:opacity-100 transition-opacity" />
                           </div>
                         ))}
-                      {allItems.filter(i => i.id !== item.id && !(item.related_items || []).includes(i.id)).filter(i => !relationSearchQuery || (i.title || i.content).toLowerCase().includes(relationSearchQuery.toLowerCase())).length === 0 && (
+                      {relationSearchItems.length === 0 && (
                         <div className="p-8 text-center text-[13px] font-bold text-gray-400 dark:text-text-tertiary italic">검색 결과가 없습니다.</div>
                       )}
                     </div>
@@ -1152,127 +1178,38 @@ function ItemDetailPanel({
               </div>
             </div>
 
-            <div className="flex items-start min-h-[48px] group">
-              <div className="w-48 flex items-center gap-3 text-gray-400 dark:text-text-tertiary shrink-0 pt-2.5">
-                <Github size={18} strokeWidth={2.5} />
-                <span className="text-[13px] font-black uppercase tracking-widest">GitHub</span>
-              </div>
-              <div className="flex-1 px-3 py-3 rounded-xl bg-white dark:bg-bg-hover border border-gray-100 dark:border-border-subtle flex flex-col gap-3">
-                {isGitHubLoading ? (
-                  <span className="text-[13px] font-bold text-gray-400 dark:text-text-tertiary">GitHub 정보를 불러오는 중...</span>
-                ) : (
-                  <>
-                    {githubStatus?.connected ? (
-                      <div className="flex flex-col gap-3">
-                        <div className="flex items-center justify-between gap-3 flex-wrap">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[13px] font-bold text-gray-700 dark:text-text-secondary">
-                              Connected as @{githubStatus.githubLogin}
-                            </span>
-                            {ticketKey && (
-                              <span className="px-2.5 py-1 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[11px] font-black uppercase tracking-widest">
-                                {ticketKey}
-                              </span>
-                            )}
-                          </div>
-                          <button
-                            onClick={onManageGitHubSettings}
-                            className="px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest border border-gray-200 dark:border-border-subtle text-gray-600 dark:text-text-secondary hover:border-gray-400 dark:hover:border-border-strong cursor-pointer"
-                          >
-                            프로필에서 관리
-                          </button>
-                        </div>
-
-                        <span className="text-[12px] font-bold text-gray-500 dark:text-text-tertiary">
-                          이슈 생성 시 티켓이 없으면 자동으로 발급한 뒤 [{ticketKey || 'QZR-*'}] 형식으로 GitHub 이슈를 생성합니다.
+            {hasExistingGitHubIssue && (
+              <div className="flex items-start min-h-[48px] group">
+                <div className="w-48 flex items-center gap-3 text-gray-400 dark:text-text-tertiary shrink-0 pt-2.5">
+                  <Github size={18} strokeWidth={2.5} />
+                  <span className="text-[13px] font-black uppercase tracking-widest">GitHub</span>
+                </div>
+                <div className="flex-1 flex flex-col gap-2 px-3 py-2 rounded-xl bg-white dark:bg-bg-hover border border-gray-100 dark:border-border-subtle">
+                  {githubIssues.map((issue) => (
+                    <a
+                      key={issue.id || `${issue.repo_full_name}-${issue.issue_number}`}
+                      href={issue.issue_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 dark:border-border-subtle px-3 py-2 text-sm text-gray-700 dark:text-text-secondary hover:border-brand-200 dark:hover:border-brand-600"
+                    >
+                      <div className="flex items-center gap-2 flex-wrap min-w-0">
+                        <span className="font-bold truncate">
+                          {issue.repo_full_name}#{issue.issue_number}
                         </span>
-                        {needsGitHubAppInstall && (
-                          <span className="text-[12px] font-bold text-amber-600 dark:text-amber-400">
-                            GitHub App이 아직 설치되지 않아 이슈를 생성할 수 없습니다. 프로필에서 App 설치를 먼저 진행해주세요.
+                        {(issue.ticket_key || ticketKey) && (
+                          <span className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-bg-base text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-text-secondary">
+                            {issue.ticket_key || ticketKey}
                           </span>
                         )}
-                        {hasExistingGitHubIssue && (
-                          <span className="text-[12px] font-bold text-amber-600 dark:text-amber-400">
-                            이 아이템에는 이미 GitHub 이슈가 연결되어 있어서 추가 생성할 수 없습니다.
-                          </span>
-                        )}
-
-                        <div className="flex gap-2 flex-wrap">
-                          <select
-                            value={selectedGitHubRepo}
-                            onChange={(e) => setSelectedGitHubRepo(e.target.value)}
-                            className="min-w-[240px] flex-1 bg-gray-50 dark:bg-bg-base border border-gray-200 dark:border-border-subtle rounded-xl px-3 py-2 text-sm font-bold text-gray-800 dark:text-text-primary dark:color-scheme-dark"
-                          >
-                            {githubRepos.length === 0 ? (
-                              <option value="">접근 가능한 레포가 없습니다</option>
-                            ) : (
-                              githubRepos.map((repo) => (
-                                <option key={repo.id} value={repo.full_name}>
-                                  {repo.full_name}
-                                </option>
-                              ))
-                            )}
-                          </select>
-                          <button
-                            onClick={handleCreateGitHubIssue}
-                            disabled={!selectedGitHubRepo || isGitHubSubmitting || hasExistingGitHubIssue || needsGitHubAppInstall}
-                            className="px-4 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[12px] font-black uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                          >
-                            {isGitHubSubmitting ? '티켓 발급 후 생성 중...' : '이슈 생성'}
-                          </button>
-                        </div>
-
-                        {githubIssues.length > 0 && (
-                          <div className="flex flex-col gap-2">
-                            {githubIssues.map((issue) => (
-                              <a
-                                key={issue.id || `${issue.repo_full_name}-${issue.issue_number}`}
-                                href={issue.issue_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 dark:border-border-subtle px-3 py-2 text-sm text-gray-700 dark:text-text-secondary hover:border-brand-200 dark:hover:border-brand-600"
-                              >
-                                <div className="flex items-center gap-2 flex-wrap min-w-0">
-                                  <span className="font-bold">
-                                    {issue.repo_full_name}#{issue.issue_number}
-                                  </span>
-                                  {(issue.ticket_key || ticketKey) && (
-                                    <span className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-bg-base text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-text-secondary">
-                                      {issue.ticket_key || ticketKey}
-                                    </span>
-                                  )}
-                                </div>
-                                <span className="flex items-center gap-1 text-gray-400 dark:text-text-tertiary">
-                                  <ExternalLink size={14} />
-                                </span>
-                              </a>
-                            ))}
-                          </div>
-                        )}
                       </div>
-                    ) : (
-                      <div className="flex items-center justify-between gap-3 flex-wrap">
-                        <span className="text-[13px] font-bold text-gray-400 dark:text-text-tertiary">
-                          GitHub 계정을 연결해야 이슈를 생성할 수 있습니다.
-                        </span>
-                          <button
-                            onClick={onManageGitHubSettings}
-                            className="px-4 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[12px] font-black uppercase tracking-widest cursor-pointer"
-                          >
-                            프로필에서 연결
-                          </button>
-                      </div>
-                    )}
-
-                    {gitHubError && (
-                      <div className="text-[12px] font-bold text-red-500 dark:text-red-400">
-                        {gitHubError}
-                      </div>
-                    )}
-                  </>
-                )}
+                      <ExternalLink size={14} className="shrink-0 text-gray-400 dark:text-text-tertiary" />
+                    </a>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
           </div>
           )}
 
@@ -1370,6 +1307,199 @@ function ItemDetailPanel({
           )}
         </div>
       </div>
+      {showGitHubIssueCreator && !isMemo && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 px-4 backdrop-blur-sm"
+          onMouseDown={() => {
+            if (!isGitHubSubmitting) {
+              setShowGitHubIssueCreator(false);
+              setGitHubError('');
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-lg rounded-3xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-border-subtle dark:bg-bg-elevated"
+            onMouseDown={stopProp}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.22em] text-gray-400 dark:text-text-tertiary">
+                  <Github size={16} strokeWidth={2.5} />
+                  GitHub
+                </div>
+                <h2 className="mt-2 text-xl font-black text-gray-950 dark:text-text-primary">이슈 생성하기</h2>
+                <p className="mt-1 text-sm font-semibold text-gray-500 dark:text-text-secondary">
+                  레포지토리를 선택하면 이 아이템 기준으로 GitHub 이슈를 만듭니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isGitHubSubmitting) {
+                    setShowGitHubIssueCreator(false);
+                    setGitHubError('');
+                  }
+                }}
+                disabled={isGitHubSubmitting}
+                className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:text-text-tertiary dark:hover:bg-bg-hover dark:hover:text-text-primary"
+                aria-label="GitHub 이슈 생성 닫기"
+              >
+                <X size={18} strokeWidth={2.4} />
+              </button>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-4">
+              {isGitHubLoading ? (
+                <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm font-bold text-gray-500 dark:border-border-subtle dark:bg-bg-base dark:text-text-secondary">
+                  GitHub 정보를 불러오는 중...
+                </div>
+              ) : githubStatus?.connected ? (
+                <>
+                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 dark:border-border-subtle dark:bg-bg-base">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-gray-800 dark:text-text-primary">
+                        Connected as @{githubStatus.githubLogin}
+                      </p>
+                      <p className="mt-1 text-xs font-bold text-gray-500 dark:text-text-secondary">
+                        {ticketKey ? `현재 티켓: ${ticketKey}` : '티켓이 없으면 이슈 생성 시 자동 발급됩니다.'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={onManageGitHubSettings}
+                      className="shrink-0 rounded-xl border border-gray-200 px-3 py-2 text-[11px] font-black text-gray-600 transition-colors hover:border-gray-400 dark:border-border-subtle dark:text-text-secondary dark:hover:border-border-strong"
+                    >
+                      프로필 관리
+                    </button>
+                  </div>
+
+                  {needsGitHubAppInstall && (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                      GitHub App이 아직 설치되지 않아 이슈를 생성할 수 없습니다. 프로필에서 App 설치를 먼저 진행해주세요.
+                    </div>
+                  )}
+
+                  {hasExistingGitHubIssue && (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                      이 아이템에는 이미 GitHub 이슈가 연결되어 있어서 추가 생성할 수 없습니다.
+                    </div>
+                  )}
+
+                  {githubIssues.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                      <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-text-tertiary">연결된 이슈</p>
+                      {githubIssues.map((issue) => (
+                        <a
+                          key={issue.id || `${issue.repo_full_name}-${issue.issue_number}`}
+                          href={issue.issue_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center justify-between gap-3 rounded-2xl border border-gray-100 px-4 py-3 text-sm text-gray-700 transition-colors hover:border-brand-200 dark:border-border-subtle dark:text-text-secondary dark:hover:border-brand-600"
+                        >
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <span className="truncate font-black">
+                              {issue.repo_full_name}#{issue.issue_number}
+                            </span>
+                            {(issue.ticket_key || ticketKey) && (
+                              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-gray-600 dark:bg-bg-base dark:text-text-secondary">
+                                {issue.ticket_key || ticketKey}
+                              </span>
+                            )}
+                          </div>
+                          <ExternalLink size={14} className="shrink-0 text-gray-400 dark:text-text-tertiary" />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+
+                  {!hasExistingGitHubIssue && !needsGitHubAppInstall && (
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-text-tertiary">
+                        생성할 레포지토리
+                      </label>
+                      <select
+                        value={selectedGitHubRepo}
+                        onChange={(e) => setSelectedGitHubRepo(e.target.value)}
+                        className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-black text-gray-800 dark:border-border-subtle dark:bg-bg-base dark:text-text-primary dark:color-scheme-dark"
+                      >
+                        {githubRepos.length === 0 ? (
+                          <option value="">접근 가능한 레포가 없습니다</option>
+                        ) : (
+                          githubRepos.map((repo) => (
+                            <option key={repo.id} value={repo.full_name}>
+                              {repo.full_name}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+                  )}
+
+                  {gitHubError && (
+                    <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                      {gitHubError}
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowGitHubIssueCreator(false);
+                        setGitHubError('');
+                      }}
+                      disabled={isGitHubSubmitting}
+                      className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-black text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border-subtle dark:text-text-secondary dark:hover:bg-bg-hover"
+                    >
+                      닫기
+                    </button>
+                    {!hasExistingGitHubIssue && !needsGitHubAppInstall && (
+                      <button
+                        type="button"
+                        onClick={handleCreateGitHubIssue}
+                        disabled={!selectedGitHubRepo || isGitHubSubmitting}
+                        className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-black text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-gray-900"
+                      >
+                        {isGitHubSubmitting ? '티켓 발급 후 생성 중...' : '이슈 생성'}
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm font-bold text-gray-500 dark:border-border-subtle dark:bg-bg-base dark:text-text-secondary">
+                    GitHub 계정을 연결해야 이슈를 생성할 수 있습니다.
+                  </div>
+                  {gitHubError && (
+                    <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                      {gitHubError}
+                    </div>
+                  )}
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowGitHubIssueCreator(false);
+                        setGitHubError('');
+                      }}
+                      className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-black text-gray-600 transition-colors hover:bg-gray-50 dark:border-border-subtle dark:text-text-secondary dark:hover:bg-bg-hover"
+                    >
+                      닫기
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onManageGitHubSettings}
+                      className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-black text-white transition-colors hover:bg-gray-800 dark:bg-white dark:text-gray-900"
+                    >
+                      프로필에서 연결
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   </div>
   );

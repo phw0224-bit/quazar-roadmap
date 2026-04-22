@@ -52,10 +52,6 @@ export async function getAuthenticatedUser(req) {
     return null;
   }
 
-  console.info('[auth] Authenticated user resolved', {
-    userId: data.user?.id,
-    email: data.user?.email,
-  });
   return data.user ?? null;
 }
 

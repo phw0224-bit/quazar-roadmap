@@ -448,11 +448,16 @@ input:focus, textarea:focus {
 
 .markdown-preview :where(code):not(pre code) {
   border-radius: 0.45rem;
-  background: rgba(148, 163, 184, 0.14);
-  color: #f8d58a;
+  background: rgba(79, 107, 136, 0.1);
+  color: #8a4b12;
   padding: 0.08rem 0.35rem;
   font-family: var(--font-mono);
   font-size: 0.92em;
+}
+
+.dark .markdown-preview :where(code):not(pre code) {
+  background: rgba(148, 163, 184, 0.14);
+  color: #f8d58a;
 }
 
 .markdown-preview :where(code)::before,
@@ -469,6 +474,10 @@ input:focus, textarea:focus {
 }
 
 .markdown-preview :where(a) {
+  color: #315f95;
+}
+
+.dark .markdown-preview :where(a) {
   color: #93c5fd;
 }
 
@@ -660,8 +669,12 @@ input:focus, textarea:focus {
 }
 
 .cm-live-preview-shell .cm-cursor {
-  border-left-color: #93c5fd;
+  border-left-color: #315f95;
   border-left-width: 2px;
+}
+
+.dark .cm-live-preview-shell .cm-cursor {
+  border-left-color: #93c5fd;
 }
 
 .dark .cm-live-preview-shell .cm-activeLine,
@@ -682,12 +695,17 @@ input:focus, textarea:focus {
 .cm-live-heading {
   font-weight: 800;
   letter-spacing: -0.03em;
-  color: #f5f2eb;
+  color: #263241;
 }
 
 .cm-live-active-heading {
   font-weight: 800;
   letter-spacing: -0.03em;
+  color: #263241;
+}
+
+.dark .cm-live-heading,
+.dark .cm-live-active-heading {
   color: #f5f2eb;
 }
 
@@ -710,10 +728,15 @@ input:focus, textarea:focus {
 }
 
 .cm-live-quote-line {
-  border-left: 3px solid rgba(96, 165, 250, 0.35);
+  border-left: 3px solid rgba(79, 107, 136, 0.35);
   padding-left: 0.65rem;
-  color: #cfc7ba;
+  color: #59687a;
   font-style: italic;
+}
+
+.dark .cm-live-quote-line {
+  border-left-color: rgba(96, 165, 250, 0.35);
+  color: #cfc7ba;
 }
 
 .cm-live-toggle-line {
@@ -725,14 +748,22 @@ input:focus, textarea:focus {
 .cm-live-bullet-prefix,
 .cm-live-ordered-prefix,
 .cm-live-wiki-link {
-  color: #93c5fd;
+  color: #315f95;
   font-weight: 700;
 }
 
+.dark .cm-live-wiki-link {
+  color: #93c5fd;
+}
+
 .cm-live-wiki-link {
-  background: rgba(59, 130, 246, 0.12);
+  background: rgba(79, 107, 136, 0.1);
   border-radius: 0.5rem;
   padding: 0.08rem 0.35rem;
+}
+
+.dark .cm-live-wiki-link {
+  background: rgba(59, 130, 246, 0.12);
 }
 
 .cm-live-task-line {
@@ -750,21 +781,34 @@ input:focus, textarea:focus {
 
 .cm-live-strong {
   font-weight: 800;
-  color: #f5f2eb;
+  color: #1f2937;
 }
 
 .cm-live-emphasis {
   font-style: italic;
+  color: #3f4d5f;
+}
+
+.dark .cm-live-strong {
+  color: #f5f2eb;
+}
+
+.dark .cm-live-emphasis {
   color: #efe6d8;
 }
 
 .cm-live-inline-code {
   border-radius: 0.45rem;
-  background: rgba(148, 163, 184, 0.14);
-  color: #f8d58a;
+  background: rgba(79, 107, 136, 0.1);
+  color: #8a4b12;
   padding: 0.08rem 0.35rem;
   font-family: var(--font-mono);
   font-size: 0.92em;
+}
+
+.dark .cm-live-inline-code {
+  background: rgba(148, 163, 184, 0.14);
+  color: #f8d58a;
 }
 
 .cm-live-strikethrough {
@@ -774,14 +818,15 @@ input:focus, textarea:focus {
 }
 
 .cm-live-highlight {
-  background: rgba(250, 204, 21, 0.22);
-  color: #fde68a;
+  background: rgba(217, 119, 6, 0.14);
+  color: #7c3b02;
   border-radius: 0.25rem;
   padding: 0.05rem 0.15rem;
 }
 
 .dark .cm-live-highlight {
   background: rgba(250, 204, 21, 0.18);
+  color: #fde68a;
 }
 
 /* 이미지 인라인 위젯 */
@@ -860,26 +905,34 @@ input:focus, textarea:focus {
 .md-callout-body { font-size: 0.93em; opacity: 0.9; }
 
 /* 색상 변형 */
-.md-callout-blue    { border-color: #60a5fa; background: rgba(96,165,250,0.08); }
-.md-callout-blue .md-callout-title  { color: #93c5fd; }
+.md-callout-blue    { border-color: #3b82f6; background: rgba(59,130,246,0.08); }
+.md-callout-blue .md-callout-title  { color: #1d4ed8; }
 
 .md-callout-yellow  { border-color: #fbbf24; background: rgba(251,191,36,0.08); }
-.md-callout-yellow .md-callout-title { color: #fde68a; }
+.md-callout-yellow .md-callout-title { color: #92400e; }
 
 .md-callout-orange  { border-color: #f97316; background: rgba(249,115,22,0.08); }
-.md-callout-orange .md-callout-title { color: #fdba74; }
+.md-callout-orange .md-callout-title { color: #9a3412; }
 
 .md-callout-red     { border-color: #f87171; background: rgba(248,113,113,0.08); }
-.md-callout-red .md-callout-title   { color: #fca5a5; }
+.md-callout-red .md-callout-title   { color: #b91c1c; }
 
 .md-callout-green   { border-color: #4ade80; background: rgba(74,222,128,0.08); }
-.md-callout-green .md-callout-title { color: #86efac; }
+.md-callout-green .md-callout-title { color: #047857; }
 
 .md-callout-gray    { border-color: #94a3b8; background: rgba(148,163,184,0.08); }
-.md-callout-gray .md-callout-title  { color: #cbd5e1; }
+.md-callout-gray .md-callout-title  { color: #475569; }
 
 .md-callout-purple  { border-color: #a78bfa; background: rgba(167,139,250,0.08); }
-.md-callout-purple .md-callout-title { color: #c4b5fd; }
+.md-callout-purple .md-callout-title { color: #6d28d9; }
+
+.dark .md-callout-blue .md-callout-title  { color: #93c5fd; }
+.dark .md-callout-yellow .md-callout-title { color: #fde68a; }
+.dark .md-callout-orange .md-callout-title { color: #fdba74; }
+.dark .md-callout-red .md-callout-title   { color: #fca5a5; }
+.dark .md-callout-green .md-callout-title { color: #86efac; }
+.dark .md-callout-gray .md-callout-title  { color: #cbd5e1; }
+.dark .md-callout-purple .md-callout-title { color: #c4b5fd; }
 
 /* Live Preview callout 위젯 */
 .cm-live-callout-widget { margin: 0.05rem 0; }
@@ -944,10 +997,15 @@ input:focus, textarea:focus {
 .cm-live-preview-shell .cm-live-mermaid-wrapper {
   margin: 0.05rem 0;
   padding: 1rem;
-  background: var(--color-bg-elevated, rgba(30, 41, 59, 0.35));
+  background: rgba(248, 250, 252, 0.95);
   border-radius: 0.75rem;
-  border: 1px solid var(--color-border-subtle, rgba(148, 163, 184, 0.22));
+  border: 1px solid rgba(203, 213, 225, 0.9);
   overflow-x: auto;
+}
+
+.dark .cm-live-preview-shell .cm-live-mermaid-wrapper {
+  background: var(--color-bg-elevated, rgba(30, 41, 59, 0.35));
+  border-color: var(--color-border-subtle, rgba(148, 163, 184, 0.22));
 }
 
 .cm-live-preview-shell .cm-live-mermaid-diagram {
@@ -972,9 +1030,14 @@ input:focus, textarea:focus {
   margin: 1rem 0;
   padding: 0.9rem;
   border-radius: 0.75rem;
-  border: 1px solid var(--color-border-subtle, rgba(148, 163, 184, 0.22));
-  background: var(--color-bg-elevated, rgba(30, 41, 59, 0.35));
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  background: rgba(248, 250, 252, 0.95);
   overflow-x: auto;
+}
+
+.dark .markdown-preview .markdown-preview-mermaid-wrapper {
+  border-color: var(--color-border-subtle, rgba(148, 163, 184, 0.22));
+  background: var(--color-bg-elevated, rgba(30, 41, 59, 0.35));
 }
 
 .markdown-preview .markdown-preview-mermaid-wrapper svg {
@@ -1013,22 +1076,43 @@ input:focus, textarea:focus {
   border-collapse: collapse;
   overflow: hidden;
   border-radius: 0.9rem;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(248, 250, 252, 0.95);
+  border: 1px solid rgba(203, 213, 225, 0.9);
 }
 
 .cm-live-table-widget th,
 .cm-live-table-widget td {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(203, 213, 225, 0.85);
   padding: 0.7rem 0.85rem;
   text-align: left;
 }
 
 .cm-live-table-widget th {
   font-weight: 800;
-  color: #f5f2eb;
+  color: #263241;
+  background: rgba(241, 245, 249, 0.85);
 }
 
 .cm-live-table-widget td {
+  color: #475569;
+}
+
+.dark .cm-live-table-widget table {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: transparent;
+}
+
+.dark .cm-live-table-widget th,
+.dark .cm-live-table-widget td {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.dark .cm-live-table-widget th {
+  color: #f5f2eb;
+  background: transparent;
+}
+
+.dark .cm-live-table-widget td {
   color: #d6d0c7;
 }
 
@@ -1102,11 +1186,16 @@ input:focus, textarea:focus {
 
 .markdown-preview sup a,
 .markdown-preview .footnote-ref {
-  color: #93c5fd;
+  color: #315f95;
   text-decoration: none;
   font-size: 0.78em;
   font-weight: 700;
   padding: 0 0.1rem;
+}
+
+.dark .markdown-preview sup a,
+.dark .markdown-preview .footnote-ref {
+  color: #93c5fd;
 }
 
 .markdown-preview sup a:hover,
@@ -1116,17 +1205,25 @@ input:focus, textarea:focus {
 
 .markdown-preview .footnote-backref {
   margin-left: 0.25rem;
-  color: #93c5fd;
+  color: #315f95;
   text-decoration: none;
+}
+
+.dark .markdown-preview .footnote-backref {
+  color: #93c5fd;
 }
 
 /* Live Preview 각주 인라인 표시 */
 .cm-live-footnote-ref {
-  color: #93c5fd;
+  color: #315f95;
   font-size: 0.78em;
   font-weight: 700;
   vertical-align: super;
   line-height: 1;
+}
+
+.dark .cm-live-footnote-ref {
+  color: #93c5fd;
 }
 
 /* ── TaskList (체크리스트) ── */

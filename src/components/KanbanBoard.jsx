@@ -606,6 +606,13 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
     () => projects.flatMap(project => project.items || []),
     [projects],
   );
+  const relationCandidateItems = useMemo(() => {
+    const teamProjectItems = projects
+      .filter(project => (project.board_type || 'main') !== MAIN_BOARD_TYPE)
+      .flatMap(project => project.items || []);
+    const teamGeneralDocs = generalDocs.filter(doc => (doc.board_type || 'main') !== MAIN_BOARD_TYPE);
+    return user ? [...teamProjectItems, ...teamGeneralDocs, ...personalMemos] : [...teamProjectItems, ...teamGeneralDocs];
+  }, [generalDocs, personalMemos, projects, user]);
 
   const searchableAdditionalItems = useMemo(() => {
     const items = [...generalDocs];
@@ -1675,6 +1682,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                   project={detailProject}
                   entityContext={detailEntityContext}
                   allItems={[...projectItems, ...generalDocs, ...personalMemos]}
+                  relationItems={relationCandidateItems}
                   onClose={closeDetailPanel}
                   isFullscreen={isDetailFullscreen}
                   onToggleFullscreen={() => setUrlState({ fullscreen: !isDetailFullscreen })}

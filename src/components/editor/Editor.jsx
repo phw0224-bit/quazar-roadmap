@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useTheme } from 'next-themes';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { Prec } from '@codemirror/state';
@@ -74,6 +75,7 @@ function Editor({
   editorViewRef: externalEditorViewRef,
   onUpdate: externalOnUpdate,
 }) {
+  const { resolvedTheme } = useTheme();
   const internalEditorViewRef = useRef(null);
   const editorViewRef = externalEditorViewRef || internalEditorViewRef;
   const wrapperRef = useRef(null);
@@ -485,7 +487,7 @@ function Editor({
           }}
           editable={editable}
           extensions={extensions}
-          theme={editable ? oneDark : 'light'}
+          theme={resolvedTheme === 'dark' ? oneDark : 'light'}
           onCreateEditor={(view) => {
             editorViewRef.current = view;
             syncSlashMenu(view);

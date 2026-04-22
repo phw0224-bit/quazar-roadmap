@@ -17,9 +17,10 @@
 | `AppLayout.jsx` | Sidebar와 메인 콘텐츠를 배치하는 공통 레이아웃 |
 | `AssigneePicker.jsx` | **핵심.** 담당자 추천 선택 + 직접 입력을 공통화하는 편집 UI |
 | `KanbanBoard.jsx` | **최상위 오케스트레이터.** DnD 컨텍스트, 뷰 전환, 전역 모달 관리 |
+| `RepositoriesDashboard.jsx` | GitHub 레포별 PR/이슈/커밋, 티켓 prefix 설정, 로드맵 아이템 연결 대시보드 |
 | `NotificationsInbox.jsx` | 보드 헤더 우측 알림함. 담당자 지정 알림 조회/읽음 처리/대상 이동 |
 | `PresenceAvatars.jsx` | 보드 헤더 우측의 전체 접속자 아바타 표시 |
-| `ItemDetailPanel.jsx` | 우측 슬라이드 패널. 에디터+메타데이터+AI요약+댓글. 가장 복잡한 컴포넌트 |
+| `ItemDetailPanel.jsx` | 우측 슬라이드 패널. 에디터+메타데이터+GitHub 이슈 생성/표시+AI요약+댓글. 가장 복잡한 컴포넌트 |
 | `ItemViewers.jsx` | 상세 패널 상단에서 같은 아이템을 보는 중/편집 중인 사용자 표시 |
 | `ItemDescriptionSection.jsx` | ItemDetailPanel 내부의 Markdown live/source/view editor, AI 요약, 링크 모달 전담 섹션 |
 | `itemDescriptionMode.js` | 상세 설명 섹션이 본문 유무와 읽기 전용 여부에 따라 기본 모드를 정하는 규칙 |
@@ -62,6 +63,8 @@ const stopProp = (e) => e.stopPropagation();
 
 **다크모드:** 모든 컴포넌트에 `dark:` prefix 적용. `html.dark` 클래스 기반.
 
+**상세내용 에디터 테마:** `components/editor/Editor.jsx`는 현재 resolved theme에 맞춰 CodeMirror light/oneDark를 선택한다. live preview CSS는 `src/index.css`에서 기본 라이트 색상 + `.dark` 오버라이드로 관리한다.
+
 **isReadOnly 적용:**
 
 ```javascript
@@ -90,3 +93,18 @@ const stopProp = (e) => e.stopPropagation();
 ```
 
 보드 컬럼은 task/card만 렌더링하고, page 타입은 SidebarTree에서 별도로 사용한다.
+
+**연관 업무 검색 범위:**
+
+```javascript
+<ItemDetailPanel
+  allItems={[...projectItems, ...generalDocs, ...personalMemos]}
+  relationItems={relationCandidateItems}
+/>
+```
+
+`allItems`는 기존 연결 표시/백링크 탐색용 전체 컨텍스트이고, `relationItems`는 신규 연관 업무 검색 후보 전용이다. 전사 로드맵(`roadmap_items`, `roadmap_projects`) 기반 항목은 신규 연결 후보에서 제외한다.
+
+**GitHub 이슈 생성 UI:**
+
+아이템 상세 제목 아래 보조 액션 버튼에서 모달을 열고, 모달 내부에서 레포지토리를 드롭다운으로 선택해 이슈를 생성한다. 연결된 이슈가 이미 있으면 속성 박스 안 `GitHub` 행에 링크만 표시하고 빈 GitHub 속성 행은 렌더링하지 않는다.

@@ -14,21 +14,21 @@
 - `scripts/restore-local-supabase.ps1`: self-host Postgres에 덤프 복원
 - `.env.local.example`: 앱이 self-host Supabase를 바라보는 예시
 
-## 현재 막힌 조건
+## 현재 상태
 
-Cloud DB 전체 덤프에는 Cloud Supabase의 직접 Postgres 접속 URL이 필요하다.
+Cloud DB 전체 덤프는 Cloud Supabase의 Postgres 접속 URL을 사용해 생성한다. 현재 프로젝트는 pooler 접속 문자열 기준으로 export/restore 절차를 검증했다.
 
 필요한 값:
 
 ```powershell
-$env:SUPABASE_CLOUD_DB_URL = "postgresql://postgres:<DB_PASSWORD>@db.ealbfnlqmvitflctlats.supabase.co:5432/postgres"
+$env:SUPABASE_CLOUD_DB_URL = "postgresql://postgres.ealbfnlqmvitflctlats:<DB_PASSWORD>@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres"
 ```
 
 중요:
 
 - `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`만으로는 전체 DB dump가 불가능하다.
-- MCP도 현재 DB 쿼리에서 `Connection terminated due to connection timeout`이 발생한다.
-- DB URL이 없으면 Supabase Dashboard에서 백업 파일을 받아 복원하는 경로를 써야 한다.
+- 이 저장소의 dump 파일은 `infra/supabase-selfhost/backups/cloud/` 아래에 생성되며 `.gitignore` 처리되어 커밋하지 않는다.
+- 이미 로컬에서 dump를 만들었다면 서버에서 `yarn supabase:export`를 다시 실행할 필요 없이 backup 디렉터리만 안전하게 복사해 `yarn supabase:restore`를 실행하면 된다.
 
 ## 1. Self-Host Env 생성
 
@@ -62,12 +62,14 @@ yarn supabase:selfhost:ps
 - Studio: `http://localhost:3000`
 - Postgres: `localhost:5432`
 
+운영 서버에서는 Postgres `5432`/pooler 포트를 외부에 공개하지 않는다. 외부 HTTPS 도메인이 필요한 것은 브라우저가 접근하는 Supabase API(Kong)와 GitHub callback/webhook을 받는 앱 API 서버다.
+
 ## 3. Cloud Supabase 덤프
 
 Cloud DB 비밀번호를 알고 있으면:
 
 ```powershell
-$env:SUPABASE_CLOUD_DB_URL = "postgresql://postgres:<DB_PASSWORD>@db.ealbfnlqmvitflctlats.supabase.co:5432/postgres"
+$env:SUPABASE_CLOUD_DB_URL = "postgresql://postgres.ealbfnlqmvitflctlats:<DB_PASSWORD>@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres"
 yarn supabase:export
 ```
 
@@ -112,7 +114,7 @@ yarn dev:all
 - 파일 업로드
 - `/api/summarize` Ollama 프록시
 
-## 6. 내일 서버 배포 흐름
+## 6. 서버 배포 흐름
 
 서버에서:
 
@@ -123,10 +125,16 @@ yarn supabase:selfhost:setup
 yarn supabase:selfhost:up
 ```
 
-그 다음 Cloud DB 덤프 파일을 서버로 복사하거나 서버에서 직접:
+그 다음 로컬에서 이미 생성한 dump 파일을 서버의 `infra/supabase-selfhost/backups/cloud/`로 복사하고:
 
 ```powershell
-$env:SUPABASE_CLOUD_DB_URL = "postgresql://postgres:<DB_PASSWORD>@db.ealbfnlqmvitflctlats.supabase.co:5432/postgres"
+yarn supabase:restore
+```
+
+서버에서 직접 dump를 다시 만들 경우에만:
+
+```powershell
+$env:SUPABASE_CLOUD_DB_URL = "postgresql://postgres.ealbfnlqmvitflctlats:<DB_PASSWORD>@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres"
 yarn supabase:export
 yarn supabase:restore
 ```
@@ -138,6 +146,13 @@ VITE_SUPABASE_URL=https://<your-supabase-api-domain>
 SUPABASE_URL=https://<your-supabase-api-domain>
 APP_BASE_URL=https://roadmap.ai-quazar.uk
 ```
+
+권장 운영 노출:
+
+- `roadmap.ai-quazar.uk` → 프론트엔드
+- `api.roadmap.ai-quazar.uk` → Express `localhost:3001`
+- `supabase.roadmap.ai-quazar.uk` → Supabase Kong `localhost:8000`
+- Postgres `5432`/pooler는 외부 노출 금지
 
 ## 7. Auth/Storage 주의사항
 
