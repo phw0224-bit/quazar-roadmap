@@ -162,9 +162,9 @@ const createAssignmentNotifications = async ({
   }
 };
 
-const notifyDevRequestCreated = async ({ requestId }) => {
+const submitDevRequestNotification = async ({ requestId }) => {
   const cleanRequestId = `${requestId || ''}`.trim();
-  if (!cleanRequestId) return;
+  if (!cleanRequestId) return null;
 
   const response = await fetch(`${API_SERVER_URL}/api/notifications/dev-requests`, {
     method: 'POST',
@@ -178,6 +178,8 @@ const notifyDevRequestCreated = async ({ requestId }) => {
     const payload = await response.json().catch(() => null);
     throw new Error(payload?.error || '개발팀 요청 Google Chat 알림 전송에 실패했습니다.');
   }
+
+  return response.json();
 };
 
 const fetchProfileIdentityMaps = async () => {
@@ -1525,15 +1527,7 @@ export async function createTeamRequest(boardType, title, createdBy = null, upda
     .single();
 
   if (error) throw error;
-  const createdRequest = data;
-
-  if (createdRequest?.id && boardType === '개발팀') {
-    void notifyDevRequestCreated({ requestId: createdRequest.id }).catch((notificationError) => {
-      console.warn('[createTeamRequest] Google Chat notification failed:', notificationError.message);
-    });
-  }
-
-  return createdRequest;
+  return data;
 }
 
 /**
@@ -1555,6 +1549,16 @@ export async function updateTeamRequest(requestId, updates) {
 
   if (error) throw error;
   return data;
+}
+
+/**
+ * @description 작성이 완료된 개발팀 요청을 제출하고 Google Chat 알림을 전송합니다.
+ * @param {string} requestId - 요청 레코드 ID
+ * @returns {Promise<Object>} 제출된 요청 레코드
+ */
+export async function submitTeamRequest(requestId) {
+  const result = await submitDevRequestNotification({ requestId });
+  return result?.request || null;
 }
 
 /**
@@ -1658,6 +1662,7 @@ export default {
   moveGeneralDocument,
   createTeamRequest,
   updateTeamRequest,
+  submitTeamRequest,
   deleteTeamRequest,
   moveTeamRequest,
 };

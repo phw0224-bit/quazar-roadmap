@@ -99,7 +99,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
     moveSidebarProject,
     // 신규: 일반 문서
     generalDocs, addGeneralDocument, updateGeneralDocument, deleteGeneralDocument, setBoardType, currentBoardType,
-    requestDocs, addRequestDocument, updateRequestDocument, deleteRequestDocument,
+    requestDocs, addRequestDocument, updateRequestDocument, submitRequestDocument, deleteRequestDocument,
     // 신규: 팀 보드 설정
     team_boards, updateTeamBoard,
   } = useKanbanData();
@@ -734,6 +734,12 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
     await deleteItem(projectId, itemId);
   };
 
+  const handleSubmitRequest = async (requestId) => {
+    const submitted = await submitRequestDocument(requestId);
+    if (!submitted) return null;
+    return submitted;
+  };
+
   const handleUpdateProject = async (projectId, updates) => {
     try {
       await updateProject(projectId, updates);
@@ -1110,23 +1116,33 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                               isReadOnly={isReadOnly}
                               onOpenRequest={handleOpenDetail}
                               onAddRequest={() => {
-                              showPrompt(
-                                '새 요청 문서 추가',
-                                '요청 문서 제목을 입력하세요',
-                                (title) => {
-                                  if (title) {
-                                    addRequestDocument('개발팀', title.trim(), user?.id)
-                                      .then(() => {
-                                        showToast(`'${title}' 요청 문서가 생성되었습니다.`);
-                                        setPrompt(null);
-                                      })
-                                      .catch((error) => {
-                                        showToast(`요청 문서 생성 실패: ${error.message}`, 'error');
+                                showPrompt(
+                                  '새 요청 문서 추가',
+                                  '요청 제목을 입력하세요',
+                                  async (requestForm) => {
+                                    const requestTitle = `${requestForm?.title || ''}`.trim();
+                                    if (!requestTitle) return;
+
+                                    try {
+                                      const newRequest = await addRequestDocument('개발팀', requestTitle, user?.id, {
+                                        description: `${requestForm?.description || ''}`.trim(),
+                                        request_team: `${requestForm?.request_team || ''}`.trim() || null,
+                                        priority: `${requestForm?.priority || '중간'}`.trim(),
                                       });
+                                      const submitted = await submitRequestDocument(newRequest.id);
+                                      handleOpenDetail(newRequest.id);
+                                      showToast(
+                                        submitted?.notified_at
+                                          ? `'${requestTitle}' 요청을 개발팀에 보냈습니다.`
+                                          : `'${requestTitle}' 요청은 저장됐지만 Google Chat 웹훅이 없어 알림은 건너뛰었습니다.`
+                                      );
+                                      setPrompt(null);
+                                    } catch (error) {
+                                      showToast(`요청 문서 전송 실패: ${error.message}`, 'error');
+                                    }
                                   }
-                                }
-                              );
-                            }}
+                                );
+                              }}
                             onDeleteRequest={(requestId) => {
                               const request = requestDocs.find((entry) => entry.id === requestId);
                               if (!request) return;
@@ -1508,6 +1524,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                   onUpdateItem={handleUpdateItem}
                   onUpdateProject={handleUpdateProject}
                   onDeleteItem={handleDeleteItem}
+                  onSubmitRequest={handleSubmitRequest}
                   onDeleteProject={deleteProject}
                   onAddComment={addComment}
                   onUpdateComment={updateComment}

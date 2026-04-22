@@ -17,7 +17,7 @@ import {
   ChevronsRight, Maximize2, ChevronRight, Trash2,
   Clock, Users, Building2, Tag, Link2, Plus, X,
   MessageSquare, Search, ArrowUpRight, AlignCenter, AlignJustify,
-  Calendar, Flag, LayoutList, List, Github, ExternalLink
+  Calendar, Flag, LayoutList, List, Github, ExternalLink, Send, CheckCircle2
 } from 'lucide-react';
 import CommentSection from './CommentSection';
 import ItemDescriptionSection from './ItemDescriptionSection';
@@ -47,6 +47,7 @@ function ItemDetailPanel({
   onAddChildPage,
   onShowPrompt,
   onManageGitHubSettings,
+  onSubmitRequest,
   onDeleteItem,
   onDeleteProject, onDeletePhase = onDeleteProject,
 }) {
@@ -115,8 +116,17 @@ function ItemDetailPanel({
     : 'bg-sky-500';
   const assigneeCount = isRequest ? 0 : (item.assignees || []).length;
   const teamCount = isRequest ? (item.request_team ? 1 : 0) : (item.teams || []).length;
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const headerIconButtonClass = 'p-1.5 rounded-lg text-gray-400 hover:text-gray-900 dark:text-text-tertiary dark:hover:text-text-primary hover:bg-gray-100 dark:hover:bg-bg-hover transition-colors cursor-pointer';
   const headerToggleButtonClass = 'p-1.5 rounded-lg transition-colors cursor-pointer';
+  const missingRequestFields = [
+    [item.title || item.content, '제목'],
+    [item.description, '본문'],
+    [item.request_team, '요청팀'],
+    [item.priority, '우선순위'],
+  ].filter(([value]) => !`${value || ''}`.trim()).map(([, label]) => label);
+  const isRequestNotified = Boolean(item.notified_at);
+  const isRequestSubmittedWithoutNotification = Boolean(item.submitted_at) && !item.notified_at;
 
   useEffect(() => {
     setTitleInput(item?.title || item?.content || '');
@@ -394,6 +404,27 @@ function ItemDetailPanel({
     }
   };
 
+  const handleSubmitRequest = async () => {
+    if (missingRequestFields.length > 0) {
+      onShowToast?.(`요청 제출 전에 ${missingRequestFields.join(', ')}을(를) 입력해주세요.`, 'error');
+      return;
+    }
+
+    setIsSubmittingRequest(true);
+    try {
+      const submitted = await onSubmitRequest?.(item.id);
+      if (submitted?.notified_at) {
+        onShowToast?.('개발팀 요청 알림을 전송했습니다.', 'success');
+      } else {
+        onShowToast?.('요청은 제출됐지만 Google Chat 웹훅이 설정되지 않아 알림은 건너뛰었습니다.');
+      }
+    } catch (error) {
+      onShowToast?.(error.message || '개발팀 요청 제출에 실패했습니다.', 'error');
+    } finally {
+      setIsSubmittingRequest(false);
+    }
+  };
+
   // 브레드크럼 경로 계산 (Phase -> Parent1 -> Parent2 -> ... -> Current Item)
   const itemPath = useMemo(() => {
     const path = [];
@@ -504,6 +535,44 @@ function ItemDetailPanel({
                   }}
                 />
               </div>
+
+              {!isReadOnly && (
+                <div className="rounded-3xl border border-amber-200/70 bg-amber-50/70 px-5 py-4 dark:border-amber-900/35 dark:bg-amber-950/15">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-black text-amber-950 dark:text-amber-100">
+                        {isRequestNotified
+                          ? '요청 알림 전송 완료'
+                          : isRequestSubmittedWithoutNotification
+                            ? '요청 제출됨 · 알림 미전송'
+                            : '작성 완료 후 개발팀에 요청을 보냅니다'}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-amber-800/75 dark:text-amber-200/75">
+                        {missingRequestFields.length > 0
+                          ? `필수 입력: ${missingRequestFields.join(', ')}`
+                          : '제목, 본문, 요청팀, 우선순위가 저장된 뒤 전송할 수 있습니다.'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isRequestNotified || isSubmittingRequest || missingRequestFields.length > 0}
+                      onClick={handleSubmitRequest}
+                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-black text-amber-800 shadow-sm transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100 dark:hover:bg-amber-950/45"
+                    >
+                      {isRequestNotified ? <CheckCircle2 size={16} /> : <Send size={16} />}
+                      <span>
+                        {isRequestNotified
+                          ? '요청 전송됨'
+                          : isRequestSubmittedWithoutNotification
+                            ? '알림 다시 시도'
+                            : isSubmittingRequest
+                              ? '전송 중...'
+                              : '개발팀에 요청 보내기'}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="bg-gray-50/50 dark:bg-bg-elevated/30 rounded-3xl p-6 border border-gray-100 dark:border-border-subtle flex flex-col gap-4">
                 <div className="flex items-center min-h-[48px] group">

@@ -25,7 +25,7 @@ export function buildDevRequestChatMessage({ request, creatorName }) {
   const description = normalizeText(request?.description);
 
   const lines = [
-    '개발팀 요청이 등록되었습니다.',
+    '개발팀 요청이 제출되었습니다.',
     '',
     `제목: ${title}`,
     `요청팀: ${requestTeam}`,
@@ -71,4 +71,3 @@ export async function postGoogleChatWebhookMessage(webhookUrl, messageText) {
 
   return { skipped: false };
 }
-

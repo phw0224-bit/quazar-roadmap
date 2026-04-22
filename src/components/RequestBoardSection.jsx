@@ -4,7 +4,7 @@
  * 일반 문서와 분리된 별도 테이블(team_requests)을 렌더링한다.
  * 임시 요청명세 템플릿을 상단에 노출하고, 요청 카드 목록은 단일 리스트로 보여준다.
  */
-import { ClipboardList, Plus, Trash2, Clock3, Gauge } from 'lucide-react';
+import { CheckCircle2, ClipboardList, Plus, Trash2, Clock3, Gauge, PencilLine } from 'lucide-react';
 import { DEV_REQUEST_BOARD, DEV_REQUEST_STATUSES } from '../lib/devRequestBoard';
 
 const formatDate = (value) => {
@@ -120,6 +120,8 @@ function RequestBoardSection({
             const requestTeam = request.request_team || '요청팀 미지정';
             const status = request.status || '접수됨';
             const priority = request.priority || '중간';
+            const isNotified = Boolean(request.notified_at);
+            const isSubmitted = Boolean(request.submitted_at);
 
             return (
               <article
@@ -155,6 +157,17 @@ function RequestBoardSection({
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${statusTone(status)}`}>
                     {status}
+                  </span>
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                    isNotified
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200'
+                      : isSubmitted
+                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200'
+                        : 'bg-gray-100 text-gray-600 dark:bg-white/8 dark:text-zinc-300'
+                  }`}
+                  >
+                    {isNotified ? <CheckCircle2 size={12} /> : <PencilLine size={12} />}
+                    {isNotified ? '전송됨' : isSubmitted ? '알림 미전송' : '작성중'}
                   </span>
                   <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${priorityTone(priority)}`}>
                     {priority}

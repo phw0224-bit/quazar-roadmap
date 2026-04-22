@@ -167,8 +167,6 @@ const kanbanReducer = (state, action) => {
         requestDocs: newRequests.map((request, index) => ({ ...request, order_index: index })),
       };
     }
-    case 'SET_BOARD_TYPE':
-      return { ...state, currentBoardType: action.payload };
     case 'ADD_ITEM':
       return {
         ...state,
@@ -629,11 +627,20 @@ export const useKanbanData = () => {
   const addRequestDocument = async (boardType, title, createdBy = null, updates = {}) => {
     const newRequest = await API.createTeamRequest(boardType, title, createdBy, updates);
     dispatch({ type: 'ADD_REQUEST_DOC', payload: newRequest });
+    return newRequest;
   };
 
   const updateRequestDocument = async (requestId, updates) => {
     const updated = await API.updateTeamRequest(requestId, updates);
     dispatch({ type: 'UPDATE_REQUEST_DOC', payload: { requestId, updates: updated } });
+  };
+
+  const submitRequestDocument = async (requestId) => {
+    const submitted = await API.submitTeamRequest(requestId);
+    if (submitted) {
+      dispatch({ type: 'UPDATE_REQUEST_DOC', payload: { requestId, updates: submitted } });
+    }
+    return submitted;
   };
 
   const deleteRequestDocument = async (requestId) => {
@@ -739,6 +746,7 @@ export const useKanbanData = () => {
     moveGeneralDocument,
     addRequestDocument,
     updateRequestDocument,
+    submitRequestDocument,
     deleteRequestDocument,
     moveRequestDocument,
     updateTeamBoard,  // 신규: 팀 보드 설정 업데이트

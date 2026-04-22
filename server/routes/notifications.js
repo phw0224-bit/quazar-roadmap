@@ -3,6 +3,7 @@ import { getBearerToken, requireAuthenticatedUser } from '../lib/auth.js';
 import { GOOGLE_CHAT_DEV_REQUEST_WEBHOOK_URL } from '../lib/config.js';
 import { createSupabaseUserClient, supabaseAdminClient, supabaseAuthClient } from '../lib/supabase.js';
 import { buildDevRequestChatMessage, postGoogleChatWebhookMessage } from '../lib/googleChat.js';
+import { getDevRequestSubmissionMissingFields } from '../lib/devRequestSubmission.js';
 
 const router = Router();
 
@@ -55,7 +56,7 @@ async function fetchDevRequestById(requestId) {
 
   const { data, error } = await supabaseAdminClient
     .from(DEV_REQUEST_TABLE)
-    .select('id, title, description, request_team, status, priority, board_type, created_by')
+    .select('id, title, description, request_team, status, priority, board_type, created_by, submitted_at, submitted_by, notified_at, template_data')
     .eq('id', cleanRequestId)
     .maybeSingle();
 
@@ -238,10 +239,6 @@ router.post('/api/notifications/dev-requests', async (req, res) => {
       return res.status(400).json({ error: 'request_id가 필요합니다.' });
     }
 
-    if (!GOOGLE_CHAT_DEV_REQUEST_WEBHOOK_URL) {
-      return res.json({ success: true, skipped: true, reason: 'webhook-not-configured' });
-    }
-
     const request = await fetchDevRequestById(requestId);
     if (!request) {
       return res.status(404).json({ error: '개발팀 요청을 찾을 수 없습니다.' });
@@ -249,6 +246,53 @@ router.post('/api/notifications/dev-requests', async (req, res) => {
 
     if (request.board_type !== '개발팀') {
       return res.status(400).json({ error: '개발팀 요청만 알림으로 보낼 수 있습니다.' });
+    }
+
+    const missingFields = getDevRequestSubmissionMissingFields(request);
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        error: `요청 제출 전에 ${missingFields.join(', ')}을(를) 입력해주세요.`,
+        missingFields,
+      });
+    }
+
+    if (request.notified_at) {
+      return res.json({
+        success: true,
+        skipped: true,
+        reason: 'already-notified',
+        request: {
+          id: request.id,
+          title: request.title,
+          submitted_at: request.submitted_at,
+          submitted_by: request.submitted_by,
+          notified_at: request.notified_at,
+        },
+      });
+    }
+
+    const timestamp = new Date().toISOString();
+
+    if (!GOOGLE_CHAT_DEV_REQUEST_WEBHOOK_URL) {
+      const { data: updatedRequest, error: updateError } = await supabaseAdminClient
+        .from(DEV_REQUEST_TABLE)
+        .update({
+          submitted_at: request.submitted_at || timestamp,
+          submitted_by: request.submitted_by || user.id,
+          updated_at: timestamp,
+        })
+        .eq('id', request.id)
+        .select('id, title, submitted_at, submitted_by, notified_at')
+        .single();
+
+      if (updateError) throw updateError;
+
+      return res.json({
+        success: true,
+        skipped: true,
+        reason: 'webhook-not-configured',
+        request: updatedRequest,
+      });
     }
 
     const creatorName =
@@ -266,12 +310,23 @@ router.post('/api/notifications/dev-requests', async (req, res) => {
 
     await postGoogleChatWebhookMessage(GOOGLE_CHAT_DEV_REQUEST_WEBHOOK_URL, messageText);
 
+    const { data: updatedRequest, error: updateError } = await supabaseAdminClient
+      .from(DEV_REQUEST_TABLE)
+      .update({
+        submitted_at: request.submitted_at || timestamp,
+        submitted_by: request.submitted_by || user.id,
+        notified_at: timestamp,
+        updated_at: timestamp,
+      })
+      .eq('id', request.id)
+      .select('id, title, submitted_at, submitted_by, notified_at')
+      .single();
+
+    if (updateError) throw updateError;
+
     return res.json({
       success: true,
-      request: {
-        id: request.id,
-        title: request.title,
-      },
+      request: updatedRequest,
     });
   } catch (error) {
     console.error('Dev request Google Chat notification error:', error);

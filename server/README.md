@@ -6,7 +6,7 @@
 - multipart/form-data 파일 수신 및 디스크 저장
 - 업로드/삭제 요청 인증 및 개인 메모 소유권 검증
 - 담당자 추가 시 `notifications` 테이블 기록
-- 개발팀 요청 생성 시 Google Chat incoming webhook 알림 전송
+- 개발팀 요청 제출 시 Google Chat incoming webhook 알림 전송
 - Ollama AI 요약 프록시 (HTML → Ollama → JSON)
 
 ## 주요 파일
@@ -24,7 +24,7 @@
 | DELETE | `/uploads/:itemId/:filename` | 인증 사용자만 단일 파일 삭제. 개인 메모는 소유자만 가능 |
 | DELETE | `/uploads/:itemId` | 인증 사용자만 아이템의 모든 파일 삭제. 개인 메모는 소유자만 가능 |
 | POST | `/api/notifications/assignments` | 인증 사용자가 추가한 담당자에게 assignment 알림 레코드 생성 |
-| POST | `/api/notifications/dev-requests` | 개발팀 요청 생성 시 Google Chat incoming webhook 알림 전송 |
+| POST | `/api/notifications/dev-requests` | 개발팀 요청 제출 시 Google Chat incoming webhook 알림 전송 |
 | POST | `/api/summarize` | AI 요약. `{ content: htmlString }` |
 
 ## 파일 업로드 제약
@@ -55,4 +55,4 @@ yarn dev:all         # 프론트와 함께 실행 (권장)
 
 업로드 권한 확인을 위해 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`가 필요하다.
 
-Google Chat 알림을 쓰려면 `GOOGLE_CHAT_DEV_REQUEST_WEBHOOK_URL`을 추가로 설정한다. 이 값이 없으면 개발팀 요청 생성은 그대로 동작하지만 Chat 전송만 비활성화된다.
+Google Chat 알림을 쓰려면 `GOOGLE_CHAT_DEV_REQUEST_WEBHOOK_URL`을 추가로 설정한다. 이 값이 없으면 개발팀 요청 제출은 기록하지만 Chat 전송만 비활성화된다.

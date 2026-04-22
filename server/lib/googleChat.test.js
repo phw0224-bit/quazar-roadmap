@@ -23,7 +23,7 @@ test('buildDevRequestChatMessage includes the important request fields', () => {
     creatorName: '홍길동',
   });
 
-  assert.ok(message.includes('개발팀 요청이 등록되었습니다.'));
+  assert.ok(message.includes('개발팀 요청이 제출되었습니다.'));
   assert.ok(message.includes('제목: 로그인 오류 수정'));
   assert.ok(message.includes('요청팀: 기획팀'));
   assert.ok(message.includes('상태: 접수됨'));
