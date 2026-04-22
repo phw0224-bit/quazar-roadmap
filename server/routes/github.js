@@ -273,14 +273,22 @@ function isMissingTicketSchemaError(error) {
 }
 
 async function findItemRecordById(itemId) {
-  const tables = ['items', 'roadmap_items'];
+  const tables = [
+    { name: 'items' },
+    { name: 'roadmap_items', mainOnly: true },
+  ];
 
   for (const table of tables) {
-    const { data, error } = await supabaseAdminClient
-      .from(table)
+    let query = supabaseAdminClient
+      .from(table.name)
       .select('id, title, content, description, board_type, assignees, tags, status, is_ticket, ticket_key, ticket_number, ticket_created_at')
-      .eq('id', itemId)
-      .maybeSingle();
+      .eq('id', itemId);
+
+    if (table.mainOnly) {
+      query = query.eq('board_type', 'main');
+    }
+
+    const { data, error } = await query.maybeSingle();
 
     if (error) {
       if (isMissingTicketSchemaError(error)) {
@@ -289,7 +297,7 @@ async function findItemRecordById(itemId) {
       throw error;
     }
 
-    if (data) return { table, item: data };
+    if (data) return { table: table.name, item: data };
   }
 
   return null;
@@ -644,11 +652,17 @@ async function fetchRoadmapItemsByIds(itemIds) {
   const normalizedIds = [...new Set(itemIds.map((id) => String(id || '')).filter(Boolean))];
   const itemMap = new Map();
 
-  for (const table of ['items', 'roadmap_items']) {
-    const { data, error } = await supabaseAdminClient
-      .from(table)
+  for (const table of [{ name: 'items' }, { name: 'roadmap_items', mainOnly: true }]) {
+    let query = supabaseAdminClient
+      .from(table.name)
       .select('id, title, content, board_type, status, ticket_key')
       .in('id', normalizedIds);
+
+    if (table.mainOnly) {
+      query = query.eq('board_type', 'main');
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       if (isMissingTicketSchemaError(error)) continue;
@@ -656,7 +670,9 @@ async function fetchRoadmapItemsByIds(itemIds) {
     }
 
     for (const item of data || []) {
-      itemMap.set(item.id, buildRoadmapLink(item));
+      if (!itemMap.has(item.id)) {
+        itemMap.set(item.id, buildRoadmapLink(item));
+      }
     }
   }
 
@@ -671,11 +687,17 @@ async function fetchRoadmapItemsByTicketKeys(ticketKeys) {
   const normalizedKeys = [...new Set(ticketKeys.map((key) => String(key || '').trim()).filter(Boolean))];
   const ticketMap = new Map();
 
-  for (const table of ['items', 'roadmap_items']) {
-    const { data, error } = await supabaseAdminClient
-      .from(table)
+  for (const table of [{ name: 'items' }, { name: 'roadmap_items', mainOnly: true }]) {
+    let query = supabaseAdminClient
+      .from(table.name)
       .select('id, title, content, board_type, status, ticket_key')
       .in('ticket_key', normalizedKeys);
+
+    if (table.mainOnly) {
+      query = query.eq('board_type', 'main');
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       if (isMissingTicketSchemaError(error)) continue;

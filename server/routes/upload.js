@@ -79,7 +79,7 @@ async function resolveUploadAccess(itemId, userId) {
     { data: roadmapItem, error: roadmapItemError },
   ] = await Promise.all([
     supabaseAdminClient.from('items').select('id').eq('id', itemId).maybeSingle(),
-    supabaseAdminClient.from('roadmap_items').select('id').eq('id', itemId).maybeSingle(),
+    supabaseAdminClient.from('roadmap_items').select('id').eq('id', itemId).eq('board_type', 'main').maybeSingle(),
   ]);
   if (itemError) throw itemError;
   if (roadmapItemError) throw roadmapItemError;

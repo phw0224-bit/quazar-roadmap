@@ -445,11 +445,16 @@ const supabaseAPI = {
 
     if (profileError) throw profileError;
 
-    const { data: projects, error: projectError } = await supabase
-      .from('projects')
-      .select('id, title, board_type');
+    const [
+      { data: teamProjects, error: projectError },
+      { data: mainProjects, error: mainProjectError },
+    ] = await Promise.all([
+      supabase.from('projects').select('id, title, board_type'),
+      supabase.from('roadmap_projects').select('id, title, board_type'),
+    ]);
 
     if (projectError) throw projectError;
+    if (mainProjectError) throw mainProjectError;
 
     const [
       { data: teamItems, error: itemError },
@@ -464,9 +469,16 @@ const supabaseAPI = {
     ]);
     if (itemError) throw itemError;
     if (mainItemError) throw mainItemError;
-    const allItems = [...(mainItems || []), ...(teamItems || [])];
+    const teamProjectIds = new Set((teamProjects || []).map((project) => project.id));
+    const mainProjectIds = new Set((mainProjects || []).map((project) => project.id));
+    const allItems = [
+      ...(mainItems || []).filter((item) => mainProjectIds.has(item.project_id)),
+      ...(teamItems || []).filter((item) => teamProjectIds.has(item.project_id)),
+    ];
 
-    const projectMap = new Map((projects || []).map((project) => [project.id, project]));
+    const projectMap = new Map(
+      [...(mainProjects || []), ...(teamProjects || [])].map((project) => [project.id, project])
+    );
     const membersByName = new Map();
     const teamsByName = new Map();
     const unassignedTeamName = '미분류';
