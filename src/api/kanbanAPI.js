@@ -71,6 +71,29 @@ async function serverRequest(path, init = {}) {
 const itemsTable = (boardType) => boardType === 'main' ? 'roadmap_items' : 'items';
 const projectsTable = (boardType) => boardType === 'main' ? 'roadmap_projects' : 'projects';
 const personalMemosTable = 'personal_memos';
+const BOARD_DATA_QUERY_TIMEOUT_MS = 3000;
+
+async function readBoardDataQuery(label, queryBuilder, fallback = []) {
+  const controller = new AbortController();
+  const timeoutId = globalThis.setTimeout(() => controller.abort(), BOARD_DATA_QUERY_TIMEOUT_MS);
+
+  try {
+    const query = typeof queryBuilder.abortSignal === 'function'
+      ? queryBuilder.abortSignal(controller.signal)
+      : queryBuilder;
+    const { data, error } = await query;
+    if (error) {
+      console.warn(`[getBoardData] ${label} 조회 실패:`, error.message);
+      return fallback;
+    }
+    return data || fallback;
+  } catch (error) {
+    console.warn(`[getBoardData] ${label} 조회 실패:`, error.message);
+    return fallback;
+  } finally {
+    globalThis.clearTimeout(timeoutId);
+  }
+}
 
 const requireAuthenticatedUserId = async () => {
   const {
@@ -281,60 +304,36 @@ const supabaseAPI = {
    * projects: 각 project에 items 배열 내장, items에 comments(with profiles) 배열 내장
    */
   getBoardData: async () => {
-    const sessionPromise = supabase.auth.getSession();
-    const coreDataPromise = Promise.all([
-      supabase.from('projects').select('*').order('order_index', { ascending: true }),
-      supabase.from('roadmap_projects').select('*').order('order_index', { ascending: true }),
-      supabase.from('items').select(`*, comments (*, profiles (name, department))`).order('order_index', { ascending: true }),
-      supabase.from('roadmap_items').select('*').order('order_index', { ascending: true }),
-      supabase.from('items').select(`*, comments (*, profiles (name, department))`).is('project_id', null).in('page_type', ['page', 'folder']).order('board_type', { ascending: true }).order('order_index', { ascending: true }),
-      supabase.from('roadmap_items').select('*').is('project_id', null).in('page_type', ['page', 'folder']).order('order_index', { ascending: true }),
-      supabase.from('profiles').select('id, name, department'),
-      supabase.from('sections').select('*').order('order_index', { ascending: true }),
-    ]);
-
     const [
-      {
-        data: { session },
-      },
-      [
-        { data: teamProjects, error: pError },
-        { data: mainProjects, error: rpError },
-        { data: teamItems, error: iError },
-        { data: mainItemsData, error: riError },
-        { data: teamGeneralDocs, error: docError },
-        { data: mainGeneralDocs, error: rdocError },
-        { data: profiles, error: profileError },
-        { data: sections, error: sError },
-      ],
-    ] = await Promise.all([sessionPromise, coreDataPromise]);
-    const isAuthenticated = Boolean(session?.user);
-
-    if (pError) throw pError;
-    if (rpError) throw rpError;
-    if (iError) throw iError;
-    if (riError) throw riError;
-    if (docError) throw docError;
-    if (rdocError) throw rdocError;
-    if (profileError) throw profileError;
-    if (sError) throw sError;
+      teamProjects,
+      mainProjects,
+      teamItems,
+      mainItemsData,
+      teamGeneralDocs,
+      mainGeneralDocs,
+      comments,
+      profiles,
+      sections,
+      customizationRows,
+      teamRequestDocs,
+    ] = await Promise.all([
+      readBoardDataQuery('팀 프로젝트', supabase.from('projects').select('*').order('order_index', { ascending: true })),
+      readBoardDataQuery('전사 프로젝트', supabase.from('roadmap_projects').select('*').order('order_index', { ascending: true })),
+      readBoardDataQuery('팀 아이템', supabase.from('items').select('*').order('order_index', { ascending: true })),
+      readBoardDataQuery('전사 아이템', supabase.from('roadmap_items').select('*').order('order_index', { ascending: true })),
+      readBoardDataQuery('팀 일반 문서', supabase.from('items').select('*').is('project_id', null).in('page_type', ['page', 'folder']).order('board_type', { ascending: true }).order('order_index', { ascending: true })),
+      readBoardDataQuery('전사 일반 문서', supabase.from('roadmap_items').select('*').is('project_id', null).in('page_type', ['page', 'folder']).order('order_index', { ascending: true })),
+      readBoardDataQuery('댓글', supabase.from('comments').select('*, profiles (name, department)').order('created_at', { ascending: true })),
+      readBoardDataQuery('프로필', supabase.from('profiles').select('id, name, department')),
+      readBoardDataQuery('섹션', supabase.from('sections').select('*').order('order_index', { ascending: true })),
+      readBoardDataQuery('프로필 꾸미기', supabase.from('profile_customizations').select('user_id, avatar_style, theme_color, status_message, mood_emoji')),
+      readBoardDataQuery('요청 문서', supabase.from(requestsTable()).select('*').order('order_index', { ascending: true })),
+    ]);
 
     const allProjects = [...(mainProjects || []), ...(teamProjects || [])];
     const mainProjectIds = new Set((mainProjects || []).map((project) => project.id));
 
     const generalDocItems = [...(mainGeneralDocs || []), ...(teamGeneralDocs || [])];
-
-    let customizationRows = [];
-    if (isAuthenticated) {
-      const { data: customizationData, error: customizationError } = await supabase
-        .from('profile_customizations')
-        .select('user_id, avatar_style, theme_color, status_message, mood_emoji');
-      if (customizationError) {
-        console.warn('[getBoardData] profile_customizations 조회 실패:', customizationError.message);
-      } else {
-        customizationRows = customizationData || [];
-      }
-    }
 
     const customizationsByUserId = new Map(
       customizationRows.map((row) => [row.user_id, normalizeProfileCustomization(row)])
@@ -348,6 +347,25 @@ const supabaseAPI = {
         },
       ])
     );
+    const commentsByItemId = new Map();
+    (comments || []).forEach((comment) => {
+      const bucket = commentsByItemId.get(comment.item_id) || [];
+      let nextComment = comment;
+      if (comment?.user_id) {
+        const userProfile = profilesById.get(comment.user_id);
+        if (userProfile) {
+          nextComment = {
+            ...comment,
+            profiles: {
+              ...(comment.profiles || {}),
+              customization: userProfile.customization,
+            },
+          };
+        }
+      }
+      bucket.push(nextComment);
+      commentsByItemId.set(comment.item_id, bucket);
+    });
 
     // 4. 트리 구조로 조립
     const formattedProjects = allProjects.map(project => ({
@@ -362,20 +380,7 @@ const supabaseAPI = {
           related_items: Array.isArray(item.related_items) ? item.related_items : [],
           assignee_user_ids: Array.isArray(item.assignee_user_ids) ? item.assignee_user_ids : [],
           creator_profile: item.created_by ? profilesById.get(item.created_by) || null : null,
-          comments: (item.comments || [])
-            .map((comment) => {
-              if (!comment?.user_id) return comment;
-              const userProfile = profilesById.get(comment.user_id);
-              if (!userProfile) return comment;
-              return {
-                ...comment,
-                profiles: {
-                  ...(comment.profiles || {}),
-                  customization: userProfile.customization,
-                },
-              };
-            })
-            .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+          comments: commentsByItemId.get(item.id) || [],
         }))
     }));
 
@@ -385,40 +390,14 @@ const supabaseAPI = {
       related_items: Array.isArray(item.related_items) ? item.related_items : [],
       assignee_user_ids: Array.isArray(item.assignee_user_ids) ? item.assignee_user_ids : [],
       creator_profile: item.created_by ? profilesById.get(item.created_by) || null : null,
-      comments: (item.comments || [])
-        .map((comment) => {
-          if (!comment?.user_id) return comment;
-          const userProfile = profilesById.get(comment.user_id);
-          if (!userProfile) return comment;
-          return {
-            ...comment,
-            profiles: {
-              ...(comment.profiles || {}),
-              customization: userProfile.customization,
-            },
-          };
-        })
-        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+      comments: commentsByItemId.get(item.id) || [],
     }));
 
-    let formattedRequestDocs = [];
-    try {
-      const { data: teamRequestDocs, error: requestDocError } = await supabase
-        .from(requestsTable())
-        .select('*')
-        .order('order_index', { ascending: true });
-      if (requestDocError) throw requestDocError;
-
-      formattedRequestDocs = (teamRequestDocs || []).map((request) => ({
-          ...request,
-          template_data: request.template_data || createDevRequestTemplateData(),
-          creator_profile: request.created_by ? profilesById.get(request.created_by) || null : null,
-        }));
-    } catch (requestError) {
-      if (requestError?.code !== '42P01') {
-        console.warn('[getBoardData] team_requests 조회 실패:', requestError.message);
-      }
-    }
+    const formattedRequestDocs = (teamRequestDocs || []).map((request) => ({
+      ...request,
+      template_data: request.template_data || createDevRequestTemplateData(),
+      creator_profile: request.created_by ? profilesById.get(request.created_by) || null : null,
+    }));
 
     return {
       projects: formattedProjects,

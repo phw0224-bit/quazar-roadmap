@@ -35,9 +35,20 @@ export function Toast({ message, type = 'success', onClose }) {
  * Confirmation Modal
  */
 export function ConfirmModal({ title, message, confirmText = '확인', cancelText = '취소', onConfirm, onCancel, type = 'danger' }) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const confirmBtnClass = type === 'danger' 
     ? 'bg-red-600 hover:bg-red-700 shadow-red-500/20' 
     : 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-black dark:hover:bg-gray-100 shadow-black/10';
+
+  const handleConfirm = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await onConfirm();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[1100] flex items-center justify-center p-6">
@@ -51,11 +62,11 @@ export function ConfirmModal({ title, message, confirmText = '확인', cancelTex
           <p className="text-gray-500 dark:text-text-secondary font-bold text-sm leading-relaxed text-center px-4">{message}</p>
         </div>
         <div className="flex gap-3">
-          <button onClick={onCancel} className="flex-1 py-4 bg-gray-50 dark:bg-bg-base text-gray-400 dark:text-text-tertiary rounded-2xl font-black text-[13px] uppercase tracking-widest hover:bg-gray-100 dark:hover:bg-bg-hover transition-all cursor-pointer border border-transparent dark:border-border-subtle">
+          <button disabled={isSubmitting} onClick={onCancel} className="flex-1 py-4 bg-gray-50 dark:bg-bg-base text-gray-400 dark:text-text-tertiary rounded-2xl font-black text-[13px] uppercase tracking-widest hover:bg-gray-100 dark:hover:bg-bg-hover transition-all cursor-pointer border border-transparent dark:border-border-subtle disabled:cursor-not-allowed disabled:opacity-50">
             {cancelText}
           </button>
-          <button onClick={onConfirm} className={`flex-1 py-4 text-white rounded-2xl font-black text-[13px] uppercase tracking-widest transition-all cursor-pointer shadow-xl hover:scale-105 active:scale-95 ${confirmBtnClass}`}>
-            {confirmText}
+          <button disabled={isSubmitting} onClick={handleConfirm} className={`flex-1 py-4 text-white rounded-2xl font-black text-[13px] uppercase tracking-widest transition-all cursor-pointer shadow-xl hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100 ${confirmBtnClass}`}>
+            {isSubmitting ? '처리 중...' : confirmText}
           </button>
         </div>
       </div>
@@ -68,6 +79,7 @@ export function ConfirmModal({ title, message, confirmText = '확인', cancelTex
  */
 export function InputModal({ title, placeholder, defaultValue = '', confirmText = '완료', cancelText = '취소', onConfirm, onCancel }) {
   const [value, setValue] = useState(defaultValue);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [requestForm, setRequestForm] = useState({
     title: '',
     description: createDevRequestDescriptionScaffold(),
@@ -92,6 +104,15 @@ export function InputModal({ title, placeholder, defaultValue = '', confirmText 
     && requestForm.priority.trim();
   const updateRequestField = (field, nextValue) => {
     setRequestForm((current) => ({ ...current, [field]: nextValue }));
+  };
+  const submitValue = async (nextValue) => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await onConfirm(nextValue);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isRequestDocumentFlow) {
@@ -185,11 +206,11 @@ export function InputModal({ title, placeholder, defaultValue = '', confirmText 
               {cancelText}
             </button>
             <button
-              disabled={!canSubmitRequest}
-              onClick={() => onConfirm(requestForm)}
+              disabled={!canSubmitRequest || isSubmitting}
+              onClick={() => submitValue(requestForm)}
               className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-black text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 cursor-pointer"
             >
-              요청 문서 만들기
+              {isSubmitting ? '만드는 중...' : '요청 문서 만들기'}
             </button>
           </div>
         </div>
@@ -223,9 +244,10 @@ export function InputModal({ title, placeholder, defaultValue = '', confirmText 
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') onConfirm(value);
-              if (e.key === 'Escape') onCancel();
+              if (e.key === 'Enter') submitValue(value);
+              if (e.key === 'Escape' && !isSubmitting) onCancel();
             }}
+            disabled={isSubmitting}
           />
         </div>
 
@@ -235,16 +257,18 @@ export function InputModal({ title, placeholder, defaultValue = '', confirmText 
 
         <div className="mt-8 flex items-center justify-end gap-2 border-t border-gray-100 pt-4 dark:border-border-subtle">
           <button
+            disabled={isSubmitting}
             onClick={onCancel}
-            className="rounded-lg px-3.5 py-2 text-sm font-bold text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-text-tertiary dark:hover:bg-bg-hover dark:hover:text-text-primary cursor-pointer"
+            className="rounded-lg px-3.5 py-2 text-sm font-bold text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-text-tertiary dark:hover:bg-bg-hover dark:hover:text-text-primary cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
           >
             {cancelText}
           </button>
           <button
-            onClick={() => onConfirm(value)}
-            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-black text-white transition-colors hover:bg-black dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 cursor-pointer"
+            disabled={isSubmitting}
+            onClick={() => submitValue(value)}
+            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-black text-white transition-colors hover:bg-black dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {confirmText}
+            {isSubmitting ? '처리 중...' : confirmText}
           </button>
         </div>
       </div>

@@ -11,7 +11,7 @@
  * DnD 타입 판별: activeId prefix ('section-', phase vs item)
  * localStorage: expandedSections Set, isMainBoardCollapsed boolean
  */
-import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { useTheme } from 'next-themes';
 import { CheckCircle2, ChevronRight, ChevronDown } from 'lucide-react';
 import {
@@ -428,6 +428,164 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
     setPrompt({ title, placeholder, onConfirm });
   }, []);
 
+  const pendingMutationKeysRef = useRef(new Set());
+  const [pendingMutationKeys, setPendingMutationKeys] = useState(new Set());
+
+  const runExclusiveMutation = useCallback(async (key, action, options = {}) => {
+    if (pendingMutationKeysRef.current.has(key)) {
+      showToast(options.pendingMessage || '이미 처리 중입니다. 잠시만 기다려주세요.', 'error');
+      return null;
+    }
+
+    pendingMutationKeysRef.current.add(key);
+    setPendingMutationKeys(new Set(pendingMutationKeysRef.current));
+
+    try {
+      const result = await action();
+      if (options.successMessage) {
+        showToast(typeof options.successMessage === 'function' ? options.successMessage(result) : options.successMessage);
+      }
+      return result;
+    } catch (error) {
+      showToast(`${options.errorPrefix || '처리 실패'}: ${error.message}`, 'error');
+      return null;
+    } finally {
+      pendingMutationKeysRef.current.delete(key);
+      setPendingMutationKeys(new Set(pendingMutationKeysRef.current));
+    }
+  }, [showToast]);
+
+  const guardedAddSection = useCallback(async (boardType, title) => {
+    const cleanTitle = `${title || ''}`.trim();
+    if (!cleanTitle) return null;
+    return runExclusiveMutation(
+      `section:create:${boardType}:${cleanTitle.toLowerCase()}`,
+      () => addSection(boardType, cleanTitle),
+      { successMessage: `'${cleanTitle}' 섹션이 생성되었습니다.`, errorPrefix: '섹션 생성 실패' },
+    );
+  }, [addSection, runExclusiveMutation]);
+
+  const guardedAddProject = useCallback(async (title, boardType = 'main', sectionId = null) => {
+    const cleanTitle = `${title || ''}`.trim();
+    if (!cleanTitle) return null;
+    return runExclusiveMutation(
+      `project:create:${boardType}:${sectionId || 'root'}:${cleanTitle.toLowerCase()}`,
+      () => addProject(cleanTitle, boardType, sectionId),
+      { successMessage: `'${cleanTitle}' 프로젝트가 생성되었습니다.`, errorPrefix: '프로젝트 생성 실패' },
+    );
+  }, [addProject, runExclusiveMutation]);
+
+  const guardedAddItem = useCallback(async (projectId, title, content = '', createdBy = null) => {
+    const cleanTitle = `${title || ''}`.trim();
+    if (!cleanTitle) return null;
+    return runExclusiveMutation(
+      `item:create:${projectId}:${cleanTitle.toLowerCase()}`,
+      () => addItem(projectId, cleanTitle, content, createdBy),
+      { successMessage: `'${cleanTitle}' 업무가 추가되었습니다.`, errorPrefix: '업무 생성 실패' },
+    );
+  }, [addItem, runExclusiveMutation]);
+
+  const guardedUpdateItem = useCallback(async (projectId, itemId, updates) => runExclusiveMutation(
+    `item:update:${itemId}`,
+    () => updateItem(projectId, itemId, updates),
+    { errorPrefix: '아이템 저장 실패' },
+  ), [runExclusiveMutation, updateItem]);
+
+  const guardedDeleteItem = useCallback(async (projectId, itemId) => runExclusiveMutation(
+    `item:delete:${itemId}`,
+    () => deleteItem(projectId, itemId),
+    { successMessage: '삭제되었습니다.', errorPrefix: '삭제 실패' },
+  ), [deleteItem, runExclusiveMutation]);
+
+  const guardedUpdateProject = useCallback(async (projectId, updates) => runExclusiveMutation(
+    `project:update:${projectId}`,
+    () => updateProject(projectId, updates),
+    { errorPrefix: '프로젝트 저장 실패' },
+  ), [runExclusiveMutation, updateProject]);
+
+  const guardedDeleteProject = useCallback(async (projectId) => runExclusiveMutation(
+    `project:delete:${projectId}`,
+    () => deleteProject(projectId),
+    { successMessage: '프로젝트가 삭제되었습니다.', errorPrefix: '프로젝트 삭제 실패' },
+  ), [deleteProject, runExclusiveMutation]);
+
+  const guardedCompleteProject = useCallback(async (projectId, isCompleted) => runExclusiveMutation(
+    `project:complete:${projectId}`,
+    () => completeProject(projectId, isCompleted),
+    { errorPrefix: '프로젝트 상태 변경 실패' },
+  ), [completeProject, runExclusiveMutation]);
+
+  const guardedAddGeneralDocument = useCallback(async (boardType, title, type = 'document', parentFolderId = null, createdBy = null) => {
+    const cleanTitle = `${title || ''}`.trim();
+    if (!cleanTitle) return null;
+    const entityLabel = type === 'folder' ? '폴더' : '문서';
+    return runExclusiveMutation(
+      `document:create:${boardType}:${parentFolderId || 'root'}:${type}:${cleanTitle.toLowerCase()}`,
+      () => addGeneralDocument(boardType, cleanTitle, type, parentFolderId, createdBy),
+      { successMessage: `'${cleanTitle}' ${entityLabel}가 생성되었습니다.`, errorPrefix: `${entityLabel} 생성 실패` },
+    );
+  }, [addGeneralDocument, runExclusiveMutation]);
+
+  const guardedDeleteGeneralDocument = useCallback(async (itemId) => runExclusiveMutation(
+    `document:delete:${itemId}`,
+    () => deleteGeneralDocument(itemId),
+    { successMessage: '삭제되었습니다.', errorPrefix: '삭제 실패' },
+  ), [deleteGeneralDocument, runExclusiveMutation]);
+
+  const guardedUpdateGeneralDocument = useCallback(async (itemId, updates) => runExclusiveMutation(
+    `document:update:${itemId}`,
+    () => updateGeneralDocument(itemId, updates),
+    { errorPrefix: '문서 저장 실패' },
+  ), [runExclusiveMutation, updateGeneralDocument]);
+
+  const guardedAddRequestDocument = useCallback(async (boardType, title, createdBy = null, updates = {}) => {
+    const cleanTitle = `${title || ''}`.trim();
+    if (!cleanTitle) return null;
+    return runExclusiveMutation(
+      `request:create:${boardType}:${cleanTitle.toLowerCase()}`,
+      () => addRequestDocument(boardType, cleanTitle, createdBy, updates),
+      { errorPrefix: '요청 문서 생성 실패' },
+    );
+  }, [addRequestDocument, runExclusiveMutation]);
+
+  const guardedDeleteRequestDocument = useCallback(async (requestId) => runExclusiveMutation(
+    `request:delete:${requestId}`,
+    () => deleteRequestDocument(requestId),
+    { successMessage: '삭제되었습니다.', errorPrefix: '삭제 실패' },
+  ), [deleteRequestDocument, runExclusiveMutation]);
+
+  const guardedUpdateRequestDocument = useCallback(async (requestId, updates) => runExclusiveMutation(
+    `request:update:${requestId}`,
+    () => updateRequestDocument(requestId, updates),
+    { errorPrefix: '요청 문서 저장 실패' },
+  ), [runExclusiveMutation, updateRequestDocument]);
+
+  const guardedSubmitRequestDocument = useCallback(async (requestId) => runExclusiveMutation(
+    `request:submit:${requestId}`,
+    () => submitRequestDocument(requestId),
+    { errorPrefix: '요청 전송 실패' },
+  ), [runExclusiveMutation, submitRequestDocument]);
+
+  const handlePromptConfirm = useCallback(async (value) => {
+    if (!prompt) return;
+    try {
+      await prompt.onConfirm(value);
+      setPrompt(null);
+    } catch (error) {
+      showToast(error.message || '처리 중 오류가 발생했습니다.', 'error');
+    }
+  }, [prompt, showToast]);
+
+  const handleConfirmAccept = useCallback(async () => {
+    if (!confirm) return;
+    try {
+      await confirm.onConfirm(true);
+      setConfirm(null);
+    } catch (error) {
+      showToast(error.message || '처리 중 오류가 발생했습니다.', 'error');
+    }
+  }, [confirm, showToast]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { distance: 8 }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -693,7 +851,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
 
   const handleUpdateItem = async (projectId, itemId, updates) => {
     if (detailEntityContext?.type === ENTITY_TYPES.PROJECT) {
-      await updateProject(itemId, updates);
+      await guardedUpdateProject(itemId, updates);
       return;
     }
     if (detailEntityContext?.type === ENTITY_TYPES.MEMO) {
@@ -701,7 +859,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
       return;
     }
     if (detailEntityContext?.collection === 'general') {
-      await updateGeneralDocument(itemId, updates);
+      await guardedUpdateGeneralDocument(itemId, updates);
       return;
     }
     if (detailEntityContext?.type === ENTITY_TYPES.REQUEST) {
@@ -717,10 +875,10 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
       delete nextUpdates.tags;
       delete nextUpdates.start_date;
       delete nextUpdates.end_date;
-      await updateRequestDocument(itemId, nextUpdates);
+      await guardedUpdateRequestDocument(itemId, nextUpdates);
       return;
     }
-    await updateItem(projectId, itemId, updates);
+    await guardedUpdateItem(projectId, itemId, updates);
   };
 
   const handleDeleteItem = async (projectId, itemId) => {
@@ -729,25 +887,25 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
       return;
     }
     if (detailEntityContext?.collection === 'general') {
-      await deleteGeneralDocument(itemId);
+      await guardedDeleteGeneralDocument(itemId);
       return;
     }
     if (detailEntityContext?.type === ENTITY_TYPES.REQUEST) {
-      await deleteRequestDocument(itemId);
+      await guardedDeleteRequestDocument(itemId);
       return;
     }
-    await deleteItem(projectId, itemId);
+    await guardedDeleteItem(projectId, itemId);
   };
 
   const handleSubmitRequest = async (requestId) => {
-    const submitted = await submitRequestDocument(requestId);
+    const submitted = await guardedSubmitRequestDocument(requestId);
     if (!submitted) return null;
     return submitted;
   };
 
   const handleUpdateProject = async (projectId, updates) => {
     try {
-      await updateProject(projectId, updates);
+      await guardedUpdateProject(projectId, updates);
     } catch (err) {
       showToast('프로젝트 업데이트 실패: ' + err.message, 'error');
     }
@@ -837,6 +995,8 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
     }, 80);
   };
 
+  const hasPendingMutation = pendingMutationKeys.size > 0;
+
   return (
     <PresenceContext.Provider value={{ onlineUsers, updateEditing, currentUserId: user?.id ?? null }}>
     <AppLayout
@@ -892,6 +1052,12 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
               </h1>
             </div>
             <div className="flex items-center gap-2 min-w-0">
+              {hasPendingMutation && (
+                <span className="hidden sm:inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-black uppercase tracking-widest text-gray-500 dark:border-border-subtle dark:bg-bg-elevated dark:text-text-secondary">
+                  <span className="h-2 w-2 rounded-full border-2 border-gray-300 border-t-gray-700 animate-spin dark:border-border-strong dark:border-t-white" />
+                  처리 중
+                </span>
+              )}
               {(activeView === 'board' || activeView === 'roadmap') && (
                 <FilterBar
                   inline
@@ -920,7 +1086,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
               <TimelineView
                 projects={filteredProjects.filter(p => (p.board_type || 'main') !== 'main')}
                 sections={sections.filter(s => (s.board_type || 'main') !== 'main')}
-                onUpdateItem={updateItem}
+                onUpdateItem={guardedUpdateItem}
                 onOpenDetail={handleOpenDetail}
                 isReadOnly={isReadOnly}
                 showToast={showToast}
@@ -1017,7 +1183,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                     {user && (
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => showPrompt('새 섹션 추가', '섹션 이름을 입력하세요', (title) => { if (title) { addSection(boardName, title); showToast(`'${title}' 섹션이 생성되었습니다.`); setPrompt(null); } })}
+                          onClick={() => showPrompt('새 섹션 추가', '섹션 이름을 입력하세요', (title) => guardedAddSection(boardName, title))}
                           className="px-5 py-2.5 bg-gray-50 dark:bg-bg-elevated text-gray-400 dark:text-text-tertiary rounded-xl text-sm font-bold hover:bg-gray-100 dark:hover:bg-bg-hover border border-dashed border-gray-200 dark:border-border-strong transition-all flex items-center gap-2 cursor-pointer hover:text-gray-600 dark:hover:text-text-secondary"
                         >
                           <span className="text-xl">+</span>
@@ -1028,11 +1194,9 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                             showPrompt(
                               `${boardDisplayName} 프로젝트 추가`,
                               '새 프로젝트의 이름을 입력하세요',
-                              (title) => {
+                              async (title) => {
                                 if (title) {
-                                  addProject(title, boardName);
-                                  showToast(`'${title}' 프로젝트가 생성되었습니다.`);
-                                  setPrompt(null);
+                                  await guardedAddProject(title, boardName);
                                 }
                               }
                             );
@@ -1067,11 +1231,9 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                             showPrompt(
                               '새 문서 추가',
                               '문서 제목을 입력하세요',
-                              (title) => {
+                              async (title) => {
                                 if (title) {
-                                  addGeneralDocument(boardName, title.trim(), undefined, undefined, user?.id);
-                                  showToast(`'${title}' 문서가 생성되었습니다.`);
-                                  setPrompt(null);
+                                  await guardedAddGeneralDocument(boardName, title, 'document', null, user?.id);
                                 }
                               }
                             );
@@ -1105,9 +1267,9 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                     const boardRequestDocs = boardName === '개발팀' ? requestDocs : [];
                     const isEmpty = boardProjects.length === 0 && boardSections.length === 0 && boardGeneralDocs.length === 0 && boardRequestDocs.length === 0;
                     const projectColumnProps = {
-                      onAddItem: addItem, onUpdateItem: updateItem, onDeleteItem: deleteItem,
-                      onUpdateProject: updateProject, onDeleteProject: deleteProject,
-                      onCompleteProject: completeProject,
+                      onAddItem: guardedAddItem, onUpdateItem: guardedUpdateItem, onDeleteItem: guardedDeleteItem,
+                      onUpdateProject: guardedUpdateProject, onDeleteProject: guardedDeleteProject,
+                      onCompleteProject: guardedCompleteProject,
                       onOpenDetail: handleOpenDetail,
                       onShowConfirm: showConfirm, onShowToast: showToast,
                       currentUserId: user?.id || null,
@@ -1132,14 +1294,15 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                                     try {
                                       const requestDescription = `${requestForm?.description || ''}`.trim()
                                         || createDevRequestDescriptionScaffold();
-                                      const newRequest = await addRequestDocument('개발팀', requestTitle, user?.id, {
+                                      const newRequest = await guardedAddRequestDocument('개발팀', requestTitle, user?.id, {
                                         description: requestDescription,
                                         request_team: `${user?.user_metadata?.department || ''}`.trim() || null,
                                         priority: `${requestForm?.priority || '중간'}`.trim(),
                                       });
-                                      handleOpenDetail(newRequest.id);
-                                      showToast(`'${requestTitle}' 요청 문서를 만들었습니다. 본문 템플릿을 채운 뒤 전송하세요.`);
-                                      setPrompt(null);
+                                      if (newRequest) {
+                                        handleOpenDetail(newRequest.id);
+                                        showToast(`'${requestTitle}' 요청 문서를 만들었습니다. 본문 템플릿을 채운 뒤 전송하세요.`);
+                                      }
                                     } catch (error) {
                                       showToast(`요청 문서 생성 실패: ${error.message}`, 'error');
                                     }
@@ -1156,8 +1319,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                                 async (confirmed) => {
                                   if (confirmed) {
                                     try {
-                                      await deleteRequestDocument(requestId);
-                                      showToast('삭제되었습니다.', 'success');
+                                      await guardedDeleteRequestDocument(requestId);
                                     } catch (error) {
                                       showToast(`삭제 실패: ${error.message}`, 'error');
                                     }
@@ -1176,7 +1338,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                               <p className="text-gray-400 dark:text-text-tertiary font-black text-xl mb-6 tracking-tight">이 보드에는 아직 프로젝트가 없습니다.</p>
                               {user && (
                                 <button
-                                  onClick={() => showPrompt(`${boardDisplayName} 첫 프로젝트 만들기`, '첫 번째 프로젝트의 이름을 입력하세요', (title) => { if (title) { addProject(title, boardName); showToast(`'${title}' 프로젝트가 생성되었습니다.`); setPrompt(null); } })}
+                                  onClick={() => showPrompt(`${boardDisplayName} 첫 프로젝트 만들기`, '첫 번째 프로젝트의 이름을 입력하세요', (title) => guardedAddProject(title, boardName))}
                                   className="text-sm font-black text-brand-500 dark:text-brand-400 bg-white dark:bg-bg-elevated px-8 py-3.5 rounded-2xl shadow-lg border border-brand-100 dark:border-brand-800/30 hover:bg-brand-50 dark:hover:bg-bg-hover transition-all flex items-center gap-2 hover:scale-105 active:scale-95 cursor-pointer uppercase tracking-widest"
                                 >
                                   + 첫 번째 프로젝트 추가하기
@@ -1217,11 +1379,9 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                                           showPrompt(
                                             '새 문서 추가',
                                             '문서 제목을 입력하세요',
-                                            (title) => {
+                                            async (title) => {
                                               if (title) {
-                                                addGeneralDocument(boardName, title.trim(), 'document', undefined, user?.id);
-                                                showToast(`'${title}' 문서가 생성되었습니다.`);
-                                                setPrompt(null);
+                                                await guardedAddGeneralDocument(boardName, title, 'document', null, user?.id);
                                               }
                                             }
                                           );
@@ -1237,11 +1397,9 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                                           showPrompt(
                                             '새 폴더 추가',
                                             '폴더 이름을 입력하세요',
-                                            (title) => {
+                                            async (title) => {
                                               if (title) {
-                                                addGeneralDocument(boardName, title.trim(), 'folder', undefined, user?.id);
-                                                showToast(`'${title}' 폴더가 생성되었습니다.`);
-                                                setPrompt(null);
+                                                await guardedAddGeneralDocument(boardName, title, 'folder', null, user?.id);
                                               }
                                             }
                                           );
@@ -1268,8 +1426,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                                             `"${doc.title}"을(를) 삭제하시겠습니까?`,
                                             async (confirmed) => {
                                               if (confirmed) {
-                                                await deleteGeneralDocument(itemId);
-                                                showToast('삭제되었습니다.', 'success');
+                                                await guardedDeleteGeneralDocument(itemId);
                                               }
                                             },
                                             'delete'
@@ -1296,7 +1453,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                                             if (!targetFolder) return;
 
                                             try {
-                                              await updateGeneralDocument(itemId, { parent_item_id: targetFolder.id });
+                                              await guardedUpdateGeneralDocument(itemId, { parent_item_id: targetFolder.id });
                                               showToast(`"${doc.title}"이(가) "${targetFolder.title}"으로 이동되었습니다.`, 'success');
                                             } catch (err) {
                                               showToast(`이동 실패: ${err.message}`, 'error');
@@ -1308,11 +1465,9 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                                         showPrompt(
                                           '새 문서 추가',
                                           '문서 제목을 입력하세요',
-                                          (title) => {
+                                          async (title) => {
                                             if (title) {
-                                              addGeneralDocument(boardName, title.trim(), 'document', folderId, user?.id);
-                                              showToast(`'${title}' 문서가 생성되었습니다.`);
-                                              setPrompt(null);
+                                              await guardedAddGeneralDocument(boardName, title, 'document', folderId, user?.id);
                                             }
                                           }
                                         );
@@ -1528,7 +1683,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                   onUpdateProject={handleUpdateProject}
                   onDeleteItem={handleDeleteItem}
                   onSubmitRequest={handleSubmitRequest}
-                  onDeleteProject={deleteProject}
+                  onDeleteProject={guardedDeleteProject}
                   onAddComment={addComment}
                   onUpdateComment={updateComment}
                   onDeleteComment={deleteComment}
@@ -1580,7 +1735,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
             title={confirm.title}
             message={confirm.message}
             type={confirm.type}
-            onConfirm={() => { confirm.onConfirm(true); setConfirm(null); }}
+            onConfirm={handleConfirmAccept}
             onCancel={() => setConfirm(null)}
           />
         )}
@@ -1588,7 +1743,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
           <InputModal
             title={prompt.title}
             placeholder={prompt.placeholder}
-            onConfirm={(val) => { prompt.onConfirm(val); setPrompt(null); }}
+            onConfirm={handlePromptConfirm}
             onCancel={() => setPrompt(null)}
           />
         )}

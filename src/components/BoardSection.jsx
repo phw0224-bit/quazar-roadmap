@@ -128,10 +128,9 @@ export default function BoardSection({
               onClick={() => onShowPrompt(
                 `${section.title} — 프로젝트 추가`,
                 '새 프로젝트의 이름을 입력하세요',
-                (title) => {
+                async (title) => {
                   if (title) {
-                    onAddProject(title, section.board_type, section.id);
-                    onShowToast(`'${title}' 프로젝트가 생성되었습니다.`);
+                    await onAddProject(title, section.board_type, section.id);
                   }
                 }
               )}

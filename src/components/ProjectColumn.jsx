@@ -50,6 +50,7 @@ export default function ProjectColumn({
   const [showMenu, setShowMenu] = useState(false);
   const [isEditingAssignees, setIsEditingAssignees] = useState(false);
   const [showAddItem, setShowAddItem] = useState(false);
+  const [isCreatingItem, setIsCreatingItem] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, transformOrigin: 'top right' });
   const menuButtonRef = useRef(null);
 
@@ -80,6 +81,21 @@ export default function ProjectColumn({
   const setNodeRef = (node) => { setDroppableRef(node); setSortableRef(node); };
 
   const [newItemTitle, setNewItemTitle] = useState('');
+
+  const handleCreateItem = async () => {
+    const title = newItemTitle.trim();
+    if (!title || isCreatingItem) return;
+
+    setIsCreatingItem(true);
+    try {
+      const createdItem = await onAddItem(project.id, title, '', currentUserId);
+      if (!createdItem) return;
+      setNewItemTitle('');
+      setShowAddItem(false);
+    } finally {
+      setIsCreatingItem(false);
+    }
+  };
 
   useEffect(() => {
     if (isReadOnly) return;
@@ -362,31 +378,24 @@ export default function ProjectColumn({
                       value={newItemTitle}
                       onChange={e => setNewItemTitle(e.target.value)}
                       onKeyDown={async e => {
-                        if (e.key === 'Enter' && newItemTitle.trim()) {
-                          await onAddItem(project.id, newItemTitle, '', currentUserId);
-                          setNewItemTitle('');
-                          setShowAddItem(false);
-                          onShowToast?.(`'${newItemTitle}' 업무가 추가되었습니다.`);
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          await handleCreateItem();
                       } else if (e.key === 'Escape') {
                         setShowAddItem(false);
                       }
                     }}
+                    disabled={isCreatingItem}
                   />
                 </div>
                 <div className="flex justify-end gap-2 border-t border-gray-100 dark:border-border-subtle pt-3">
-                  <button className="px-4 py-2 text-[13px] font-bold text-gray-400 dark:text-text-tertiary hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-colors uppercase tracking-widest" onClick={() => setShowAddItem(false)}>닫기</button>
+                  <button disabled={isCreatingItem} className="px-4 py-2 text-[13px] font-bold text-gray-400 dark:text-text-tertiary hover:text-gray-900 dark:hover:text-text-primary cursor-pointer transition-colors uppercase tracking-widest disabled:cursor-not-allowed disabled:opacity-50" onClick={() => setShowAddItem(false)}>닫기</button>
                   <button
-                    className="px-5 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-[13px] font-black hover:bg-black dark:hover:bg-gray-100 transition-all shadow-md cursor-pointer uppercase tracking-widest active:scale-95"
-                    onClick={async () => {
-                      if (newItemTitle.trim()) {
-                        await onAddItem(project.id, newItemTitle, '', currentUserId);
-                        setNewItemTitle('');
-                        setShowAddItem(false);
-                        onShowToast?.(`'${newItemTitle}' 업무가 추가되었습니다.`);
-                      }
-                    }}
+                    disabled={isCreatingItem || !newItemTitle.trim()}
+                    className="px-5 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-[13px] font-black hover:bg-black dark:hover:bg-gray-100 transition-all shadow-md cursor-pointer uppercase tracking-widest active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
+                    onClick={handleCreateItem}
                   >
-                    업무 생성
+                    {isCreatingItem ? '생성 중...' : '업무 생성'}
                   </button>
                 </div>
               </div>

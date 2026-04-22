@@ -312,6 +312,7 @@ const kanbanReducer = (state, action) => {
 export const useKanbanData = () => {
   const [state, dispatch] = useReducer(kanbanReducer, INITIAL_STATE);
   const fetchRequestIdRef = useRef(0);
+  const fetchDebounceRef = useRef(null);
 
   const fetchTeamBoardConfigs = useCallback(async () => {
     try {
@@ -348,41 +349,64 @@ export const useKanbanData = () => {
     }
   }, []);
 
+  const scheduleFetchData = useCallback(() => {
+    if (fetchDebounceRef.current) {
+      clearTimeout(fetchDebounceRef.current);
+    }
+    fetchDebounceRef.current = setTimeout(() => {
+      fetchDebounceRef.current = null;
+      fetchData();
+    }, 500);
+  }, [fetchData]);
+
+  const fetchCommentWithProfile = useCallback(async (commentId) => {
+    const { data, error } = await supabase
+      .from('comments')
+      .select('*, profiles(name, department)')
+      .eq('id', commentId)
+      .single();
+    if (!error) {
+      const { data: customization } = await supabase
+        .from('profile_customizations')
+        .select('avatar_style, theme_color, status_message, mood_emoji')
+        .eq('user_id', data.user_id)
+        .maybeSingle();
+      return {
+        ...data,
+        profiles: {
+          ...(data.profiles || {}),
+          customization: normalizeProfileCustomization(customization),
+        },
+      };
+    }
+    return null;
+  }, []);
+
   useEffect(() => {
     fetchData();
     fetchTeamBoardConfigs();
 
-    const fetchCommentWithProfile = async (commentId) => {
-      const { data, error } = await supabase
-        .from('comments')
-        .select('*, profiles(name, department)')
-        .eq('id', commentId)
-        .single();
-      if (!error) {
-        const { data: customization } = await supabase
-          .from('profile_customizations')
-          .select('avatar_style, theme_color, status_message, mood_emoji')
-          .eq('user_id', data.user_id)
-          .maybeSingle();
-        return {
-          ...data,
-          profiles: {
-            ...(data.profiles || {}),
-            customization: normalizeProfileCustomization(customization),
-          },
-        };
+    return () => {
+      fetchRequestIdRef.current += 1;
+      if (fetchDebounceRef.current) {
+        clearTimeout(fetchDebounceRef.current);
+        fetchDebounceRef.current = null;
       }
-      return null;
     };
+  }, [fetchData, fetchTeamBoardConfigs]);
 
-    // Real-time Subscriptions
+  useEffect(() => {
+    if (state.loading) {
+      return undefined;
+    }
+
     const itemsChannel = supabase.channel('items-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'items' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'roadmap_items' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'items' }, scheduleFetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'roadmap_items' }, scheduleFetchData)
       .subscribe();
 
     const requestDocsChannel = supabase.channel('team-requests-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'team_requests' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'team_requests' }, scheduleFetchData)
       .subscribe();
 
     const commentsChannel = supabase.channel('comments-db-changes')
@@ -404,23 +428,26 @@ export const useKanbanData = () => {
       .subscribe();
 
     const projectsChannel = supabase.channel('projects-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'roadmap_projects' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, scheduleFetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'roadmap_projects' }, scheduleFetchData)
       .subscribe();
 
     const profileCustomizationChannel = supabase.channel('profile-customizations-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profile_customizations' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profile_customizations' }, scheduleFetchData)
       .subscribe();
 
     return () => {
-      fetchRequestIdRef.current += 1;
+      if (fetchDebounceRef.current) {
+        clearTimeout(fetchDebounceRef.current);
+        fetchDebounceRef.current = null;
+      }
       supabase.removeChannel(itemsChannel);
       supabase.removeChannel(requestDocsChannel);
       supabase.removeChannel(commentsChannel);
       supabase.removeChannel(projectsChannel);
       supabase.removeChannel(profileCustomizationChannel);
     };
-  }, [fetchData, fetchTeamBoardConfigs]);
+  }, [fetchCommentWithProfile, scheduleFetchData, state.loading]);
 
   /**
    * @description 새 칸반 컬럼(프로젝트)을 추가. order_index는 현재 최대값+1 자동 계산.
@@ -431,6 +458,7 @@ export const useKanbanData = () => {
   const addProject = async (title, boardType = 'main', sectionId = null) => {
     const newProject = await API.addProject(title, boardType, sectionId);
     dispatch({ type: 'ADD_PROJECT', payload: newProject });
+    return newProject;
   };
 
   const updateProject = async (projectId, updates) => {
@@ -473,6 +501,7 @@ export const useKanbanData = () => {
     const boardType = project?.board_type ?? 'main';
     const newItem = await API.addItem(projectId, title, content, createdBy, boardType);
     dispatch({ type: 'ADD_ITEM', payload: { projectId, item: newItem } });
+    return newItem;
   };
 
   const resolveProjectForItem = (projectId, itemId) => {
@@ -494,6 +523,7 @@ export const useKanbanData = () => {
     const resolvedProjectId = project?.id ?? projectId;
     const updated = await API.updateItem(resolvedProjectId, itemId, updates, boardType);
     dispatch({ type: 'UPDATE_ITEM', payload: { projectId: resolvedProjectId, itemId, updates: updated } });
+    return updated;
   };
 
   const deleteItem = async (projectId, itemId) => {
@@ -591,12 +621,14 @@ export const useKanbanData = () => {
   const addSection = async (boardType, title) => {
     const newSection = await API.addSection(boardType, title);
     dispatch({ type: 'ADD_SECTION', payload: newSection });
+    return newSection;
   };
 
   // 신규: 일반 문서 관련 함수들
   const addGeneralDocument = async (boardType, title, type = 'document', parentFolderId = null, createdBy = null) => {
     const newDoc = await API.createGeneralDocument(boardType, title, type, parentFolderId, createdBy);
     dispatch({ type: 'ADD_GENERAL_DOC', payload: newDoc });
+    return newDoc;
   };
 
   const updateGeneralDocument = async (itemId, updates) => {
