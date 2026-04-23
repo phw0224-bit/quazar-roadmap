@@ -7,6 +7,19 @@ import {
   GITHUB_CLIENT_SECRET,
 } from './config.js';
 
+function decodeJwtPayload(token) {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+
+    const payload = parts[1];
+    const decoded = Buffer.from(payload, 'base64').toString('utf8');
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+}
+
 export function requireServerConfig(res) {
   if (!supabaseAuthClient || !supabaseAdminClient) {
     res.status(500).json({ error: 'Supabase server configuration is missing.' });
@@ -30,10 +43,6 @@ export function isGitHubAppAuthConfigured() {
 }
 
 export async function getAuthenticatedUser(req) {
-  if (!supabaseAuthClient) {
-    throw new Error('Supabase auth client is not configured');
-  }
-
   const authHeader = req.headers.authorization || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
   if (!token) {
@@ -41,18 +50,24 @@ export async function getAuthenticatedUser(req) {
     return null;
   }
 
-  const { data, error } = await supabaseAuthClient.auth.getUser(token);
-  if (error) {
-    console.warn('[auth] Supabase auth.getUser failed', {
-      message: error.message,
-      status: error.status,
-      code: error.code,
-      tokenLength: token.length,
-    });
+  const payload = decodeJwtPayload(token);
+  if (!payload) {
+    console.warn('[auth] Failed to decode JWT token');
     return null;
   }
 
-  return data.user ?? null;
+  const now = Math.floor(Date.now() / 1000);
+  if (payload.exp && payload.exp < now) {
+    console.warn('[auth] JWT token expired', { exp: payload.exp, now });
+    return null;
+  }
+
+  return {
+    id: payload.sub,
+    email: payload.email,
+    user_metadata: payload.user_metadata || {},
+    app_metadata: payload.app_metadata || {},
+  };
 }
 
 export function getBearerToken(req) {
