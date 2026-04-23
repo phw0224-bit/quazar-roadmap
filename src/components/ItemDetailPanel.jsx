@@ -17,7 +17,8 @@ import {
   ChevronsRight, Maximize2, ChevronRight, Trash2,
   Clock, Users, Building2, Tag, Link2, Plus, X,
   MessageSquare, Search, ArrowUpRight, AlignCenter, AlignJustify,
-  Calendar, Flag, LayoutList, List, Github, ExternalLink, Send, CheckCircle2
+  Calendar, Flag, LayoutList, List, Github, ExternalLink, Send, CheckCircle2,
+  Share2, Copy
 } from 'lucide-react';
 import CommentSection from './CommentSection';
 import ItemDescriptionSection from './ItemDescriptionSection';
@@ -74,6 +75,8 @@ function ItemDetailPanel({
   const [isGitHubLoading, setIsGitHubLoading] = useState(false);
   const [isGitHubSubmitting, setIsGitHubSubmitting] = useState(false);
   const [gitHubError, setGitHubError] = useState('');
+  const [showShareLinkModal, setShowShareLinkModal] = useState(false);
+  const [itemShareLink, setItemShareLink] = useState('');
   const [issuedTicket, setIssuedTicket] = useState({
     key: item?.ticket_key || '',
     number: item?.ticket_number ?? null,
@@ -213,6 +216,79 @@ function ItemDetailPanel({
   useEffect(() => () => {
     updateEditing(null);
   }, [updateEditing]);
+
+  const buildItemShareUrl = () => {
+    if (typeof window === 'undefined' || !item?.id) return '';
+
+    const url = new URL(window.location.href);
+    url.searchParams.set('item', item.id);
+    url.searchParams.set('fullscreen', '1');
+
+    if (!url.searchParams.get('boardType') && phase?.board_type && phase.board_type !== 'personal') {
+      url.searchParams.set('boardType', phase.board_type);
+    }
+
+    return url.toString();
+  };
+
+  const copyTextToClipboard = async (text) => {
+    if (!text) return false;
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {
+      // 일부 PWA/WebView에서는 clipboard API 권한이 없어 아래 fallback으로 시도한다.
+    }
+
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.top = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const copied = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return copied;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleCopyShareLink = async (link = itemShareLink) => {
+    const copied = await copyTextToClipboard(link);
+    if (copied) {
+      onShowToast?.('공유 링크가 복사되었습니다.');
+    }
+    return copied;
+  };
+
+  const handleShareItem = async () => {
+    const link = buildItemShareUrl();
+    setItemShareLink(link);
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: item.title || item.content || '아이템 공유',
+          url: link,
+        });
+        return;
+      } catch (error) {
+        if (error?.name === 'AbortError') return;
+      }
+    }
+
+    const copied = await handleCopyShareLink(link);
+    if (!copied) {
+      setShowShareLinkModal(true);
+      onShowToast?.('자동 복사가 막혀 링크를 표시했습니다.');
+    }
+  };
 
   const handleHeadingClick = (offset) => {
     // CodeMirror editorView로 스크롤
@@ -480,6 +556,64 @@ function ItemDetailPanel({
       }),
     [item?.id, item?.related_items, relationItems, relationSearchQuery],
   );
+  const shareLinkModal = showShareLinkModal && (
+    <div
+      className="fixed inset-0 z-[130] flex items-center justify-center bg-black/45 px-4 backdrop-blur-sm"
+      onMouseDown={() => setShowShareLinkModal(false)}
+    >
+      <div
+        className="w-full max-w-lg rounded-3xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-border-subtle dark:bg-bg-elevated"
+        onMouseDown={stopProp}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.22em] text-gray-400 dark:text-text-tertiary">
+              <Share2 size={16} strokeWidth={2.5} />
+              공유
+            </div>
+            <h2 className="mt-2 text-xl font-black text-gray-950 dark:text-text-primary">아이템 링크</h2>
+            <p className="mt-1 text-sm font-semibold text-gray-500 dark:text-text-secondary">
+              자동 복사가 안 될 때는 아래 링크를 길게 누르거나 선택해서 복사하세요.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowShareLinkModal(false)}
+            className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-text-tertiary dark:hover:bg-bg-hover dark:hover:text-text-primary"
+            aria-label="공유 링크 닫기"
+          >
+            <X size={18} strokeWidth={2.4} />
+          </button>
+        </div>
+
+        <div className="mt-6 flex flex-col gap-3">
+          <input
+            readOnly
+            value={itemShareLink}
+            onFocus={(event) => event.target.select()}
+            className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:ring-4 focus:ring-brand-500/10 dark:border-border-subtle dark:bg-bg-base dark:text-text-primary"
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowShareLinkModal(false)}
+              className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-black text-gray-600 transition-colors hover:bg-gray-50 dark:border-border-subtle dark:text-text-secondary dark:hover:bg-bg-hover"
+            >
+              닫기
+            </button>
+            <button
+              type="button"
+              onClick={() => handleCopyShareLink(itemShareLink)}
+              className="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2 text-sm font-black text-white transition-colors hover:bg-gray-800 dark:bg-white dark:text-gray-900"
+            >
+              <Copy size={15} strokeWidth={2.5} />
+              복사
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   if (!item) return null;
 
@@ -499,6 +633,15 @@ function ItemDetailPanel({
                 title={isFullscreen ? '사이드바로 전환' : '전체화면으로 전환'}
               >
                 {isFullscreen ? <ChevronsRight size={17} strokeWidth={2.4} /> : <Maximize2 size={17} strokeWidth={2.4} />}
+              </button>
+              <button
+                type="button"
+                onClick={handleShareItem}
+                className={headerIconButtonClass}
+                aria-label="공유 링크 복사"
+                title="공유 링크 복사"
+              >
+                <Share2 size={17} strokeWidth={2.4} />
               </button>
               {!isReadOnly && (
                 <button
@@ -682,6 +825,7 @@ function ItemDetailPanel({
             </div>
           </div>
         </div>
+        {shareLinkModal}
       </div>
     );
   }
@@ -703,6 +847,15 @@ function ItemDetailPanel({
               title={isFullscreen ? '사이드바로 전환' : '전체화면으로 전환'}
             >
               {isFullscreen ? <ChevronsRight size={17} strokeWidth={2.4} /> : <Maximize2 size={17} strokeWidth={2.4} />}
+            </button>
+            <button
+              type="button"
+              onClick={handleShareItem}
+              className={headerIconButtonClass}
+              aria-label="공유 링크 복사"
+              title="공유 링크 복사"
+            >
+              <Share2 size={17} strokeWidth={2.4} />
             </button>
             <button
               onClick={() => setIsWideView(v => !v)}
@@ -1307,6 +1460,7 @@ function ItemDetailPanel({
           )}
         </div>
       </div>
+      {shareLinkModal}
       {showGitHubIssueCreator && !isMemo && (
         <div
           className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 px-4 backdrop-blur-sm"
