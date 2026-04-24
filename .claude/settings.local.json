@@ -35,7 +35,8 @@
       "Bash(pkill -f \"vite --port 5173\")",
       "Bash(pkill -f \"yarn dev:all\")",
       "Bash(awk '{print $2}')",
-      "Bash(xargs -r kill -9)"
+      "Bash(xargs -r kill -9)",
+      "Bash(npm run *)"
     ]
   },
   "enableAllProjectMcpServers": true,

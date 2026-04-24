@@ -18,7 +18,7 @@ import {
   Clock, Users, Building2, Tag, Link2, Plus, X,
   MessageSquare, Search, ArrowUpRight, AlignCenter, AlignJustify,
   Calendar, Flag, LayoutList, List, Github, ExternalLink, Send, CheckCircle2,
-  Share2, Copy
+  Share2, Copy, ClipboardList
 } from 'lucide-react';
 import CommentSection from './CommentSection';
 import ItemDescriptionSection from './ItemDescriptionSection';
@@ -42,6 +42,7 @@ import {
 function ItemDetailPanel({
   item, project = null, phase = project, entityContext = null, allItems = [], onClose, onUpdateItem, onUpdateProject, onUpdatePhase = onUpdateProject, isReadOnly,
   relationItems = allItems,
+  reverseLinkedItems = null,
   isFullscreen = false, onToggleFullscreen,
   onBreadcrumbNavigate,
   onAddComment, onUpdateComment, onDeleteComment, onOpenDetail,
@@ -60,6 +61,8 @@ function ItemDetailPanel({
   const [newTagInput, setNewTagInput] = useState('');
   const [isEditingRelations, setIsEditingRelations] = useState(false);
   const [relationSearchQuery, setRelationSearchQuery] = useState('');
+  const [expandedBoardTypes, setExpandedBoardTypes] = useState(new Set());
+  const [expandedSubGroups, setExpandedSubGroups] = useState(new Set());
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [titleInput, setTitleInput] = useState(item?.title || item?.content || '');
@@ -556,6 +559,31 @@ function ItemDetailPanel({
       }),
     [item?.id, item?.related_items, relationItems, relationSearchQuery],
   );
+  const groupedRelationItems = useMemo(() => {
+    const groups = {};
+    relationSearchItems.forEach(item => {
+      const board = item._boardType || '기타';
+      const sub = item._subGroup || '기타';
+      if (!groups[board]) groups[board] = {};
+      if (!groups[board][sub]) groups[board][sub] = [];
+      groups[board][sub].push(item);
+    });
+    return groups;
+  }, [relationSearchItems]);
+  const effectiveExpandedBoardTypes = useMemo(() => {
+    if (relationSearchQuery) return new Set(Object.keys(groupedRelationItems));
+    return expandedBoardTypes;
+  }, [relationSearchQuery, groupedRelationItems, expandedBoardTypes]);
+  const effectiveExpandedSubGroups = useMemo(() => {
+    if (relationSearchQuery) {
+      const all = new Set();
+      Object.entries(groupedRelationItems).forEach(([board, subs]) => {
+        Object.keys(subs).forEach(sub => all.add(`${board}::${sub}`));
+      });
+      return all;
+    }
+    return expandedSubGroups;
+  }, [relationSearchQuery, groupedRelationItems, expandedSubGroups]);
   const shareLinkModal = showShareLinkModal && (
     <div
       className="fixed inset-0 z-[130] flex items-center justify-center bg-black/45 px-4 backdrop-blur-sm"
@@ -1192,12 +1220,15 @@ function ItemDetailPanel({
                     const relatedItem = allItems.find(i => i.id === relatedId);
                     if (!relatedItem) return null;
                     return (
-                      <span 
-                        key={relatedId} 
+                      <span
+                        key={relatedId}
                         onClick={(e) => { e.stopPropagation(); onOpenDetail?.(relatedId); }}
                         className="flex items-center gap-2 bg-brand-50 dark:bg-brand-800/20 text-brand-700 dark:text-brand-300 border border-brand-100 dark:border-brand-700/40 px-3 py-1.5 rounded-xl text-[13px] font-black shadow-sm group/rel cursor-pointer hover:bg-brand-100 dark:hover:bg-brand-800/30 transition-all hover:scale-105 active:scale-95"
                       >
-                        <ArrowUpRight size={12} strokeWidth={3} />
+                        {relatedItem._isRequest
+                          ? <ClipboardList size={12} strokeWidth={2.5} />
+                          : <ArrowUpRight size={12} strokeWidth={3} />
+                        }
                         {relatedItem.title || relatedItem.content}
                         {!isReadOnly && (
                           <button 
@@ -1232,22 +1263,59 @@ function ItemDetailPanel({
                         onKeyDown={e => { if (e.key === 'Escape') setIsEditingRelations(false); }}
                       />
                     </div>
-                    <div className="absolute top-full left-0 w-full max-h-60 overflow-y-auto bg-white dark:bg-bg-elevated border border-gray-200 dark:border-border-subtle rounded-2xl shadow-2xl z-[100] mt-2 p-2 custom-scrollbar animate-in zoom-in-95 duration-200">
-                      {relationSearchItems.map(searchItem => (
-                          <div 
-                            key={searchItem.id}
-                            onClick={() => handleAddRelation(searchItem.id)}
-                            className="p-3 rounded-xl text-sm font-bold text-gray-700 dark:text-text-secondary hover:bg-brand-50 dark:hover:bg-brand-800/20 hover:text-brand-600 dark:hover:text-brand-400 cursor-pointer transition-colors flex items-center justify-between group/searchitem"
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className="px-2 py-0.5 bg-gray-100 dark:bg-bg-hover text-[11px] font-black text-gray-400 uppercase rounded-md group-hover/searchitem:bg-brand-100 dark:group-hover/searchitem:bg-brand-800/30 group-hover/searchitem:text-brand-500 transition-colors">
-                                {searchItem.teams?.[0] || '전체'}
-                              </span>
-                              {searchItem.title || searchItem.content}
-                            </div>
-                            <Plus size={14} className="opacity-0 group-hover/searchitem:opacity-100 transition-opacity" />
+                    <div className="absolute top-full left-0 w-full max-h-72 overflow-y-auto bg-white dark:bg-bg-elevated border border-gray-200 dark:border-border-subtle rounded-2xl shadow-2xl z-[100] mt-2 p-1.5 custom-scrollbar animate-in zoom-in-95 duration-200">
+                      {Object.entries(groupedRelationItems).map(([boardType, subGroups]) => {
+                        const isBoardExpanded = effectiveExpandedBoardTypes.has(boardType);
+                        const totalCount = Object.values(subGroups).reduce((s, arr) => s + arr.length, 0);
+                        return (
+                          <div key={boardType}>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedBoardTypes(prev => {
+                                const next = new Set(prev);
+                                if (next.has(boardType)) next.delete(boardType); else next.add(boardType);
+                                return next;
+                              })}
+                              className="w-full flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-[0.15em] text-gray-500 dark:text-text-tertiary hover:bg-gray-50 dark:hover:bg-bg-hover transition-colors"
+                            >
+                              <ChevronRight size={11} strokeWidth={3} className={`transition-transform duration-150 ${isBoardExpanded ? 'rotate-90' : ''}`} />
+                              <span>{boardType}</span>
+                              <span className="ml-auto text-[10px] font-bold text-gray-300 dark:text-text-tertiary">{totalCount}</span>
+                            </button>
+                            {isBoardExpanded && Object.entries(subGroups).map(([subGroup, items]) => {
+                              const subKey = `${boardType}::${subGroup}`;
+                              const isSubExpanded = effectiveExpandedSubGroups.has(subKey);
+                              return (
+                                <div key={subKey} className="ml-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpandedSubGroups(prev => {
+                                      const next = new Set(prev);
+                                      if (next.has(subKey)) next.delete(subKey); else next.add(subKey);
+                                      return next;
+                                    })}
+                                    className="w-full flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold text-gray-400 dark:text-text-tertiary hover:bg-gray-50 dark:hover:bg-bg-hover transition-colors"
+                                  >
+                                    <ChevronRight size={10} strokeWidth={2.5} className={`transition-transform duration-150 ${isSubExpanded ? 'rotate-90' : ''}`} />
+                                    <span>{subGroup}</span>
+                                    <span className="ml-auto text-[10px] text-gray-300 dark:text-text-tertiary">{items.length}</span>
+                                  </button>
+                                  {isSubExpanded && items.map(searchItem => (
+                                    <div
+                                      key={searchItem.id}
+                                      onClick={() => handleAddRelation(searchItem.id)}
+                                      className="ml-4 px-3 py-2 rounded-xl text-sm font-bold text-gray-700 dark:text-text-secondary hover:bg-brand-50 dark:hover:bg-brand-800/20 hover:text-brand-600 dark:hover:text-brand-400 cursor-pointer transition-colors flex items-center justify-between group/searchitem"
+                                    >
+                                      <span className="truncate">{searchItem.title || searchItem.content}</span>
+                                      <Plus size={13} className="shrink-0 opacity-0 group-hover/searchitem:opacity-100 transition-opacity ml-2" />
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })}
                           </div>
-                        ))}
+                        );
+                      })}
                       {relationSearchItems.length === 0 && (
                         <div className="p-8 text-center text-[13px] font-bold text-gray-400 dark:text-text-tertiary italic">검색 결과가 없습니다.</div>
                       )}
@@ -1256,6 +1324,34 @@ function ItemDetailPanel({
                 )}
               </div>
             </div>
+
+            {/* 연결된 업무 (요청문서에서 역방향 링크) */}
+            {reverseLinkedItems !== null && (
+              <div className="flex items-start min-h-[48px]">
+                <div className="w-48 flex items-center gap-3 text-gray-400 dark:text-text-tertiary shrink-0 pt-2.5">
+                  <ClipboardList size={18} strokeWidth={2.5} />
+                  <span className="text-[13px] font-black uppercase tracking-widest">연결된 업무</span>
+                </div>
+                <div className="flex-1 px-3 py-2 rounded-xl min-h-[40px] flex flex-col gap-2 justify-center">
+                  {reverseLinkedItems.length === 0 ? (
+                    <span className="text-[13px] font-bold text-gray-300 dark:text-text-tertiary italic ml-1">연결된 업무 없음</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-2 items-center">
+                      {reverseLinkedItems.map(linked => (
+                        <span
+                          key={linked.id}
+                          onClick={() => onOpenDetail?.(linked.id)}
+                          className="flex items-center gap-2 bg-brand-50 dark:bg-brand-800/20 text-brand-700 dark:text-brand-300 border border-brand-100 dark:border-brand-700/40 px-3 py-1.5 rounded-xl text-[13px] font-black shadow-sm cursor-pointer hover:bg-brand-100 dark:hover:bg-brand-800/30 transition-all hover:scale-105 active:scale-95"
+                        >
+                          <ArrowUpRight size={12} strokeWidth={3} />
+                          {linked.title || linked.content}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* 시작일 */}
             <div className="flex items-center min-h-[48px] group">

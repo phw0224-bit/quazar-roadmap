@@ -609,13 +609,45 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
   const relationCandidateItems = useMemo(() => {
     const teamProjectItems = projects
       .filter(project => (project.board_type || 'main') !== MAIN_BOARD_TYPE)
-      .flatMap(project => project.items || []);
-    const teamGeneralDocs = generalDocs.filter(doc => (doc.board_type || 'main') !== MAIN_BOARD_TYPE);
-    return user ? [...teamProjectItems, ...teamGeneralDocs, ...personalMemos] : [...teamProjectItems, ...teamGeneralDocs];
-  }, [generalDocs, personalMemos, projects, user]);
+      .flatMap(project => (project.items || []).map(item => ({
+        ...item,
+        _boardType: project.board_type || '팀',
+        _subGroup: project.title,
+      })));
+    const teamGeneralDocs = generalDocs
+      .filter(doc => (doc.board_type || 'main') !== MAIN_BOARD_TYPE)
+      .map(doc => ({
+        ...doc,
+        _boardType: doc.board_type || '팀',
+        _subGroup: '일반 문서',
+      }));
+    const mappedRequestDocs = requestDocs.map(r => ({
+      ...r,
+      _isRequest: true,
+      teams: [r.board_type || '개발팀'],
+      related_items: r.related_items || [],
+      _boardType: r.board_type || '개발팀',
+      _subGroup: '요청',
+    }));
+    const memoItems = personalMemos.map(m => ({
+      ...m,
+      _boardType: '개인',
+      _subGroup: '메모',
+    }));
+    return user
+      ? [...teamProjectItems, ...teamGeneralDocs, ...memoItems, ...mappedRequestDocs]
+      : [...teamProjectItems, ...teamGeneralDocs, ...mappedRequestDocs];
+  }, [generalDocs, personalMemos, projects, requestDocs, user]);
+
+  const allNonMainProjectItems = useMemo(
+    () => projects
+      .filter(p => (p.board_type || MAIN_BOARD_TYPE) !== MAIN_BOARD_TYPE)
+      .flatMap(p => p.items || []),
+    [projects],
+  );
 
   const searchableAdditionalItems = useMemo(() => {
-    const items = [...generalDocs];
+    const items = generalDocs.filter(doc => (doc.board_type || MAIN_BOARD_TYPE) !== MAIN_BOARD_TYPE);
     if (user) {
       items.push(...personalMemos);
     }
@@ -826,6 +858,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
     }
   }
 
+  let detailRequestReverseLinks = null;
   if (!detailItem && detailItemId) {
     const requestDoc = requestDocs.find(doc => doc.id === detailItemId);
     if (requestDoc) {
@@ -835,6 +868,9 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
         title: '요청',
         board_type: '개발팀',
       };
+      detailRequestReverseLinks = projectItems.filter(
+        item => Array.isArray(item.related_items) && item.related_items.includes(requestDoc.id)
+      );
     }
   }
 
@@ -1288,6 +1324,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                           {boardName === '개발팀' && (
                             <RequestBoardSection
                               requests={requestDocs}
+                              allProjectItems={allNonMainProjectItems}
                               isReadOnly={isReadOnly}
                               onOpenRequest={handleOpenDetail}
                               onAddRequest={() => {
@@ -1681,8 +1718,9 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                   item={detailItem}
                   project={detailProject}
                   entityContext={detailEntityContext}
-                  allItems={[...projectItems, ...generalDocs, ...personalMemos]}
+                  allItems={[...projectItems, ...generalDocs, ...personalMemos, ...requestDocs]}
                   relationItems={relationCandidateItems}
+                  reverseLinkedItems={detailRequestReverseLinks}
                   onClose={closeDetailPanel}
                   isFullscreen={isDetailFullscreen}
                   onToggleFullscreen={() => setUrlState({ fullscreen: !isDetailFullscreen })}
@@ -1728,7 +1766,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
         {showSearch && (
           <Suspense fallback={<ViewLoadingFallback label="검색 창 준비 중..." />}>
             <SearchModal
-              projects={projects}
+              projects={projects.filter(p => (p.board_type || MAIN_BOARD_TYPE) !== MAIN_BOARD_TYPE)}
               additionalItems={searchableAdditionalItems}
               onOpenDetail={handleOpenDetail}
               onClose={() => setShowSearch(false)}

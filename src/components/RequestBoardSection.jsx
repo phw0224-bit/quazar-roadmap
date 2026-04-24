@@ -4,7 +4,7 @@
  * 일반 문서와 분리된 별도 테이블(team_requests)을 렌더링한다.
  * 임시 요청명세 템플릿을 상단에 노출하고, 요청 카드 목록은 단일 리스트로 보여준다.
  */
-import { CheckCircle2, ClipboardList, Plus, Trash2, Clock3, Gauge, PencilLine } from 'lucide-react';
+import { CheckCircle2, ClipboardList, Plus, Trash2, Clock3, Gauge, PencilLine, ArrowUpRight } from 'lucide-react';
 import { DEV_REQUEST_BOARD, DEV_REQUEST_STATUSES } from '../lib/devRequestBoard';
 
 const formatDate = (value) => {
@@ -49,6 +49,7 @@ const priorityTone = (priority) => {
 
 function RequestBoardSection({
   requests = [],
+  allProjectItems = [],
   isReadOnly = false,
   onAddRequest,
   onDeleteRequest,
@@ -122,6 +123,11 @@ function RequestBoardSection({
             const priority = request.priority || '중간';
             const isNotified = Boolean(request.notified_at);
             const isSubmitted = Boolean(request.submitted_at);
+            const linkedItems = allProjectItems.filter(
+              item => Array.isArray(item.related_items) && item.related_items.includes(request.id)
+            );
+            const visibleLinked = linkedItems.slice(0, 3);
+            const overflowCount = linkedItems.length - visibleLinked.length;
 
             return (
               <article
@@ -181,6 +187,25 @@ function RequestBoardSection({
                     {formatDate(request.updated_at || request.created_at)}
                   </span>
                 </div>
+
+                {linkedItems.length > 0 && (
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                    {visibleLinked.map(linked => (
+                      <span
+                        key={linked.id}
+                        className="inline-flex items-center gap-1 rounded-lg bg-brand-50 px-2 py-0.5 text-[11px] font-bold text-brand-700 dark:bg-brand-800/20 dark:text-brand-300 border border-brand-100 dark:border-brand-700/40"
+                      >
+                        <ArrowUpRight size={10} strokeWidth={3} />
+                        {linked.title || linked.content}
+                      </span>
+                    ))}
+                    {overflowCount > 0 && (
+                      <span className="rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-500 dark:bg-white/8 dark:text-zinc-400">
+                        +{overflowCount} 더보기
+                      </span>
+                    )}
+                  </div>
+                )}
 
               </article>
             );
