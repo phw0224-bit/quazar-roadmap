@@ -18,6 +18,7 @@ import {
   applySidebarProjectMove,
   cloneProjectsSnapshot,
 } from './sidebarMoveState.js';
+import { shouldRefetchBoardForEntryChange } from './boardRealtimePolicy.js';
 
 const INITIAL_STATE = {
   projects: [],
@@ -359,6 +360,14 @@ export const useKanbanData = () => {
     }, 500);
   }, [fetchData]);
 
+  const handleEntryRealtimeChange = useCallback((payload) => {
+    if (!shouldRefetchBoardForEntryChange(payload)) {
+      return;
+    }
+
+    scheduleFetchData();
+  }, [scheduleFetchData]);
+
   const fetchCommentWithProfile = useCallback(async (commentId) => {
     const { data, error } = await supabase
       .from('comments')
@@ -401,12 +410,12 @@ export const useKanbanData = () => {
     }
 
     const itemsChannel = supabase.channel('items-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'items' }, scheduleFetchData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'roadmap_items' }, scheduleFetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'items' }, handleEntryRealtimeChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'roadmap_items' }, handleEntryRealtimeChange)
       .subscribe();
 
     const requestDocsChannel = supabase.channel('team-requests-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'team_requests' }, scheduleFetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'team_requests' }, handleEntryRealtimeChange)
       .subscribe();
 
     const commentsChannel = supabase.channel('comments-db-changes')
@@ -447,7 +456,7 @@ export const useKanbanData = () => {
       supabase.removeChannel(projectsChannel);
       supabase.removeChannel(profileCustomizationChannel);
     };
-  }, [fetchCommentWithProfile, scheduleFetchData, state.loading]);
+  }, [fetchCommentWithProfile, handleEntryRealtimeChange, scheduleFetchData, state.loading]);
 
   /**
    * @description 새 칸반 컬럼(프로젝트)을 추가. order_index는 현재 최대값+1 자동 계산.
