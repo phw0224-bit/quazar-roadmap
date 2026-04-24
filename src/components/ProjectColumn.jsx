@@ -20,6 +20,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { MoreHorizontal, Plus, User, Link, EyeOff, CheckCircle2 } from 'lucide-react';
 import KanbanCard from './KanbanCard';
 import AssigneePicker from './AssigneePicker';
+import { sortProjectItemsByCompletion } from './projectItemOrdering';
 import { PROJECT_TINTS } from '../lib/constants';
 import {
   getProjectMenuPosition,
@@ -57,10 +58,11 @@ export default function ProjectColumn({
   const COLLAPSED_COUNT = 6;
   const [isExpanded, setIsExpanded] = useState(false);
   const [hideCompleted, setHideCompleted] = useState(false);
-  const completedCount = project.items.filter(item => item.status === 'done').length;
+  const orderedItems = sortProjectItemsByCompletion(project.items);
+  const completedCount = orderedItems.filter(item => item.status === 'done').length;
   const displayItems = hideCompleted
-    ? project.items.filter(item => item.status !== 'done')
-    : project.items;
+    ? orderedItems.filter(item => item.status !== 'done')
+    : orderedItems;
   const hasMore = displayItems.length > COLLAPSED_COUNT;
   const visibleItems = isExpanded ? displayItems : displayItems.slice(0, COLLAPSED_COUNT);
 
@@ -96,18 +98,6 @@ export default function ProjectColumn({
       setIsCreatingItem(false);
     }
   };
-
-  useEffect(() => {
-    if (isReadOnly) return;
-    const kanbanItems = project.items.filter(item => !item.page_type || item.page_type === 'task');
-    const allDone = kanbanItems.length > 0 && kanbanItems.every(item => item.status === 'done');
-    if (allDone && !project.is_completed) {
-      onCompleteProject?.(project.id, true);
-    } else if (!allDone && project.is_completed) {
-      onCompleteProject?.(project.id, false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project.items, isReadOnly]);
 
   useEffect(() => {
     setIsEditingAssignees(false);
