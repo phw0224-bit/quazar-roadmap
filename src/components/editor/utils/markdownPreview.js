@@ -16,7 +16,7 @@ marked.use({
 });
 
 function parseMarkdown(source) {
-  return marked.parse(source);
+  return decorateRenderedTables(marked.parse(source));
 }
 
 /**
@@ -186,6 +186,13 @@ function renderCalloutHTML(typeKey, def, title, bodyHTML) {
   </div>
   ${bodyHTML ? `<div class="md-callout-body">${bodyHTML}</div>` : ''}
 </div>`;
+}
+
+function decorateRenderedTables(html) {
+  if (!html || !html.includes('<table>')) return html;
+
+  return html.replace(/<table>/g, '<div class="markdown-preview-table-wrap"><table class="markdown-preview-table">')
+    .replace(/<\/table>/g, '</table></div>');
 }
 
 function escapeHTML(value) {

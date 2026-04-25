@@ -70,6 +70,20 @@ test('renderMarkdownPreviewHTML renders ordered lists', () => {
   assert.match(html, /<li>두번째<\/li>/);
 });
 
+test('renderMarkdownPreviewHTML wraps markdown tables for preview styling', () => {
+  const html = renderMarkdownPreviewHTML([
+    '| 파일 | 수정 내용 |',
+    '| --- | --- |',
+    '| app/utils/order.py | `audit_db` -> `db` |',
+  ].join('\n'));
+
+  assert.match(html, /<div class="markdown-preview-table-wrap">/);
+  assert.match(html, /<table class="markdown-preview-table">/);
+  assert.match(html, /<thead>/);
+  assert.match(html, /<tbody>/);
+  assert.match(html, /<code>audit_db<\/code>/);
+});
+
 test('renderMarkdownPreviewHTML renders extended callout types', () => {
   const html = renderMarkdownPreviewHTML([
     '> [!abstract] 요약',

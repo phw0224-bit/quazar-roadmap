@@ -438,6 +438,82 @@ input:focus, textarea:focus {
   margin: 0.7rem 0;
 }
 
+.markdown-preview .markdown-preview-table-wrap {
+  margin: 0.95rem 0;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  border-radius: 0.95rem;
+  background: rgba(248, 250, 252, 0.92);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.dark .markdown-preview .markdown-preview-table-wrap {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.markdown-preview .markdown-preview-table {
+  margin: 0;
+  width: 100%;
+  min-width: 40rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.markdown-preview .markdown-preview-table :where(th, td) {
+  padding: 0.78rem 0.9rem;
+  text-align: left;
+  vertical-align: top;
+  line-height: 1.6;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  border-right: 1px solid rgba(203, 213, 225, 0.85);
+  border-bottom: 1px solid rgba(203, 213, 225, 0.85);
+}
+
+.markdown-preview .markdown-preview-table :where(th:last-child, td:last-child) {
+  border-right: none;
+}
+
+.markdown-preview .markdown-preview-table thead th {
+  font-weight: 800;
+  color: #263241;
+  background: rgba(241, 245, 249, 0.92);
+}
+
+.markdown-preview .markdown-preview-table tbody td {
+  color: #475569;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.markdown-preview .markdown-preview-table tbody tr:last-child td {
+  border-bottom-color: transparent;
+}
+
+.dark .markdown-preview .markdown-preview-table :where(th, td) {
+  border-right-color: rgba(255, 255, 255, 0.08);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.dark .markdown-preview .markdown-preview-table thead th {
+  color: #f5f2eb;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.dark .markdown-preview .markdown-preview-table tbody td {
+  color: #d6d0c7;
+  background: transparent;
+}
+
+.markdown-preview .markdown-preview-table :where(th, td) code {
+  vertical-align: baseline;
+  white-space: normal;
+}
+
 .markdown-preview :where(ul, ol) {
   padding-left: 1.25rem;
 }
@@ -1073,47 +1149,67 @@ input:focus, textarea:focus {
 
 .cm-live-table-widget table {
   width: 100%;
-  border-collapse: collapse;
+  min-width: 40rem;
+  border-collapse: separate;
+  border-spacing: 0;
   overflow: hidden;
-  border-radius: 0.9rem;
-  background: rgba(248, 250, 252, 0.95);
+  border-radius: 0.95rem;
+  background: rgba(248, 250, 252, 0.92);
   border: 1px solid rgba(203, 213, 225, 0.9);
+  table-layout: fixed;
 }
 
 .cm-live-table-widget th,
 .cm-live-table-widget td {
+  border-right: 1px solid rgba(203, 213, 225, 0.85);
   border-bottom: 1px solid rgba(203, 213, 225, 0.85);
-  padding: 0.7rem 0.85rem;
+  padding: 0.78rem 0.9rem;
   text-align: left;
+  vertical-align: top;
+  line-height: 1.6;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.cm-live-table-widget th:last-child,
+.cm-live-table-widget td:last-child {
+  border-right: none;
 }
 
 .cm-live-table-widget th {
   font-weight: 800;
   color: #263241;
-  background: rgba(241, 245, 249, 0.85);
+  background: rgba(241, 245, 249, 0.92);
 }
 
 .cm-live-table-widget td {
   color: #475569;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.cm-live-table-widget tbody tr:last-child td {
+  border-bottom-color: transparent;
 }
 
 .dark .cm-live-table-widget table {
   background: rgba(255, 255, 255, 0.03);
-  border-color: transparent;
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .dark .cm-live-table-widget th,
 .dark .cm-live-table-widget td {
+  border-right-color: rgba(255, 255, 255, 0.08);
   border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 
 .dark .cm-live-table-widget th {
   color: #f5f2eb;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .dark .cm-live-table-widget td {
   color: #d6d0c7;
+  background: transparent;
 }
 
 .cm-live-blockquote-widget,
