@@ -806,7 +806,7 @@ const supabaseAPI = {
     if (errors.length > 0) throw errors[0].error;
   },
 
-  addComment: async (projectId, itemId, content) => {
+  addComment: async (projectId, itemId, content, tags = []) => {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) throw new Error('User not authenticated');
 
@@ -815,7 +815,8 @@ const supabaseAPI = {
       .insert([{ 
         item_id: itemId, 
         user_id: userData.user.id,
-        content 
+        content,
+        tags
       }])
       .select(`
         *,

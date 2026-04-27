@@ -1540,7 +1540,7 @@ function ItemDetailPanel({
             <div className="flex flex-col gap-10 pb-40">
               <div className="flex items-center gap-3 border-b border-gray-100 dark:border-border-subtle pb-4">
                 <MessageSquare size={18} className="text-gray-400" />
-                <h3 className="text-[13px] font-black text-gray-400 dark:text-text-tertiary uppercase tracking-[0.2em]">팀 코멘트</h3>
+                <h3 className="text-[13px] font-black text-gray-400 dark:text-text-tertiary uppercase tracking-[0.2em]">댓글</h3>
                 {(item.comments || []).length > 0 && (
                   <span className="bg-gray-100 dark:bg-bg-hover px-2 py-0.5 rounded-md text-[11px] font-black text-gray-500 tabular-nums border border-gray-200 dark:border-border-subtle">
                     {(item.comments || []).length}

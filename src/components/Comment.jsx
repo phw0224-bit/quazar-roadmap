@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Edit2, Trash2, CornerDownRight } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import ProfileAvatar from './ProfileAvatar';
 
 export default function Comment({
@@ -13,6 +15,27 @@ export default function Comment({
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(comment.content);
+  const editTextareaRef = useRef(null);
+
+  const adjustEditTextareaHeight = () => {
+    const textarea = editTextareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.max(100, textarea.scrollHeight)}px`;
+    }
+  };
+
+  useEffect(() => {
+    if (isEditing) {
+      setTimeout(adjustEditTextareaHeight, 0);
+    }
+  }, [isEditing]);
+
+  useEffect(() => {
+    if (isEditing) {
+      adjustEditTextareaHeight();
+    }
+  }, [editedText]);
 
   const handleUpdateComment = async () => {
     if (!editedText.trim() || editedText === comment.content) {
@@ -43,18 +66,13 @@ export default function Comment({
   const formatDate = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return '방금 전';
-    if (diffMins < 60) return `${diffMins}분 전`;
-    if (diffHours < 24) return `${diffHours}시간 전`;
-    if (diffDays < 7) return `${diffDays}일 전`;
-
-    return date.toLocaleDateString('ko-KR');
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    
+    return { date: `${year}.${month}.${day}`, time: `${hours}:${minutes}` };
   };
 
   const userName = comment.profiles?.name || '익명 사용자';
@@ -77,7 +95,11 @@ export default function Comment({
             {moodEmoji && <span className="text-sm leading-none">{moodEmoji}</span>}
             <span className="text-[11px] font-black text-gray-400 dark:text-text-tertiary uppercase tracking-widest">{userDept}</span>
           </div>
-          <span className="text-[11px] font-bold text-gray-300 dark:text-text-tertiary uppercase tracking-widest leading-none mt-0.5">{formatDate(comment.created_at)}</span>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-sm font-bold text-gray-500 dark:text-text-secondary">{formatDate(comment.created_at).date}</span>
+            <span className="text-[11px] font-bold text-gray-400 dark:text-text-tertiary">•</span>
+            <span className="text-sm font-bold text-gray-500 dark:text-text-secondary">{formatDate(comment.created_at).time}</span>
+          </div>
         </div>
         
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 ml-auto">
@@ -107,15 +129,34 @@ export default function Comment({
 
       <div className="pl-12">
         {!isEditing ? (
-          <p className="m-0 text-sm font-medium text-gray-700 dark:text-text-secondary break-words leading-relaxed">
-            {comment.content}
-          </p>
+          <div className="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-text-secondary break-words leading-relaxed [&>*]:my-0 [&>p]:text-sm [&>p]:font-medium [&>ul]:my-1 [&>ol]:my-1 [&>li]:text-sm [&>li]:font-medium [&>code]:bg-gray-100 [&>code]:dark:bg-bg-hover [&>code]:px-1 [&>code]:py-0.5 [&>code]:rounded [&>pre]:bg-gray-100 [&>pre]:dark:bg-bg-hover [&>pre]:p-2 [&>pre]:rounded [&>pre]:overflow-x-auto [&_code]:text-xs [&_strong]:font-bold [&_em]:italic">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+              a: ({ node, ...props }) => <a {...props} className="text-brand-500 dark:text-brand-400 hover:underline" />,
+              code: ({ node, inline, ...props }) => {
+                if (inline) {
+                  return <code {...props} className="bg-gray-100 dark:bg-bg-hover px-1 py-0.5 rounded text-xs" />;
+                }
+                return <code {...props} />;
+              },
+              blockquote: ({ node, ...props }) => <blockquote {...props} className="border-l-2 border-gray-300 dark:border-border-subtle pl-3 italic text-gray-600 dark:text-text-tertiary my-1" />,
+              hr: ({ node, ...props }) => <hr {...props} className="my-2 border-gray-200 dark:border-border-subtle" />,
+              table: ({ node, ...props }) => <table {...props} className="w-full border-collapse border border-gray-200 dark:border-border-subtle text-xs" />,
+              th: ({ node, ...props }) => <th {...props} className="border border-gray-200 dark:border-border-subtle bg-gray-100 dark:bg-bg-hover p-1" />,
+              td: ({ node, ...props }) => <td {...props} className="border border-gray-200 dark:border-border-subtle p-1" />,
+            }}>
+              {comment.content}
+            </ReactMarkdown>
+          </div>
         ) : (
           <div className="flex flex-col gap-3 bg-white dark:bg-bg-base border border-gray-200 dark:border-border-subtle rounded-2xl p-4 shadow-xl animate-in zoom-in-95 duration-200">
             <textarea
-              className="w-full p-0 border-none rounded-lg text-sm font-bold resize-none min-h-[80px] focus:ring-0 bg-transparent text-gray-900 dark:text-text-primary"
+              ref={editTextareaRef}
+              className="w-full p-0 border-none rounded-lg text-sm font-bold resize-none min-h-[120px] focus:ring-0 bg-transparent text-gray-900 dark:text-text-primary overflow-hidden"
               value={editedText}
-              onChange={(e) => setEditedText(e.target.value)}
+              onChange={(e) => {
+                setEditedText(e.target.value);
+                adjustEditTextareaHeight();
+              }}
               onKeyDown={e => e.stopPropagation()}
               autoFocus
             />
