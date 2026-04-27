@@ -447,6 +447,12 @@ function Editor({
     event.target.value = '';
   };
 
+  const handleInsertDate = useCallback(() => {
+    if (!editorViewRef.current) return;
+    const today = new Date().toISOString().split('T')[0];
+    insertAtSelection(editorViewRef.current, `# ${today}`);
+  }, [editorViewRef]);
+
   return (
     <div
       className="space-y-3"
@@ -461,6 +467,7 @@ function Editor({
         itemId={itemId}
         fileInputRef={fileInputRef}
         onFileChange={handleFileChange}
+        onInsertDate={handleInsertDate}
       />
 
       <div

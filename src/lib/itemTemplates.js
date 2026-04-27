@@ -149,6 +149,84 @@ export const ITEM_TEMPLATES = {
   },
 };
 
+export const COMMENT_TEMPLATES = {
+  daily: {
+    scaffold: `## 일일업무
+
+### 어제 진행
+
+### 오늘 예정
+
+### 이슈 / 도움 필요
+`,
+    label: '일일업무',
+  },
+  development: {
+    scaffold: `## 개발
+
+## [원인]
+
+## [목표]
+
+## [과정]
+
+## [결과]
+`,
+    label: '개발',
+  },
+  bug: {
+    scaffold: `## 버그
+
+## [현상]
+
+## [재현 조건]
+
+## [원인 추정/확인]
+
+## [조치 결과]
+`,
+    label: '버그',
+  },
+  operations: {
+    scaffold: `## 운영
+
+## [현상]
+
+## [영향 범위]
+
+## [조치 내용]
+
+## [잔여 과제]
+`,
+    label: '운영',
+  },
+  common: {
+    scaffold: `## 공통
+
+## [배경]
+
+## [요청/목표]
+
+## [진행 내용]
+
+## [현재 상태]
+`,
+    label: '공통',
+  },
+};
+
+export function getCommentTemplate(templateType) {
+  return COMMENT_TEMPLATES[templateType] || null;
+}
+
+export function getCommentScaffold(templateType) {
+  return getCommentTemplate(templateType)?.scaffold || '';
+}
+
+export function getCommentTemplateLabel(templateType) {
+  return getCommentTemplate(templateType)?.label || templateType;
+}
+
 export function getItemTemplate(templateType) {
   return ITEM_TEMPLATES[templateType] || null;
 }
