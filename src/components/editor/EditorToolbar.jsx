@@ -15,6 +15,7 @@ import {
   Quote,
   Table2,
   ChevronRightSquare,
+  Calendar,
 } from 'lucide-react';
 
 const TOOLBAR_COMMAND_IDS = [
@@ -82,6 +83,7 @@ function EditorToolbar({
   itemId,
   fileInputRef,
   onFileChange,
+  onInsertDate,
 }) {
   if (!editable) return null;
 
@@ -109,6 +111,11 @@ function EditorToolbar({
         <ToolbarButton title="굵게" onClick={insertBold}>
           <Bold size={15} />
         </ToolbarButton>
+        {onInsertDate && (
+          <ToolbarButton title="오늘 날짜 삽입" onClick={onInsertDate}>
+            <Calendar size={15} />
+          </ToolbarButton>
+        )}
       </div>
 
       <input
