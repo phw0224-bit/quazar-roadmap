@@ -385,11 +385,11 @@ async function lockRepositoryTicketPrefix(repoFullName) {
 
 async function allocateRepositoryTicketNumber(repoTicketScope) {
   const { data, error } = await supabaseAdminClient.rpc('allocate_repo_ticket_number', {
-    repo_key: repoTicketScope,
+    p_repo_key: repoTicketScope,
   });
 
   if (error) {
-    if (error.code === '42883') {
+    if (error.code === '42883' || error.code === 'PGRST202') {
       throw createHttpError(500, 'allocate_repo_ticket_number 함수가 없습니다. docs/GITHUB_REPO_TICKETS_2026-04-21.sql을 Supabase에 적용해주세요.');
     }
     throw error;
