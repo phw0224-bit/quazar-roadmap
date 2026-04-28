@@ -6,6 +6,7 @@ import {
 export const ITEM_TEMPLATES = {
   weekly: {
     scaffold: `# 주간 목표
+    
 `,
     placeholders: {},
   },
