@@ -1,9 +1,9 @@
 export const TAG_CATALOG = [
   {
-    name: '일지',
-    description: '개발일지',
+    name: '주간 목표',
+    description: '주간 목표',
     color: '64748b',
-    templateType: 'daily',
+    templateType: 'weekly',
   },
   {
     name: '공통',

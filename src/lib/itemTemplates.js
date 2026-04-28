@@ -4,16 +4,8 @@ import {
 } from './devRequestBoard.js';
 
 export const ITEM_TEMPLATES = {
-  daily: {
-    scaffold: `## 일일업무
-
-### 어제 진행
-
-### 오늘 예정
-
-### 이슈 / 도움 필요
-
-### 관련 칸반 / 이슈 링크
+  weekly: {
+    scaffold: `# 주간 목표
 `,
     placeholders: {},
   },

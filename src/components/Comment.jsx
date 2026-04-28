@@ -129,7 +129,7 @@ export default function Comment({
 
       <div className="pl-12">
         {!isEditing ? (
-          <div className="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-text-secondary break-words leading-relaxed [&>*]:my-0 [&>p]:text-sm [&>p]:font-medium [&>ul]:my-1 [&>ol]:my-1 [&>li]:text-sm [&>li]:font-medium [&>code]:bg-gray-100 [&>code]:dark:bg-bg-hover [&>code]:px-1 [&>code]:py-0.5 [&>code]:rounded [&>pre]:bg-gray-100 [&>pre]:dark:bg-bg-hover [&>pre]:p-2 [&>pre]:rounded [&>pre]:overflow-x-auto [&_code]:text-xs [&_strong]:font-bold [&_em]:italic">
+          <div className="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-text-secondary break-words leading-relaxed [&>*]:my-0 [&>p]:text-sm [&>p]:font-medium [&>p]:whitespace-pre-wrap [&>ul]:my-1 [&>ol]:my-1 [&>li]:text-sm [&>li]:font-medium [&>code]:bg-gray-100 [&>code]:dark:bg-bg-hover [&>code]:px-1 [&>code]:py-0.5 [&>code]:rounded [&>pre]:bg-gray-100 [&>pre]:dark:bg-bg-hover [&>pre]:p-2 [&>pre]:rounded [&>pre]:overflow-x-auto [&_code]:text-xs [&_strong]:font-bold [&_em]:italic">
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
               a: ({ node, ...props }) => <a {...props} className="text-brand-500 dark:text-brand-400 hover:underline" />,
               code: ({ node, inline, ...props }) => {
