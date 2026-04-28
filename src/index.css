@@ -758,6 +758,18 @@ input:focus, textarea:focus {
   background: rgba(96, 165, 250, 0.14) !important;
 }
 
+.cm-live-preview-shell .cm-editor.cm-live-table-preview-active .cm-activeLine,
+.cm-live-preview-shell .cm-editor.cm-live-table-preview-active .cm-line.cm-live-active-line {
+  background: transparent !important;
+  border-left-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.cm-live-preview-shell .cm-editor.cm-live-table-preview-active .cm-cursor,
+.cm-live-preview-shell .cm-editor.cm-live-table-preview-active .cm-dropCursor {
+  opacity: 0;
+}
+
 .cm-tooltip-autocomplete {
   display: none;
 }
@@ -1141,6 +1153,38 @@ input:focus, textarea:focus {
 
 .cm-live-table-widget {
   margin: 0.05rem 0;
+}
+
+.cm-live-table-wrap {
+  position: relative;
+}
+
+.cm-live-table-hint {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.65rem;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 120ms ease, transform 120ms ease;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #eff6ff;
+  background: rgba(30, 64, 175, 0.82);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+}
+
+.cm-live-table-wrap:hover .cm-live-table-hint {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.dark .cm-live-table-hint {
+  color: #dbeafe;
+  background: rgba(37, 99, 235, 0.68);
 }
 
 .cm-table-widget-shell {

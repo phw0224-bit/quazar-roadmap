@@ -9,11 +9,17 @@
 import { renderMarkdownPreviewHTML } from './markdownPreview.js';
 import katex from 'katex';
 
-export function getMarkdownLivePreviewPlan(text, activeLineIndex = -1, cursorPos = -1) {
+export function getMarkdownLivePreviewPlan(
+  text,
+  activeLineIndex = -1,
+  cursorPos = -1,
+  options = {},
+) {
   const source = text || '';
   const lines = source.split('\n');
   const lineStarts = getLineStarts(lines);
   const activeToggleRange = getActiveToggleRange(lines, activeLineIndex);
+  const editingTableStartLine = options.editingTableStartLine ?? null;
   const replacements = [];
   const lineClasses = [];
   const blockWidgets = [];
@@ -54,7 +60,13 @@ export function getMarkdownLivePreviewPlan(text, activeLineIndex = -1, cursorPos
       continue;
     }
 
-    const tableRange = getMarkdownTableBlock(lines, lineStarts, lineIndex, activeLineIndex);
+    const tableRange = getMarkdownTableBlock(
+      lines,
+      lineStarts,
+      lineIndex,
+      activeLineIndex,
+      editingTableStartLine,
+    );
     if (tableRange) {
       blockWidgets.push(tableRange);
       lineIndex = tableRange.endLine;
@@ -238,7 +250,38 @@ function getBlockRangeEnd(lines, lineStarts, endLine) {
   return lineStarts[endLine] + lastLine.length;
 }
 
-function getMarkdownTableBlock(lines, lineStarts, lineIndex, activeLineIndex) {
+export function findMarkdownTableRangeAtLine(text, activeLineIndex) {
+  if (activeLineIndex < 0) return null;
+
+  const lines = (text || '').split('\n');
+  const lineStarts = getLineStarts(lines);
+
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+    if (!isTableHeaderLine(lines[lineIndex]) || !isTableDividerLine(lines[lineIndex + 1])) {
+      continue;
+    }
+
+    let endLine = lineIndex + 1;
+    while (isTableBodyLine(lines[endLine + 1])) {
+      endLine += 1;
+    }
+
+    if (activeLineIndex >= lineIndex && activeLineIndex <= endLine) {
+      return {
+        startLine: lineIndex,
+        endLine,
+        from: lineStarts[lineIndex],
+        to: getBlockRangeEnd(lines, lineStarts, endLine),
+      };
+    }
+
+    lineIndex = endLine;
+  }
+
+  return null;
+}
+
+function getMarkdownTableBlock(lines, lineStarts, lineIndex, activeLineIndex, editingTableStartLine) {
   if (!isTableHeaderLine(lines[lineIndex]) || !isTableDividerLine(lines[lineIndex + 1])) {
     return null;
   }
@@ -248,18 +291,30 @@ function getMarkdownTableBlock(lines, lineStarts, lineIndex, activeLineIndex) {
     endLine += 1;
   }
 
-  if (activeLineIndex >= lineIndex && activeLineIndex <= endLine) {
+  const isEditingThisTable = (
+    editingTableStartLine === lineIndex
+    && activeLineIndex >= lineIndex
+    && activeLineIndex <= endLine
+  );
+
+  if (isEditingThisTable) {
     return null;
   }
 
   const from = lineStarts[lineIndex];
   const to = getBlockRangeEnd(lines, lineStarts, endLine);
   const markdown = lines.slice(lineIndex, endLine + 1).join('\n');
+  const renderedTable = renderMarkdownPreviewHTML(markdown);
 
   return {
     from,
     to,
-    html: renderMarkdownPreviewHTML(markdown),
+    html: `
+      <div class="cm-live-table-wrap" data-live-table-root="true" data-live-table-start-line="${lineIndex}">
+        ${renderedTable}
+        <div class="cm-live-table-hint" aria-hidden="true">드래그해서 복사 · 더블클릭해서 편집</div>
+      </div>
+    `,
     className: 'cm-live-table-widget',
     endLine,
   };

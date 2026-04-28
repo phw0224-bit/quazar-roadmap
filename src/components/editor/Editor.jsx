@@ -37,23 +37,19 @@ import {
 } from './utils/editorTextOps';
 import {
   createLivePreviewExtension,
+  setEditingTable,
   toggleHeadingFold,
 } from './codemirror/livePreviewExtension';
 import { supabase } from '../../lib/supabase';
 import { createTableSelectionExtension } from './codemirror/tableSelectionExtension';
 import { createTemplatePlaceholderExtension } from './codemirror/templatePlaceholderExtension';
-
-const LIVE_WIDGET_SELECTOR = [
-  '.cm-live-codeblock-widget',
-  '.cm-live-mermaid-wrapper',
-  '.cm-live-table-widget',
-  '.cm-live-blockquote-widget',
-  '.cm-live-callout-widget',
-  '.cm-live-math-widget',
-  '.cm-live-hr-widget',
-  '.cm-live-image-wrapper',
-  '.cm-heading-folded-placeholder',
-].join(', ');
+import {
+  DEFAULT_LIVE_WIDGET_SELECTOR,
+  findLivePreviewWidgetRoot,
+  findLiveTableRoot,
+  getLiveTableEditPosition,
+  getLiveTableStartLine,
+} from './utils/editorLiveWidgetInteractions';
 
 function Editor({
   content,
@@ -345,7 +341,11 @@ function Editor({
           }
         }
 
-        const widgetRoot = event.target?.closest?.(LIVE_WIDGET_SELECTOR);
+        if (findLiveTableRoot(event.target)) {
+          return false;
+        }
+
+        const widgetRoot = findLivePreviewWidgetRoot(event.target) || event.target?.closest?.(DEFAULT_LIVE_WIDGET_SELECTOR);
         if (widgetRoot) {
           try {
             const widgetPos = view.posAtDOM(widgetRoot, 0);
@@ -365,6 +365,28 @@ function Editor({
         }
 
         return false;
+      },
+      dblclick: (event) => {
+        const view = editorViewRef.current;
+        if (!view || mode !== 'live' || event.button !== 0) return false;
+
+        const tableRoot = findLiveTableRoot(event.target);
+        if (!tableRoot) return false;
+
+        const tableStartLine = getLiveTableStartLine(tableRoot);
+        if (tableStartLine == null) return false;
+
+        const nextCursor = getLiveTableEditPosition(view, tableRoot, event.target, tableStartLine);
+        if (nextCursor == null) return false;
+
+        event.preventDefault();
+        view.dispatch({
+          effects: setEditingTable.of(tableStartLine),
+          selection: { anchor: nextCursor, head: nextCursor },
+          scrollIntoView: true,
+        });
+        view.focus();
+        return true;
       },
       keydown: (event) => {
         const view = editorViewRef.current;

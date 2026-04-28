@@ -1,6 +1,10 @@
 import { StateEffect, StateField } from '@codemirror/state';
 import { Decoration, EditorView, WidgetType } from '@codemirror/view';
-import { getMarkdownLivePreviewPlan } from '../utils/livePreview';
+import {
+  findMarkdownTableRangeAtLine,
+  getMarkdownLivePreviewPlan,
+} from '../utils/livePreview';
+import { shouldIgnoreLivePreviewWidgetEvent } from '../utils/editorLiveWidgetInteractions';
 import { renderMermaidSVG } from '../utils/mermaidRenderer';
 
 /**
@@ -11,6 +15,7 @@ import { renderMermaidSVG } from '../utils/mermaidRenderer';
  */
 
 export const toggleHeadingFold = StateEffect.define();
+export const setEditingTable = StateEffect.define();
 
 const headingFoldField = StateField.define({
   create: () => new Set(),
@@ -29,6 +34,41 @@ const headingFoldField = StateField.define({
     }
     return next;
   },
+});
+
+const editingTableField = StateField.define({
+  create: () => null,
+  update(currentValue, transaction) {
+    let nextValue = currentValue;
+
+    for (const effect of transaction.effects) {
+      if (effect.is(setEditingTable)) {
+        nextValue = effect.value;
+      }
+    }
+
+    if (nextValue == null) return null;
+
+    const activeLineIndex = transaction.state.doc.lineAt(transaction.state.selection.main.head).number - 1;
+    const activeTableRange = findMarkdownTableRangeAtLine(transaction.state.doc.toString(), activeLineIndex);
+    if (!activeTableRange || activeTableRange.startLine !== nextValue) {
+      return null;
+    }
+
+    return nextValue;
+  },
+});
+
+const previewTableFocusField = StateField.define({
+  create(state) {
+    return isPreviewTableFocused(state);
+  },
+  update(_currentValue, transaction) {
+    return isPreviewTableFocused(transaction.state);
+  },
+  provide: (fieldRef) => EditorView.editorAttributes.from(fieldRef, (isFocused) => (
+    isFocused ? { class: 'cm-live-table-preview-active' } : {}
+  )),
 });
 
 class InlinePreviewWidget extends WidgetType {
@@ -65,11 +105,18 @@ class HTMLPreviewWidget extends WidgetType {
     const element = document.createElement('div');
     element.className = this.className;
     element.innerHTML = this.html;
+    if (this.className.includes('cm-live-table-widget')) {
+      ['pointerdown', 'mousedown', 'click'].forEach((eventName) => {
+        element.addEventListener(eventName, (event) => {
+          event.stopPropagation();
+        });
+      });
+    }
     return element;
   }
 
-  ignoreEvent() {
-    return false;
+  ignoreEvent(event) {
+    return shouldIgnoreLivePreviewWidgetEvent(event, this.className);
   }
 }
 
@@ -206,7 +253,13 @@ function getHeadingFoldRange(doc, lineFrom) {
 function buildLivePreviewDecorationsFromState(state) {
   const selection = state.selection.main;
   const activeLineIndex = state.doc.lineAt(selection.head).number - 1;
-  const plan = getMarkdownLivePreviewPlan(state.doc.toString(), activeLineIndex, selection.head);
+  const editingTableStartLine = state.field(editingTableField, false) ?? null;
+  const plan = getMarkdownLivePreviewPlan(
+    state.doc.toString(),
+    activeLineIndex,
+    selection.head,
+    { editingTableStartLine },
+  );
   const folds = state.field(headingFoldField, false) || new Set();
 
   const activeFoldedRanges = [];
@@ -312,6 +365,15 @@ function buildLivePreviewDecorationsFromState(state) {
   return Decoration.set(decorations, true);
 }
 
+function isPreviewTableFocused(state) {
+  const activeLineIndex = state.doc.lineAt(state.selection.main.head).number - 1;
+  const tableRange = findMarkdownTableRangeAtLine(state.doc.toString(), activeLineIndex);
+  if (!tableRange) return false;
+
+  const editingTableStartLine = state.field(editingTableField, false) ?? null;
+  return editingTableStartLine !== tableRange.startLine;
+}
+
 export function createLivePreviewExtension(enabled) {
   if (!enabled) return [];
 
@@ -325,5 +387,5 @@ export function createLivePreviewExtension(enabled) {
     provide: (fieldRef) => EditorView.decorations.from(fieldRef),
   });
 
-  return [headingFoldField, field];
+  return [headingFoldField, editingTableField, previewTableFocusField, field];
 }

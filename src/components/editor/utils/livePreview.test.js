@@ -126,12 +126,28 @@ test('live preview renders inactive markdown tables as block widgets', () => {
 
   assert.equal(plan.blockWidgets.length, 1);
   assert.match(plan.blockWidgets[0].html, /<table/i);
+  assert.match(plan.blockWidgets[0].html, /data-live-table-root="true"/);
+  assert.match(plan.blockWidgets[0].html, /data-live-table-start-line="0"/);
+  assert.match(plan.blockWidgets[0].html, /드래그해서 복사 · 더블클릭해서 편집/);
 });
 
-test('live preview keeps active table line in source form', () => {
+test('live preview keeps active table line rendered when not editing the table', () => {
   const plan = getMarkdownLivePreviewPlan('| 열 1 | 열 2 |\n| --- | --- |\n| 값 | 값 |', 1);
 
+  assert.equal(plan.blockWidgets.length, 1);
+  assert.equal(plan.blockWidgets[0].className, 'cm-live-table-widget');
+});
+
+test('live preview unwraps active table only for the explicitly edited table', () => {
+  const plan = getMarkdownLivePreviewPlan(
+    '| 열 1 | 열 2 |\n| --- | --- |\n| 값 | 값 |',
+    1,
+    -1,
+    { editingTableStartLine: 0 },
+  );
+
   assert.equal(plan.blockWidgets.length, 0);
+  assert.ok(plan.lineClasses.some((item) => item.className === 'cm-live-active-line'));
 });
 
 test('live preview renders inactive blockquotes as block widgets', () => {
