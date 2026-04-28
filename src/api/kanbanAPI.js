@@ -121,6 +121,18 @@ const getServerAuthHeaders = async (extra = {}) => {
   };
 };
 
+/**
+ * @description items/roadmap_items를 참조하는 하위 레코드를 먼저 정리한다.
+ * DB FK가 ON DELETE CASCADE가 아닐 수 있어 수동 삭제가 필요하다.
+ */
+const deleteItemDependents = async (itemId) => {
+  const { error: commentsError } = await supabase
+    .from('comments')
+    .delete()
+    .eq('item_id', itemId);
+  if (commentsError) throw commentsError;
+};
+
 const normalizeAssigneeNames = (values = []) => {
   const seen = new Set();
 
@@ -767,6 +779,7 @@ const supabaseAPI = {
   },
 
   deleteItem: async (projectId, itemId, boardType = 'main') => {
+    await deleteItemDependents(itemId);
     const { error } = await supabase.from(itemsTable(boardType)).delete().eq('id', itemId);
     if (error) throw error;
   },
@@ -1472,25 +1485,39 @@ export async function createGeneralDocument(
   createdBy = null,
 ) {
   const pageType = type === 'folder' ? 'folder' : 'page';
+  const tableName = itemsTable(boardType);
+  const basePayload = {
+    board_type: boardType,
+    project_id: null,  // ← 일반 문서/폴더는 프로젝트 미배정
+    title: title.trim(),
+    page_type: pageType,  // ← 'page' 또는 'folder'
+    tags: [],
+    status: 'none',
+    order_index: 0,
+    parent_item_id: parentFolderId,  // ← 부모 폴더 지정 (선택사항)
+    created_by: createdBy,
+  };
 
-  const { data, error } = await supabase
-    .from(itemsTable(boardType))
-    .insert([
-      {
-        board_type: boardType,
-        project_id: null,  // ← 일반 문서/폴더는 프로젝트 미배정
-        title: title.trim(),
-        page_type: pageType,  // ← 'page' 또는 'folder'
-        entity_type: 'document',
-        tags: [],
-        status: 'none',
-        order_index: 0,
-        parent_item_id: parentFolderId,  // ← 부모 폴더 지정 (선택사항)
-        created_by: createdBy,
-      },
-    ])
-  .select('*')
-  .single();
+  const insertWithPayload = async (payload) => {
+    const { data, error } = await supabase
+      .from(tableName)
+      .insert([payload])
+      .select('*')
+      .single();
+    return { data, error };
+  };
+
+  const { data, error } = await insertWithPayload({
+    ...basePayload,
+    entity_type: 'document',
+  });
+
+  // 일부 환경(items 테이블 구버전)에는 entity_type 컬럼이 없어 후방 호환 삽입을 지원한다.
+  if (error?.message?.includes("Could not find the 'entity_type' column")) {
+    const fallbackResult = await insertWithPayload(basePayload);
+    if (fallbackResult.error) throw fallbackResult.error;
+    return fallbackResult.data;
+  }
 
   if (error) throw error;
   return data;
@@ -1632,6 +1659,8 @@ export async function moveTeamRequest(requestId, newIndex, boardType = '개발�
  * @returns {Promise<void>}
  */
 export async function deleteGeneralDocument(itemId, boardType = 'main') {
+  await deleteItemDependents(itemId);
+
   // 안전장치: 일반 문서/폴더만 삭제
   const { error } = await supabase
     .from(itemsTable(boardType))
