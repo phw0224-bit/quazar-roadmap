@@ -34,16 +34,12 @@ import ItemViewers from './ItemViewers';
 import { ENTITY_TYPES, getEntityLabel } from '../lib/entityModel';
 import {
   createGitHubIssue,
-  createGitHubIssueBranch,
+  createGitHubItemBranch,
   getGitHubRepos,
-  getGitHubIssueBranch,
+  getGitHubItemBranch,
   getGitHubStatus,
   getItemGitHubIssues,
 } from '../api/githubAPI';
-
-function getGitHubIssueKey(repoFullName, issueNumber) {
-  return `${repoFullName}#${issueNumber}`;
-}
 
 function ItemDetailPanel({
   item, project = null, phase = project, entityContext = null, allItems = [], onClose, onUpdateItem, onUpdateProject, onUpdatePhase = onUpdateProject, isReadOnly,
@@ -79,12 +75,13 @@ function ItemDetailPanel({
   const [githubStatus, setGitHubStatus] = useState({ connected: false });
   const [githubRepos, setGitHubRepos] = useState([]);
   const [githubIssues, setGitHubIssues] = useState([]);
-  const [githubBranches, setGitHubBranches] = useState({});
+  const [githubLinkedBranch, setGitHubLinkedBranch] = useState(null);
+  const [githubLinkedBranchSource, setGitHubLinkedBranchSource] = useState(null);
   const [selectedGitHubRepo, setSelectedGitHubRepo] = useState('');
   const [showGitHubIssueCreator, setShowGitHubIssueCreator] = useState(false);
   const [isGitHubLoading, setIsGitHubLoading] = useState(false);
   const [isGitHubSubmitting, setIsGitHubSubmitting] = useState(false);
-  const [isGitHubBranchSubmitting, setIsGitHubBranchSubmitting] = useState({});
+  const [isGitHubBranchSubmitting, setIsGitHubBranchSubmitting] = useState(false);
   const [gitHubError, setGitHubError] = useState('');
   const [gitHubBranchError, setGitHubBranchError] = useState('');
   const [showShareLinkModal, setShowShareLinkModal] = useState(false);
@@ -154,8 +151,9 @@ function ItemDetailPanel({
     setShowGitHubIssueCreator(false);
     setGitHubError('');
     setGitHubBranchError('');
-    setGitHubBranches({});
-    setIsGitHubBranchSubmitting({});
+    setGitHubLinkedBranch(null);
+    setGitHubLinkedBranchSource(null);
+    setIsGitHubBranchSubmitting(false);
     setIssuedTicket({
       key: item?.ticket_key || '',
       number: item?.ticket_number ?? null,
@@ -171,7 +169,8 @@ function ItemDetailPanel({
           setGitHubStatus({ connected: false });
           setGitHubRepos([]);
           setGitHubIssues([]);
-          setGitHubBranches({});
+          setGitHubLinkedBranch(null);
+          setGitHubLinkedBranchSource(null);
           setSelectedGitHubRepo('');
           setShowGitHubIssueCreator(false);
         }
@@ -199,27 +198,18 @@ function ItemDetailPanel({
           setSelectedGitHubRepo((current) => current || repos[0]?.full_name || '');
 
           if (issueList.length > 0) {
-            const branchResults = await Promise.allSettled(
-              issueList.map((issue) => getGitHubIssueBranch({
-                repoFullName: issue.repo_full_name,
-                issueNumber: issue.issue_number,
-              }))
-            );
+            const branchResult = await getGitHubItemBranch(item.id);
             if (!active) return;
-
-            const nextBranches = {};
-            branchResults.forEach((result, index) => {
-              if (result.status !== 'fulfilled' || !result.value?.linkedBranch) return;
-              const issue = issueList[index];
-              nextBranches[getGitHubIssueKey(issue.repo_full_name, issue.issue_number)] = result.value.linkedBranch;
-            });
-            setGitHubBranches(nextBranches);
+            setGitHubLinkedBranch(branchResult?.branch || null);
+            setGitHubLinkedBranchSource(branchResult?.branchSource || null);
           } else {
-            setGitHubBranches({});
+            setGitHubLinkedBranch(null);
+            setGitHubLinkedBranchSource(null);
           }
         } else {
           setGitHubRepos([]);
-          setGitHubBranches({});
+          setGitHubLinkedBranch(null);
+          setGitHubLinkedBranchSource(null);
           setSelectedGitHubRepo('');
         }
       } catch (error) {
@@ -541,37 +531,30 @@ function ItemDetailPanel({
     }
   };
 
-  const handleCreateGitHubBranch = async (issue) => {
-    if (!issue?.repo_full_name || !issue?.issue_number || !item?.id) {
+  const handleCreateGitHubBranch = async () => {
+    if (!item?.id || !hasExistingGitHubIssue) {
       onShowToast?.('브랜치를 생성할 GitHub 이슈 정보를 찾지 못했습니다.');
       return;
     }
 
-    const issueKey = getGitHubIssueKey(issue.repo_full_name, issue.issue_number);
-    setIsGitHubBranchSubmitting((current) => ({ ...current, [issueKey]: true }));
+    setIsGitHubBranchSubmitting(true);
     setGitHubBranchError('');
 
     try {
-      const result = await createGitHubIssueBranch({
-        itemId: item.id,
-        repoFullName: issue.repo_full_name,
-        issueNumber: issue.issue_number,
-      });
+      const result = await createGitHubItemBranch(item.id);
       const linkedBranch = result?.linkedBranch || (
-        result?.branchName
+        result?.branch?.branchName || result?.branchName
           ? {
-              linkedBranchId: result.linkedBranchId || issueKey,
-              branchName: result.branchName,
-              branchUrl: result.branchUrl || null,
+              linkedBranchId: result.linkedBranchId || item.id,
+              branchName: result?.branch?.branchName || result.branchName,
+              branchUrl: result?.branch?.branchUrl || result.branchUrl || null,
             }
           : null
       );
 
       if (linkedBranch) {
-        setGitHubBranches((current) => ({
-          ...current,
-          [issueKey]: linkedBranch,
-        }));
+        setGitHubLinkedBranch(linkedBranch);
+        setGitHubLinkedBranchSource(result?.branchSource || 'linked');
       }
 
       onShowToast?.(
@@ -583,7 +566,7 @@ function ItemDetailPanel({
       setGitHubBranchError(error.message || 'GitHub 브랜치 생성에 실패했습니다.');
       onShowToast?.(error.message || 'GitHub 브랜치 생성에 실패했습니다.');
     } finally {
-      setIsGitHubBranchSubmitting((current) => ({ ...current, [issueKey]: false }));
+      setIsGitHubBranchSubmitting(false);
     }
   };
 
@@ -1516,9 +1499,8 @@ function ItemDetailPanel({
                 </div>
                 <div className="flex-1 flex flex-col gap-2 px-3 py-2 rounded-xl bg-white dark:bg-bg-hover border border-gray-100 dark:border-border-subtle">
                   {githubIssues.map((issue) => {
-                    const issueKey = getGitHubIssueKey(issue.repo_full_name, issue.issue_number);
-                    const linkedBranch = githubBranches[issueKey] || null;
-                    const isCreatingBranch = Boolean(isGitHubBranchSubmitting[issueKey]);
+                    const linkedBranch = githubLinkedBranch;
+                    const isCreatingBranch = isGitHubBranchSubmitting;
 
                     return (
                       <div
@@ -1554,6 +1536,16 @@ function ItemDetailPanel({
                                 <span className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-black text-gray-700 dark:border-border-subtle dark:bg-bg-hover dark:text-text-primary">
                                   {linkedBranch.branchName}
                                 </span>
+                                {githubLinkedBranchSource === 'discovered' && (
+                                  <span className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                                    자동 탐색
+                                  </span>
+                                )}
+                                {githubLinkedBranchSource === 'linked-fallback' && (
+                                  <span className="rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300">
+                                    linked branch
+                                  </span>
+                                )}
                                 <button
                                   type="button"
                                   onClick={async () => {
@@ -1573,6 +1565,11 @@ function ItemDetailPanel({
                                 아직 연결된 브랜치가 없습니다.
                               </p>
                             )}
+                            {linkedBranch && githubLinkedBranchSource === 'discovered' && (
+                              <p className="mt-2 text-xs font-bold text-amber-700 dark:text-amber-300">
+                                ticket 기준으로 레포 브랜치를 자동 탐색해 표시했습니다. GitHub 이슈의 Development 영역에는 아직 직접 연결되지 않았을 수 있습니다.
+                              </p>
+                            )}
                           </div>
 
                           <div className="flex items-center gap-2">
@@ -1590,7 +1587,7 @@ function ItemDetailPanel({
                             {!isReadOnly && !linkedBranch && (
                               <button
                                 type="button"
-                                onClick={() => handleCreateGitHubBranch(issue)}
+                                onClick={handleCreateGitHubBranch}
                                 disabled={isCreatingBranch}
                                 className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-[11px] font-black text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-gray-900"
                               >

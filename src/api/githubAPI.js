@@ -128,6 +128,18 @@ export async function createGitHubIssueBranch({ itemId, repoFullName, issueNumbe
   });
 }
 
+export async function getGitHubItemBranch(itemId) {
+  return serverRequest(`/api/github/items/${itemId}/branch`, {
+    method: 'GET',
+  });
+}
+
+export async function createGitHubItemBranch(itemId) {
+  return serverRequest(`/api/github/items/${itemId}/branch`, {
+    method: 'POST',
+  });
+}
+
 export async function syncGitHubIssueStatus(itemId, status) {
   return serverRequest('/api/github/issues/sync-status', {
     method: 'POST',

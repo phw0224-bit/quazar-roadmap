@@ -1035,6 +1035,33 @@ function mapLinkedBranchSummary({ linkedBranch, repoUrl }) {
   };
 }
 
+function mapRepositoryBranchSummary(branchName, repoUrl) {
+  if (!branchName) return null;
+  return {
+    linkedBranchId: null,
+    branchName,
+    branchUrl: repoUrl ? `${repoUrl}/tree/${encodeURIComponent(branchName)}` : null,
+  };
+}
+
+function branchMatchesTicketKey(branchName, ticketKey) {
+  const normalizedBranch = String(branchName || '').trim().toLowerCase();
+  const normalizedTicket = String(ticketKey || '').trim().toLowerCase();
+  if (!normalizedBranch || !normalizedTicket) return false;
+  return normalizedBranch === normalizedTicket || normalizedBranch.startsWith(`${normalizedTicket}-`);
+}
+
+function pickPreferredTicketBranch(branches, ticketKey) {
+  if (!Array.isArray(branches) || branches.length === 0 || !ticketKey) return null;
+
+  const exactMatch = branches.find((branch) => (
+    String(branch?.branchName || '').trim().toLowerCase() === String(ticketKey).trim().toLowerCase()
+  ));
+  if (exactMatch) return exactMatch;
+
+  return branches.find((branch) => branchMatchesTicketKey(branch?.branchName, ticketKey)) || null;
+}
+
 async function getGitHubIssueBranchState(token, repoFullName, issueNumber) {
   const { owner, repo } = parseRepoFullName(repoFullName);
   const data = await fetchGitHubGraphql(
@@ -1066,15 +1093,47 @@ async function getGitHubIssueBranchState(token, repoFullName, issueNumber) {
     throw createHttpError(404, 'GitHub 이슈를 찾을 수 없습니다.');
   }
 
-  const linkedBranch = issue.linkedBranches?.nodes?.[0] || null;
+  const branches = (issue.linkedBranches?.nodes || [])
+    .map((linkedBranch) => mapLinkedBranchSummary({
+      linkedBranch,
+      repoUrl: data?.repository?.url || `https://github.com/${repoFullName}`,
+    }))
+    .filter(Boolean);
+
   return {
     issueId: issue.id,
     totalCount: issue.linkedBranches?.totalCount || 0,
-    branch: mapLinkedBranchSummary({
-      linkedBranch,
-      repoUrl: data?.repository?.url || `https://github.com/${repoFullName}`,
-    }),
+    branch: branches[0] || null,
+    branches,
   };
+}
+
+async function findRepositoryBranchByTicketKey(token, repoFullName, ticketKey, repoUrl = null) {
+  const normalizedTicketKey = String(ticketKey || '').trim();
+  if (!normalizedTicketKey) return null;
+
+  const candidates = [...new Set([normalizedTicketKey, normalizedTicketKey.toLowerCase()])];
+  const matchedBranches = [];
+
+  for (const candidate of candidates) {
+    const refs = await fetchGitHubJson(
+      `https://api.github.com/repos/${repoFullName}/git/matching-refs/heads/${encodeURIComponent(candidate)}`,
+      token
+    );
+    for (const ref of Array.isArray(refs) ? refs : []) {
+      const branchName = String(ref?.ref || '').replace(/^refs\/heads\//, '');
+      if (!branchMatchesTicketKey(branchName, normalizedTicketKey)) continue;
+      matchedBranches.push(mapRepositoryBranchSummary(
+        branchName,
+        repoUrl || `https://github.com/${repoFullName}`
+      ));
+    }
+  }
+
+  return pickPreferredTicketBranch(
+    [...new Map(matchedBranches.map((branch) => [branch.branchName, branch])).values()],
+    normalizedTicketKey
+  );
 }
 
 async function createGitHubIssueLinkedBranch({ token, repoFullName, issueNumber, branchName }) {
@@ -2043,6 +2102,202 @@ router.post('/issues/:issueNumber/branch', async (req, res) => {
     });
   } catch (error) {
     console.error('GitHub issue branch create error:', error);
+    res.status(error.status || 500).json({ error: error.message || 'GitHub linked branch 생성에 실패했습니다.' });
+  }
+});
+
+router.get('/items/:itemId/branch', async (req, res) => {
+  try {
+    if (!requireServerConfig(res)) return;
+
+    const user = await requireAuthenticatedUser(req, res);
+    if (!user) return;
+
+    const itemId = String(req.params.itemId || '').trim();
+    if (!itemId) {
+      return res.status(400).json({ error: 'itemId가 필요합니다.' });
+    }
+
+    const issueRecord = await getExistingGitHubIssueForItem(itemId);
+    if (!issueRecord) {
+      return res.json({
+        hasLinkedIssue: false,
+        hasLinkedBranch: false,
+        linkedBranch: null,
+        discoveredBranch: null,
+        branch: null,
+        branchSource: null,
+        issue: null,
+      });
+    }
+
+    const itemRecord = await findItemRecordById(itemId);
+    if (!itemRecord) {
+      return res.status(404).json({ error: '아이템을 찾을 수 없습니다.' });
+    }
+
+    const ticketKey = String(itemRecord.item?.ticket_key || '').trim();
+    const connection = await requireGitHubRepoConnection(user.id);
+    const branchState = await getGitHubIssueBranchState(
+      connection.access_token,
+      issueRecord.repo_full_name,
+      issueRecord.issue_number
+    );
+    const matchedLinkedBranch = pickPreferredTicketBranch(branchState.branches, ticketKey);
+    const discoveredBranch = await findRepositoryBranchByTicketKey(
+      connection.access_token,
+      issueRecord.repo_full_name,
+      ticketKey
+    );
+    const primaryBranch = matchedLinkedBranch || discoveredBranch || branchState.branch || null;
+    const branchSource = matchedLinkedBranch
+      ? 'linked'
+      : discoveredBranch
+        ? 'discovered'
+        : branchState.branch
+          ? 'linked-fallback'
+          : null;
+
+    res.json({
+      hasLinkedIssue: true,
+      issue: {
+        itemId,
+        repoFullName: issueRecord.repo_full_name,
+        issueNumber: issueRecord.issue_number,
+        issueUrl: issueRecord.issue_url,
+      },
+      hasLinkedBranch: Boolean(matchedLinkedBranch || branchState.branch),
+      linkedBranch: matchedLinkedBranch || branchState.branch || null,
+      discoveredBranch,
+      branch: primaryBranch,
+      branchSource,
+      linkedBranchCount: branchState.totalCount,
+    });
+  } catch (error) {
+    console.error('GitHub item branch get error:', error);
+    res.status(error.status || 500).json({ error: error.message || 'GitHub linked branch 정보를 불러오지 못했습니다.' });
+  }
+});
+
+router.post('/items/:itemId/branch', async (req, res) => {
+  try {
+    if (!requireServerConfig(res)) return;
+
+    const user = await requireAuthenticatedUser(req, res);
+    if (!user) return;
+
+    const itemId = String(req.params.itemId || '').trim();
+    if (!itemId) {
+      return res.status(400).json({ error: 'itemId가 필요합니다.' });
+    }
+
+    const issueRecord = await getExistingGitHubIssueForItem(itemId);
+    if (!issueRecord) {
+      return res.status(404).json({ error: '이 아이템에 연결된 GitHub 이슈를 찾을 수 없습니다.' });
+    }
+
+    const itemRecord = await findItemRecordById(itemId);
+    if (!itemRecord) {
+      return res.status(404).json({ error: '아이템을 찾을 수 없습니다.' });
+    }
+
+    const branchName = String(itemRecord.item?.ticket_key || '').trim();
+    if (!branchName) {
+      return res.status(409).json({ error: '티켓 키가 없어 브랜치를 생성할 수 없습니다. 먼저 GitHub 이슈를 생성해주세요.' });
+    }
+
+    const connection = await requireGitHubRepoConnection(user.id);
+    const repo = await fetchGitHubJson(
+      `https://api.github.com/repos/${issueRecord.repo_full_name}`,
+      connection.access_token
+    );
+
+    if (repo?.archived) {
+      throw createHttpError(409, '보관된 레포에는 브랜치를 생성할 수 없습니다.');
+    }
+
+    if (!canCreateBranch(repo)) {
+      throw createHttpError(403, '선택한 레포에 브랜치를 생성할 권한이 없습니다.');
+    }
+
+    const branchState = await getGitHubIssueBranchState(
+      connection.access_token,
+      issueRecord.repo_full_name,
+      issueRecord.issue_number
+    );
+    const matchedLinkedBranch = pickPreferredTicketBranch(branchState.branches, branchName);
+    if (matchedLinkedBranch) {
+      return res.json({
+        itemId,
+        issueNumber: issueRecord.issue_number,
+        repoFullName: issueRecord.repo_full_name,
+        issueUrl: issueRecord.issue_url,
+        linkedBranchId: matchedLinkedBranch.linkedBranchId,
+        branchName: matchedLinkedBranch.branchName,
+        branchUrl: matchedLinkedBranch.branchUrl,
+        hasLinkedIssue: true,
+        hasLinkedBranch: true,
+        created: false,
+        linkedBranchCount: branchState.totalCount,
+        linkedBranch: matchedLinkedBranch,
+        discoveredBranch: null,
+        branch: matchedLinkedBranch,
+        branchSource: 'linked',
+      });
+    }
+
+    const discoveredBranch = await findRepositoryBranchByTicketKey(
+      connection.access_token,
+      issueRecord.repo_full_name,
+      branchName,
+      repo.html_url
+    );
+    if (discoveredBranch) {
+      return res.json({
+        itemId,
+        issueNumber: issueRecord.issue_number,
+        repoFullName: issueRecord.repo_full_name,
+        issueUrl: issueRecord.issue_url,
+        linkedBranchId: null,
+        branchName: discoveredBranch.branchName,
+        branchUrl: discoveredBranch.branchUrl,
+        hasLinkedIssue: true,
+        hasLinkedBranch: false,
+        created: false,
+        linkedBranchCount: branchState.totalCount,
+        linkedBranch: null,
+        discoveredBranch,
+        branch: discoveredBranch,
+        branchSource: 'discovered',
+      });
+    }
+
+    const result = await createGitHubIssueLinkedBranch({
+      token: connection.access_token,
+      repoFullName: issueRecord.repo_full_name,
+      issueNumber: issueRecord.issue_number,
+      branchName,
+    });
+
+    res.json({
+      itemId,
+      issueNumber: issueRecord.issue_number,
+      repoFullName: issueRecord.repo_full_name,
+      issueUrl: issueRecord.issue_url,
+      linkedBranchId: result.branch?.linkedBranchId || null,
+      branchName: result.branch?.branchName || branchName,
+      branchUrl: result.branch?.branchUrl || `${repo.html_url}/tree/${encodeURIComponent(branchName)}`,
+      hasLinkedIssue: true,
+      hasLinkedBranch: Boolean(result.branch),
+      created: result.created,
+      linkedBranchCount: result.totalCount,
+      linkedBranch: result.branch,
+      discoveredBranch: null,
+      branch: result.branch,
+      branchSource: 'linked',
+    });
+  } catch (error) {
+    console.error('GitHub item branch create error:', error);
     res.status(error.status || 500).json({ error: error.message || 'GitHub linked branch 생성에 실패했습니다.' });
   }
 });
