@@ -1098,7 +1098,7 @@ async function createGitHubIssueLinkedBranch({ token, repoFullName, issueNumber,
               }
             }
           }
-          defaultBranchRef {
+          ref(qualifiedName: "refs/heads/dev") {
             target {
               ... on Commit {
                 oid
@@ -1113,9 +1113,9 @@ async function createGitHubIssueLinkedBranch({ token, repoFullName, issueNumber,
 
   const repository = repoData?.repository;
   const issue = repository?.issue;
-  const baseOid = repository?.defaultBranchRef?.target?.oid || null;
+  const baseOid = repository?.ref?.target?.oid || null;
   if (!repository?.id || !issue?.id || !baseOid) {
-    throw createHttpError(409, '기본 브랜치 정보를 찾지 못해 linked branch를 생성할 수 없습니다.');
+    throw createHttpError(409, 'dev 브랜치를 찾지 못해 linked branch를 생성할 수 없습니다.');
   }
 
   const existingBranch = issue.linkedBranches?.nodes?.find(
