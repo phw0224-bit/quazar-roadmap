@@ -34,10 +34,16 @@ import ItemViewers from './ItemViewers';
 import { ENTITY_TYPES, getEntityLabel } from '../lib/entityModel';
 import {
   createGitHubIssue,
+  createGitHubIssueBranch,
   getGitHubRepos,
+  getGitHubIssueBranch,
   getGitHubStatus,
   getItemGitHubIssues,
 } from '../api/githubAPI';
+
+function getGitHubIssueKey(repoFullName, issueNumber) {
+  return `${repoFullName}#${issueNumber}`;
+}
 
 function ItemDetailPanel({
   item, project = null, phase = project, entityContext = null, allItems = [], onClose, onUpdateItem, onUpdateProject, onUpdatePhase = onUpdateProject, isReadOnly,
@@ -73,11 +79,14 @@ function ItemDetailPanel({
   const [githubStatus, setGitHubStatus] = useState({ connected: false });
   const [githubRepos, setGitHubRepos] = useState([]);
   const [githubIssues, setGitHubIssues] = useState([]);
+  const [githubBranches, setGitHubBranches] = useState({});
   const [selectedGitHubRepo, setSelectedGitHubRepo] = useState('');
   const [showGitHubIssueCreator, setShowGitHubIssueCreator] = useState(false);
   const [isGitHubLoading, setIsGitHubLoading] = useState(false);
   const [isGitHubSubmitting, setIsGitHubSubmitting] = useState(false);
+  const [isGitHubBranchSubmitting, setIsGitHubBranchSubmitting] = useState({});
   const [gitHubError, setGitHubError] = useState('');
+  const [gitHubBranchError, setGitHubBranchError] = useState('');
   const [showShareLinkModal, setShowShareLinkModal] = useState(false);
   const [itemShareLink, setItemShareLink] = useState('');
   const [issuedTicket, setIssuedTicket] = useState({
@@ -144,6 +153,9 @@ function ItemDetailPanel({
     setIsEditingDescription(false);
     setShowGitHubIssueCreator(false);
     setGitHubError('');
+    setGitHubBranchError('');
+    setGitHubBranches({});
+    setIsGitHubBranchSubmitting({});
     setIssuedTicket({
       key: item?.ticket_key || '',
       number: item?.ticket_number ?? null,
@@ -159,6 +171,7 @@ function ItemDetailPanel({
           setGitHubStatus({ connected: false });
           setGitHubRepos([]);
           setGitHubIssues([]);
+          setGitHubBranches({});
           setSelectedGitHubRepo('');
           setShowGitHubIssueCreator(false);
         }
@@ -176,15 +189,37 @@ function ItemDetailPanel({
         if (!active) return;
 
         setGitHubStatus(status || { connected: false });
-        setGitHubIssues(issues || []);
+        const issueList = issues || [];
+        setGitHubIssues(issueList);
 
         if (status?.connected) {
           const repos = await getGitHubRepos();
           if (!active) return;
           setGitHubRepos(repos);
           setSelectedGitHubRepo((current) => current || repos[0]?.full_name || '');
+
+          if (issueList.length > 0) {
+            const branchResults = await Promise.allSettled(
+              issueList.map((issue) => getGitHubIssueBranch({
+                repoFullName: issue.repo_full_name,
+                issueNumber: issue.issue_number,
+              }))
+            );
+            if (!active) return;
+
+            const nextBranches = {};
+            branchResults.forEach((result, index) => {
+              if (result.status !== 'fulfilled' || !result.value?.linkedBranch) return;
+              const issue = issueList[index];
+              nextBranches[getGitHubIssueKey(issue.repo_full_name, issue.issue_number)] = result.value.linkedBranch;
+            });
+            setGitHubBranches(nextBranches);
+          } else {
+            setGitHubBranches({});
+          }
         } else {
           setGitHubRepos([]);
+          setGitHubBranches({});
           setSelectedGitHubRepo('');
         }
       } catch (error) {
@@ -503,6 +538,52 @@ function ItemDetailPanel({
       onShowToast?.(error.message || 'GitHub 이슈 생성에 실패했습니다.');
     } finally {
       setIsGitHubSubmitting(false);
+    }
+  };
+
+  const handleCreateGitHubBranch = async (issue) => {
+    if (!issue?.repo_full_name || !issue?.issue_number || !item?.id) {
+      onShowToast?.('브랜치를 생성할 GitHub 이슈 정보를 찾지 못했습니다.');
+      return;
+    }
+
+    const issueKey = getGitHubIssueKey(issue.repo_full_name, issue.issue_number);
+    setIsGitHubBranchSubmitting((current) => ({ ...current, [issueKey]: true }));
+    setGitHubBranchError('');
+
+    try {
+      const result = await createGitHubIssueBranch({
+        itemId: item.id,
+        repoFullName: issue.repo_full_name,
+        issueNumber: issue.issue_number,
+      });
+      const linkedBranch = result?.linkedBranch || (
+        result?.branchName
+          ? {
+              linkedBranchId: result.linkedBranchId || issueKey,
+              branchName: result.branchName,
+              branchUrl: result.branchUrl || null,
+            }
+          : null
+      );
+
+      if (linkedBranch) {
+        setGitHubBranches((current) => ({
+          ...current,
+          [issueKey]: linkedBranch,
+        }));
+      }
+
+      onShowToast?.(
+        result?.created === false
+          ? `${linkedBranch?.branchName || '브랜치'}가 이미 연결되어 있습니다.`
+          : `${linkedBranch?.branchName || '브랜치'}가 생성되었습니다.`
+      );
+    } catch (error) {
+      setGitHubBranchError(error.message || 'GitHub 브랜치 생성에 실패했습니다.');
+      onShowToast?.(error.message || 'GitHub 브랜치 생성에 실패했습니다.');
+    } finally {
+      setIsGitHubBranchSubmitting((current) => ({ ...current, [issueKey]: false }));
     }
   };
 
@@ -1434,27 +1515,98 @@ function ItemDetailPanel({
                   <span className="text-[13px] font-black uppercase tracking-widest">GitHub</span>
                 </div>
                 <div className="flex-1 flex flex-col gap-2 px-3 py-2 rounded-xl bg-white dark:bg-bg-hover border border-gray-100 dark:border-border-subtle">
-                  {githubIssues.map((issue) => (
-                    <a
-                      key={issue.id || `${issue.repo_full_name}-${issue.issue_number}`}
-                      href={issue.issue_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 dark:border-border-subtle px-3 py-2 text-sm text-gray-700 dark:text-text-secondary hover:border-brand-200 dark:hover:border-brand-600"
-                    >
-                      <div className="flex items-center gap-2 flex-wrap min-w-0">
-                        <span className="font-bold truncate">
-                          {issue.repo_full_name}#{issue.issue_number}
-                        </span>
-                        {(issue.ticket_key || ticketKey) && (
-                          <span className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-bg-base text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-text-secondary">
-                            {issue.ticket_key || ticketKey}
-                          </span>
-                        )}
+                  {githubIssues.map((issue) => {
+                    const issueKey = getGitHubIssueKey(issue.repo_full_name, issue.issue_number);
+                    const linkedBranch = githubBranches[issueKey] || null;
+                    const isCreatingBranch = Boolean(isGitHubBranchSubmitting[issueKey]);
+
+                    return (
+                      <div
+                        key={issue.id || `${issue.repo_full_name}-${issue.issue_number}`}
+                        className="rounded-xl border border-gray-100 px-3 py-3 dark:border-border-subtle"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <a
+                            href={issue.issue_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex min-w-0 items-center gap-2 flex-wrap text-sm text-gray-700 dark:text-text-secondary hover:text-brand-600 dark:hover:text-brand-400"
+                          >
+                            <span className="font-bold truncate">
+                              {issue.repo_full_name}#{issue.issue_number}
+                            </span>
+                            {(issue.ticket_key || ticketKey) && (
+                              <span className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-bg-base text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-text-secondary">
+                                {issue.ticket_key || ticketKey}
+                              </span>
+                            )}
+                          </a>
+                          <ExternalLink size={14} className="shrink-0 text-gray-400 dark:text-text-tertiary" />
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-gray-50 px-3 py-2 dark:bg-bg-base">
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-text-tertiary">
+                              Linked Branch
+                            </p>
+                            {linkedBranch ? (
+                              <div className="mt-1 flex flex-wrap items-center gap-2">
+                                <span className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-black text-gray-700 dark:border-border-subtle dark:bg-bg-hover dark:text-text-primary">
+                                  {linkedBranch.branchName}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const copied = await copyTextToClipboard(linkedBranch.branchName);
+                                    if (copied) {
+                                      onShowToast?.('브랜치명이 복사되었습니다.');
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-[11px] font-black text-gray-600 transition-colors hover:bg-white dark:border-border-subtle dark:text-text-secondary dark:hover:bg-bg-hover"
+                                >
+                                  <Copy size={12} strokeWidth={2.6} />
+                                  복사
+                                </button>
+                              </div>
+                            ) : (
+                              <p className="mt-1 text-xs font-bold text-gray-500 dark:text-text-secondary">
+                                아직 연결된 브랜치가 없습니다.
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {linkedBranch?.branchUrl && (
+                              <a
+                                href={linkedBranch.branchUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-black text-gray-600 transition-colors hover:bg-white dark:border-border-subtle dark:text-text-secondary dark:hover:bg-bg-hover"
+                              >
+                                <ExternalLink size={12} strokeWidth={2.6} />
+                                브랜치 보기
+                              </a>
+                            )}
+                            {!isReadOnly && !linkedBranch && (
+                              <button
+                                type="button"
+                                onClick={() => handleCreateGitHubBranch(issue)}
+                                disabled={isCreatingBranch}
+                                className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-[11px] font-black text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-gray-900"
+                              >
+                                {isCreatingBranch ? '생성 중...' : '브랜치 생성'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <ExternalLink size={14} className="shrink-0 text-gray-400 dark:text-text-tertiary" />
-                    </a>
-                  ))}
+                    );
+                  })}
+                  {gitHubBranchError && (
+                    <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                      {gitHubBranchError}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

@@ -193,6 +193,14 @@ function canWriteRepo(repo) {
   );
 }
 
+function canCreateBranch(repo) {
+  return Boolean(
+    repo?.permissions?.push ||
+    repo?.permissions?.maintain ||
+    repo?.permissions?.admin
+  );
+}
+
 async function requireGitHubRepoConnection(userId) {
   const connection = await getStoredGitHubConnection(userId);
   if (!connection?.access_token) {
@@ -990,6 +998,185 @@ async function addGitHubIssueLabels(repoFullName, issueNumber, labels, token) {
   return Array.isArray(appliedLabels) ? appliedLabels : [];
 }
 
+function parseRepoFullName(repoFullName) {
+  const [owner, repo] = String(repoFullName || '').split('/');
+  if (!owner || !repo) {
+    throw createHttpError(400, '유효한 repoFullName이 필요합니다.');
+  }
+
+  return { owner, repo };
+}
+
+async function fetchGitHubGraphql(token, query, variables = {}) {
+  const payload = await fetchGitHubJson('https://api.github.com/graphql', token, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, variables }),
+  });
+
+  if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
+    const error = new Error(payload.errors[0]?.message || 'GitHub GraphQL 요청 처리에 실패했습니다.');
+    error.status = 422;
+    error.payload = payload;
+    throw error;
+  }
+
+  return payload?.data ?? null;
+}
+
+function mapLinkedBranchSummary({ linkedBranch, repoUrl }) {
+  const branchName = linkedBranch?.ref?.name || null;
+  if (!linkedBranch?.id || !branchName) return null;
+
+  return {
+    linkedBranchId: linkedBranch.id,
+    branchName,
+    branchUrl: repoUrl ? `${repoUrl}/tree/${encodeURIComponent(branchName)}` : null,
+  };
+}
+
+async function getGitHubIssueBranchState(token, repoFullName, issueNumber) {
+  const { owner, repo } = parseRepoFullName(repoFullName);
+  const data = await fetchGitHubGraphql(
+    token,
+    `
+      query GetIssueLinkedBranch($owner: String!, $repo: String!, $issueNumber: Int!) {
+        repository(owner: $owner, name: $repo) {
+          url
+          issue(number: $issueNumber) {
+            id
+            linkedBranches(first: 10) {
+              totalCount
+              nodes {
+                id
+                ref {
+                  name
+                }
+              }
+            }
+          }
+        }
+      }
+    `,
+    { owner, repo, issueNumber: Number(issueNumber) }
+  );
+
+  const issue = data?.repository?.issue;
+  if (!issue?.id) {
+    throw createHttpError(404, 'GitHub 이슈를 찾을 수 없습니다.');
+  }
+
+  const linkedBranch = issue.linkedBranches?.nodes?.[0] || null;
+  return {
+    issueId: issue.id,
+    totalCount: issue.linkedBranches?.totalCount || 0,
+    branch: mapLinkedBranchSummary({
+      linkedBranch,
+      repoUrl: data?.repository?.url || `https://github.com/${repoFullName}`,
+    }),
+  };
+}
+
+async function createGitHubIssueLinkedBranch({ token, repoFullName, issueNumber, branchName }) {
+  const { owner, repo } = parseRepoFullName(repoFullName);
+  const repoData = await fetchGitHubGraphql(
+    token,
+    `
+      query PrepareLinkedBranch($owner: String!, $repo: String!, $issueNumber: Int!) {
+        repository(owner: $owner, name: $repo) {
+          id
+          url
+          issue(number: $issueNumber) {
+            id
+            linkedBranches(first: 10) {
+              totalCount
+              nodes {
+                id
+                ref {
+                  name
+                }
+              }
+            }
+          }
+          defaultBranchRef {
+            target {
+              ... on Commit {
+                oid
+              }
+            }
+          }
+        }
+      }
+    `,
+    { owner, repo, issueNumber: Number(issueNumber) }
+  );
+
+  const repository = repoData?.repository;
+  const issue = repository?.issue;
+  const baseOid = repository?.defaultBranchRef?.target?.oid || null;
+  if (!repository?.id || !issue?.id || !baseOid) {
+    throw createHttpError(409, '기본 브랜치 정보를 찾지 못해 linked branch를 생성할 수 없습니다.');
+  }
+
+  const existingBranch = issue.linkedBranches?.nodes?.find(
+    (candidate) => candidate?.ref?.name === branchName
+  ) || issue.linkedBranches?.nodes?.[0] || null;
+
+  if (existingBranch) {
+    return {
+      created: false,
+      branch: mapLinkedBranchSummary({
+        linkedBranch: existingBranch,
+        repoUrl: repository.url || `https://github.com/${repoFullName}`,
+      }),
+      totalCount: issue.linkedBranches?.totalCount || 1,
+    };
+  }
+
+  const mutationData = await fetchGitHubGraphql(
+    token,
+    `
+      mutation CreateLinkedBranch(
+        $issueId: ID!
+        $repositoryId: ID!
+        $name: String!
+        $oid: GitObjectID!
+      ) {
+        createLinkedBranch(
+          input: {
+            issueId: $issueId
+            repositoryId: $repositoryId
+            name: $name
+            oid: $oid
+          }
+        ) {
+          linkedBranch {
+            id
+            ref {
+              name
+            }
+          }
+        }
+      }
+    `,
+    {
+      issueId: issue.id,
+      repositoryId: repository.id,
+      name: branchName,
+      oid: baseOid,
+    }
+  );
+
+  return {
+    created: true,
+    branch: mapLinkedBranchSummary({
+      linkedBranch: mutationData?.createLinkedBranch?.linkedBranch,
+      repoUrl: repository.url || `https://github.com/${repoFullName}`,
+    }),
+    totalCount: (issue.linkedBranches?.totalCount || 0) + 1,
+  };
+}
+
 function buildGitHubApiErrorMessage(error) {
   const base = error?.message || 'GitHub 요청 처리에 실패했습니다.';
   const detail = error?.payload?.errors;
@@ -1765,6 +1952,98 @@ router.post('/issues', async (req, res) => {
     }
 
     res.status(error.status || 500).json({ error: error.message || 'GitHub 이슈 생성에 실패했습니다.' });
+  }
+});
+
+router.get('/issues/:issueNumber/branch', async (req, res) => {
+  try {
+    if (!requireServerConfig(res)) return;
+
+    const user = await requireAuthenticatedUser(req, res);
+    if (!user) return;
+
+    const issueNumber = Number(req.params.issueNumber);
+    const repoFullName = String(req.query.repoFullName || '').trim();
+    if (!Number.isFinite(issueNumber) || !repoFullName) {
+      return res.status(400).json({ error: 'issueNumber와 repoFullName이 필요합니다.' });
+    }
+
+    const connection = await requireGitHubRepoConnection(user.id);
+    const branchState = await getGitHubIssueBranchState(connection.access_token, repoFullName, issueNumber);
+
+    res.json({
+      issueNumber,
+      repoFullName,
+      hasLinkedBranch: Boolean(branchState.branch),
+      linkedBranch: branchState.branch,
+      linkedBranchCount: branchState.totalCount,
+    });
+  } catch (error) {
+    console.error('GitHub issue branch get error:', error);
+    res.status(error.status || 500).json({ error: error.message || 'GitHub linked branch 정보를 불러오지 못했습니다.' });
+  }
+});
+
+router.post('/issues/:issueNumber/branch', async (req, res) => {
+  try {
+    if (!requireServerConfig(res)) return;
+
+    const user = await requireAuthenticatedUser(req, res);
+    if (!user) return;
+
+    const issueNumber = Number(req.params.issueNumber);
+    const { itemId, repoFullName } = req.body || {};
+    if (!Number.isFinite(issueNumber) || !itemId || !repoFullName) {
+      return res.status(400).json({ error: 'itemId, issueNumber, repoFullName이 필요합니다.' });
+    }
+
+    const issueRecord = await getGitHubIssueRecord(repoFullName, issueNumber);
+    if (!issueRecord || issueRecord.item_id !== itemId) {
+      return res.status(404).json({ error: '이 아이템에 연결된 GitHub 이슈를 찾을 수 없습니다.' });
+    }
+
+    const itemRecord = await findItemRecordById(itemId);
+    if (!itemRecord) {
+      return res.status(404).json({ error: '아이템을 찾을 수 없습니다.' });
+    }
+
+    const branchName = String(itemRecord.item?.ticket_key || '').trim();
+    if (!branchName) {
+      return res.status(409).json({ error: '티켓 키가 없어 브랜치를 생성할 수 없습니다. 먼저 GitHub 이슈를 생성해주세요.' });
+    }
+
+    const connection = await requireGitHubRepoConnection(user.id);
+    const repo = await fetchGitHubJson(`https://api.github.com/repos/${repoFullName}`, connection.access_token);
+
+    if (repo?.archived) {
+      throw createHttpError(409, '보관된 레포에는 브랜치를 생성할 수 없습니다.');
+    }
+
+    if (!canCreateBranch(repo)) {
+      throw createHttpError(403, '선택한 레포에 브랜치를 생성할 권한이 없습니다.');
+    }
+
+    const result = await createGitHubIssueLinkedBranch({
+      token: connection.access_token,
+      repoFullName,
+      issueNumber,
+      branchName,
+    });
+
+    res.json({
+      issueNumber,
+      repoFullName,
+      linkedBranchId: result.branch?.linkedBranchId || null,
+      branchName: result.branch?.branchName || branchName,
+      branchUrl: result.branch?.branchUrl || `${repo.html_url}/tree/${encodeURIComponent(branchName)}`,
+      hasLinkedBranch: Boolean(result.branch),
+      created: result.created,
+      linkedBranchCount: result.totalCount,
+      linkedBranch: result.branch,
+    });
+  } catch (error) {
+    console.error('GitHub issue branch create error:', error);
+    res.status(error.status || 500).json({ error: error.message || 'GitHub linked branch 생성에 실패했습니다.' });
   }
 });
 

@@ -114,6 +114,20 @@ export async function createGitHubIssue(itemId, repoFullName) {
   });
 }
 
+export async function getGitHubIssueBranch({ repoFullName, issueNumber }) {
+  const search = new URLSearchParams({ repoFullName });
+  return serverRequest(`/api/github/issues/${issueNumber}/branch?${search.toString()}`, {
+    method: 'GET',
+  });
+}
+
+export async function createGitHubIssueBranch({ itemId, repoFullName, issueNumber }) {
+  return serverRequest(`/api/github/issues/${issueNumber}/branch`, {
+    method: 'POST',
+    body: JSON.stringify({ itemId, repoFullName }),
+  });
+}
+
 export async function syncGitHubIssueStatus(itemId, status) {
   return serverRequest('/api/github/issues/sync-status', {
     method: 'POST',
