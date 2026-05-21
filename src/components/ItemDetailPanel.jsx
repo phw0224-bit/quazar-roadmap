@@ -1734,7 +1734,7 @@ function ItemDetailPanel({
               </div>
             </div>
 
-            {hasExistingGitHubIssue && (
+            {(hasExistingGitHubIssue || isGitHubSubmitting) && (
               <div className="flex items-start min-h-[48px] group">
                 <div className="w-48 flex items-center gap-3 text-gray-400 dark:text-text-tertiary shrink-0 pt-2.5">
                   <Github size={18} strokeWidth={2.5} />
