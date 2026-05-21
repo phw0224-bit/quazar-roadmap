@@ -802,13 +802,15 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
 
   const getProjectDetailItem = (project) => ({
     id: project.id,
+    project_id: project.id,
     title: project.title,
     description: project.description || '',
     status: 'none',
     page_type: 'project',
     assignees: project.assignees || [],
+    assignee_user_ids: project.assignee_user_ids || [],
     teams: [],
-    tags: [],
+    tags: project.tags || [],
     related_items: [],
     creator_profile: null,
   });
@@ -1737,6 +1739,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                   onShowConfirm={showConfirm}
                   onShowToast={showToast}
                   onAddChildPage={(projectId, parentItemId, title) => addChildPage(projectId, parentItemId, title, user?.id)}
+                  onAddProjectItem={(projectId, title) => guardedAddItem(projectId, title, '', user?.id)}
                   onShowPrompt={showPrompt}
                   onManageGitHubSettings={handleOpenProfileModal}
                   isReadOnly={isReadOnly}

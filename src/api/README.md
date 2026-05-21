@@ -53,6 +53,7 @@ return data;
 - `moveItem()`은 칸반 보드뿐 아니라 Sidebar 트리 이동도 지원하도록 `targetParentId`를 받을 수 있다.
 - `getPersonalMemos()` 계열은 더 이상 `roadmap_items.is_private`에 의존하지 않고 전용 `personal_memos` 저장소를 사용한다.
 - `getBoardData()`는 팀 보드(`projects`/`items`)와 전사 로드맵(`roadmap_projects`/`roadmap_items`)을 함께 읽지만, 신규 연관 업무 검색 후보는 컴포넌트 레이어에서 팀 보드/개인 메모 범위로 제한한다.
+- 프로젝트도 `tags` 배열을 가질 수 있으며, `addProject()`는 빈 `tags[]`를 초기화하고 `getBoardData()`는 프로젝트 태그를 배열로 정규화한다.
 - 담당자 저장은 `assignees` 표시 이름 배열과 `assignee_user_ids` 식별자 배열을 함께 동기화한다.
 - 담당자 변경 알림은 `updateItem()` / `updateProject()`에서 assignee diff를 계산한 뒤 `POST /api/notifications/assignments`로 전달한다.
 - 개발팀 요청 알림은 작성 폼 제출 후 `submitTeamRequest()`가 `POST /api/notifications/dev-requests`를 호출해 Google Chat incoming webhook으로 전달한다.

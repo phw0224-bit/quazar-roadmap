@@ -20,9 +20,9 @@
 | `RepositoriesDashboard.jsx` | GitHub 레포별 PR/이슈/커밋, 티켓 prefix 설정, 로드맵 아이템 연결 대시보드 |
 | `NotificationsInbox.jsx` | 보드 헤더 우측 알림함. 담당자 지정 알림 조회/읽음 처리/대상 이동 |
 | `PresenceAvatars.jsx` | 보드 헤더 우측의 전체 접속자 아바타 표시 |
-| `ItemDetailPanel.jsx` | 우측 슬라이드 패널. 에디터+메타데이터+GitHub 이슈 생성/표시+AI요약+댓글. 가장 복잡한 컴포넌트 |
+| `ItemDetailPanel.jsx` | 우측 슬라이드 패널. 에디터+메타데이터+GitHub 이슈 생성/표시+AI요약+댓글. 프로젝트/아이템 공용 shell이지만 엔티티별 저장 경로를 분기 |
 | `ItemViewers.jsx` | 상세 패널 상단에서 같은 아이템을 보는 중/편집 중인 사용자 표시 |
-| `ItemDescriptionSection.jsx` | ItemDetailPanel 내부의 Markdown live/source/view editor, AI 요약, 링크 모달 전담 섹션 |
+| `ItemDescriptionSection.jsx` | ItemDetailPanel 내부의 Markdown live/source/view editor, AI 요약, 링크 모달 전담 섹션. 프로젝트 상세에서는 slash 명령을 새 업무 생성으로 연결 |
 | `itemDescriptionMode.js` | 상세 설명 섹션이 본문 유무와 읽기 전용 여부에 따라 기본 모드를 정하는 규칙 |
 | `BoardSection.jsx` | 섹션 그룹 (프로젝트 컬럼들을 묶음) |
 | `ProjectColumn.jsx` | **핵심.** 칸반 컬럼 하나 (Project). 완료 프로젝트 전환, 프로젝트 가상 페이지 진입 포함 |
@@ -108,3 +108,8 @@ const stopProp = (e) => e.stopPropagation();
 **GitHub 이슈 생성 UI:**
 
 아이템 상세 제목 아래 보조 액션 버튼에서 모달을 열고, 모달 내부에서 레포지토리를 드롭다운으로 선택해 이슈를 생성한다. 연결된 이슈가 이미 있으면 속성 박스 안 `GitHub` 행에 링크만 표시하고 빈 GitHub 속성 행은 렌더링하지 않는다.
+
+**프로젝트 상세 vs 아이템 상세:**
+
+- 프로젝트 상세는 `page_type='project'` 가상 엔티티를 사용하지만, slash 생성/태그/설명 저장은 실제 `projects` 레코드로 반영한다.
+- 프로젝트 상세 에디터의 `새 업무` 명령은 새 `items` task를 생성하고, 일반 아이템/문서 상세의 `새 페이지` 명령은 하위 문서를 생성한다.

@@ -22,6 +22,7 @@ import EditorToolbar from './EditorToolbar';
 import { buildPageWikiLink } from './utils/markdownPreview';
 import {
   EDITOR_COMMANDS,
+  buildEditorCommands,
   filterEditorCommands,
   getSlashCommandContext,
   getWikiLinkContext,
@@ -70,6 +71,10 @@ function Editor({
   onLinkExistingPage,
   editorViewRef: externalEditorViewRef,
   onUpdate: externalOnUpdate,
+  createPageLabel = '새 페이지',
+  createPromptTitle = '하위 페이지 추가',
+  createPromptPlaceholder = '페이지 제목을 입력하세요',
+  createErrorPrefix = '하위 페이지 생성 실패',
 }) {
   const { resolvedTheme } = useTheme();
   const internalEditorViewRef = useRef(null);
@@ -77,9 +82,17 @@ function Editor({
   const wrapperRef = useRef(null);
   const fileInputRef = useRef(null);
   const isApplyingExternalValue = useRef(false);
+  const commands = useMemo(
+    () => (
+      createPageLabel === '새 페이지'
+        ? EDITOR_COMMANDS
+        : buildEditorCommands({ createPageLabel })
+    ),
+    [createPageLabel],
+  );
   const commandMap = useMemo(
-    () => Object.fromEntries(EDITOR_COMMANDS.map((command) => [command.id, command])),
-    [],
+    () => Object.fromEntries(commands.map((command) => [command.id, command])),
+    [commands],
   );
 
   const [slashState, setSlashState] = useState(null);
@@ -97,8 +110,8 @@ function Editor({
   }, []);
 
   const filteredSlashCommands = useMemo(
-    () => filterEditorCommands(slashState?.query || ''),
-    [slashState?.query],
+    () => filterEditorCommands(slashState?.query || '', commands),
+    [commands, slashState?.query],
   );
 
   const wikiSuggestions = useMemo(() => {
@@ -201,7 +214,7 @@ function Editor({
   const handleInsertChildPage = useCallback(() => {
     if (!onAddChildPage || !onShowPrompt || !editorViewRef.current) return;
 
-    onShowPrompt('하위 페이지 추가', '페이지 제목을 입력하세요', async (title) => {
+    onShowPrompt(createPromptTitle, createPromptPlaceholder, async (title) => {
       if (!title?.trim()) return;
 
       try {
@@ -209,10 +222,18 @@ function Editor({
         if (!newPage) return;
         insertAtSelection(editorViewRef.current, buildPageWikiLink(newPage));
       } catch (error) {
-        onShowToast?.(`하위 페이지 생성 실패: ${error.message}`);
+        onShowToast?.(`${createErrorPrefix}: ${error.message}`);
       }
     });
-  }, [editorViewRef, onAddChildPage, onShowPrompt, onShowToast]);
+  }, [
+    createErrorPrefix,
+    createPromptPlaceholder,
+    createPromptTitle,
+    editorViewRef,
+    onAddChildPage,
+    onShowPrompt,
+    onShowToast,
+  ]);
 
   const runCommand = useCallback((command, range = null) => {
     const view = editorViewRef.current;

@@ -384,6 +384,7 @@ const supabaseAPI = {
       ...project,
       assignees: Array.isArray(project.assignees) ? project.assignees : [],
       assignee_user_ids: Array.isArray(project.assignee_user_ids) ? project.assignee_user_ids : [],
+      tags: Array.isArray(project.tags) ? project.tags : [],
       items: (mainProjectIds.has(project.id) ? (mainItemsData || []) : (teamItems || []))
         .filter(item => item.project_id === project.id)
         .sort((a, b) => a.order_index - b.order_index)
@@ -553,7 +554,7 @@ const supabaseAPI = {
 
     const { data, error } = await supabase
       .from(projectsTable(boardType))
-      .insert([{ title, order_index: nextOrder, board_type: boardType, assignees: [], assignee_user_ids: [], section_id: sectionId }])
+      .insert([{ title, order_index: nextOrder, board_type: boardType, assignees: [], assignee_user_ids: [], tags: [], section_id: sectionId }])
       .select();
 
     if (error) throw error;

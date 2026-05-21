@@ -50,6 +50,7 @@ function ItemDetailPanel({
   onAddComment, onUpdateComment, onDeleteComment, onOpenDetail,
   onShowConfirm, onShowToast,
   onAddChildPage,
+  onAddProjectItem,
   onShowPrompt,
   onManageGitHubSettings,
   onSubmitRequest,
@@ -1624,6 +1625,7 @@ function ItemDetailPanel({
             onShowToast={onShowToast}
             onUpdateItem={onUpdateItem}
             onAddChildPage={canCreateProjectChildPage ? onAddChildPage : null}
+            onAddProjectItem={isProjectLike ? onAddProjectItem : null}
             onShowPrompt={onShowPrompt}
             editorViewRef={editorViewRef}
             onEditorUpdate={handleEditorUpdate}

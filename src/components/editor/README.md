@@ -7,7 +7,7 @@
 - Markdown preview 렌더링과 위키링크/토글 상호작용 제공
 - legacy HTML import와 clipboard normalization 처리
 - 툴바와 슬래시 메뉴가 공유하는 Markdown 명령 정의 유지
-- Markdown 표 편집 보조와 새 페이지 생성 명령 제공
+- Markdown 표 편집 보조와 엔티티 문맥별 생성 명령 제공
 
 ## 주요 파일
 
@@ -48,6 +48,9 @@ const context = getSlashCommandContext(doc, cursor);
 // /toggle, /todo, /table, /page 같은 query를 감지해
 // SlashCommandMenu에 필터링된 명령 목록을 띄운다.
 ```
+
+- 기본적으로 `page` 명령은 하위 페이지 생성을 뜻한다.
+- 프로젝트 상세 문맥에서는 같은 명령 id를 `새 업무` 라벨과 새 task 생성 콜백으로 override한다.
 
 **표 편집 보조**
 - Markdown 표는 source text 그대로 저장한다.

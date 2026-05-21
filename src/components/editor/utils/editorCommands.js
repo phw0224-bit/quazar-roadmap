@@ -16,7 +16,7 @@ export function buildCalloutSnippet(type) {
   return `> [!${type}] 제목\n> 내용\n`;
 }
 
-export const EDITOR_COMMANDS = [
+const BASE_EDITOR_COMMANDS = [
   { id: 'h1', label: '제목 1', keywords: ['h1', 'heading', 'title'], insert: '# ', cursorOffset: 2 },
   { id: 'h2', label: '제목 2', keywords: ['h2', 'heading', 'title'], insert: '## ', cursorOffset: 3 },
   { id: 'h3', label: '제목 3', keywords: ['h3', 'heading', 'title'], insert: '### ', cursorOffset: 4 },
@@ -60,11 +60,25 @@ export const EDITOR_COMMANDS = [
   { id: 'callout-quote',    label: '💬 Quote',    keywords: ['quote', 'callout'],    insert: buildCalloutSnippet('quote'),   selectionFrom: 10, selectionTo: 12 },
 ];
 
-export function filterEditorCommands(query) {
-  const normalized = (query || '').trim().toLowerCase();
-  if (!normalized) return EDITOR_COMMANDS;
+export function buildEditorCommands(overrides = {}) {
+  const createPageLabel = overrides.createPageLabel?.trim();
 
-  return EDITOR_COMMANDS.filter((command) =>
+  if (!createPageLabel) return BASE_EDITOR_COMMANDS;
+
+  return BASE_EDITOR_COMMANDS.map((command) => (
+    command.id === 'page'
+      ? { ...command, label: createPageLabel }
+      : command
+  ));
+}
+
+export const EDITOR_COMMANDS = buildEditorCommands();
+
+export function filterEditorCommands(query, commands = EDITOR_COMMANDS) {
+  const normalized = (query || '').trim().toLowerCase();
+  if (!normalized) return commands;
+
+  return commands.filter((command) =>
     command.id.includes(normalized)
     || command.label.toLowerCase().includes(normalized)
     || command.keywords.some((keyword) => keyword.includes(normalized)),

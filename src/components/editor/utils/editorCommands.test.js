@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   EDITOR_COMMANDS,
+  buildEditorCommands,
   buildToggleSnippet,
   filterEditorCommands,
   getSlashCommandContext,
@@ -23,6 +24,16 @@ test('buildToggleSnippet emits canonical toggle markdown', () => {
 
 test('filterEditorCommands returns full list for empty query', () => {
   assert.equal(filterEditorCommands('').length, EDITOR_COMMANDS.length);
+});
+
+test('buildEditorCommands can override project-specific create label', () => {
+  const commands = buildEditorCommands({ createPageLabel: '새 업무' });
+  const createCommand = commands.find((command) => command.id === 'page');
+
+  assert.equal(createCommand?.label, '새 업무');
+  assert.ok(
+    filterEditorCommands('업무', commands).some((command) => command.id === 'page'),
+  );
 });
 
 test('filterEditorCommands matches by id and keyword', () => {

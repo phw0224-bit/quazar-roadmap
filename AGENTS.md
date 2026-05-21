@@ -70,7 +70,7 @@ Google Chat Bot (:3002) → 웹훅 → Ollama NLU → Supabase
 
 ```sql
 sections       -- 칸반 컬럼 시각적 그룹 (board_type, order_index, timeline_order_index)
-projects       -- 칸반 컬럼 Project (section_id, is_completed, pre_completion_*)
+projects       -- 칸반 컬럼 Project (section_id, is_completed, pre_completion_*, tags[])
 items          -- 카드 또는 페이지
   ├── project_id, parent_item_id (중첩), page_type, status, priority
   ├── assignees[], teams[], tags[], related_items[]
@@ -78,7 +78,7 @@ items          -- 카드 또는 페이지
   └── created_by (auth.users.id)
 comments       -- 댓글 (item_id, user_id, content)
 profiles       -- 사용자 프로필 (name, department)
-roadmap_projects -- 전사 로드맵 전용 프로젝트 테이블
+roadmap_projects -- 전사 로드맵 전용 프로젝트 테이블 (tags[])
 roadmap_items    -- 전사 로드맵 전용 아이템/문서 테이블
 personal_memos   -- 개인 메모 전용 저장소
 team_requests    -- 개발팀 요청 문서

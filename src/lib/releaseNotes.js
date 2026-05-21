@@ -9,6 +9,23 @@ export const RELEASE_NOTES_STORAGE_KEY = 'kanban-release-notes-last-seen';
 
 export const RELEASE_NOTES = [
   {
+    id: '2026-05-21-project-detail-task-and-tags',
+    version: 'v0.10.5',
+    title: '프로젝트 상세 새 업무/태그 흐름 정리',
+    description: '프로젝트 상세 에디터의 slash 명령과 태그 템플릿 적용 경로를 프로젝트 모델에 맞게 정리했습니다.',
+    sections: [
+      {
+        title: '변경',
+        items: [
+          '프로젝트 상세 에디터에서 `/ 새 페이지` 실행 시 하위 문서 대신 해당 프로젝트의 새 업무를 생성하도록 변경',
+          '일반 아이템/문서 상세에서는 기존처럼 하위 페이지 생성 흐름을 유지',
+          '프로젝트 상세 태그가 실제 프로젝트 데이터와 연결되어 템플릿 scaffold/placeholder 적용이 가능하도록 정리',
+          '프로젝트/전사 프로젝트 테이블에 `tags[]`를 사용할 수 있도록 스키마 보강 SQL 추가',
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-04-22-editor-light-theme',
     version: 'v0.10.4',
     title: '상세내용 라이트 모드 가독성 개선',

@@ -40,6 +40,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
   onShowToast,
   onUpdateItem,
   onAddChildPage,
+  onAddProjectItem,
   onShowPrompt,
   editorViewRef,
   onEditorUpdate,
@@ -66,6 +67,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
 
   const isMemo = entityContext?.type === ENTITY_TYPES.MEMO;
   const isRequest = entityContext?.type === ENTITY_TYPES.REQUEST;
+  const isProject = entityContext?.type === ENTITY_TYPES.PROJECT;
   const isEditorMode = descriptionMode === 'live' || descriptionMode === 'source';
 
   useEffect(() => {
@@ -364,6 +366,16 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
     [isReadOnly, matchedTemplateType],
   );
 
+  const handleCreateLinkedEntry = useCallback(async (title) => {
+    if (!title?.trim()) return null;
+
+    if (isProject) {
+      return onAddProjectItem ? onAddProjectItem(projectId, title.trim()) : null;
+    }
+
+    return onAddChildPage ? onAddChildPage(projectId, item.id, title.trim()) : null;
+  }, [isProject, item.id, onAddChildPage, onAddProjectItem, projectId]);
+
   return (
     <>
       <div className="flex flex-col gap-6">
@@ -523,11 +535,15 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
               onFocus={() => setIsEditorFocused(true)}
               onBlur={handleDescriptionBlur}
               onEditorBlur={() => setIsEditorFocused(false)}
-              onAddChildPage={onAddChildPage ? async (title) => onAddChildPage(projectId, item.id, title) : null}
+              onAddChildPage={(isProject ? onAddProjectItem : onAddChildPage) ? handleCreateLinkedEntry : null}
               onShowPrompt={onShowPrompt}
               onLinkExistingPage={handleLinkExistingPage}
               editorViewRef={editorViewRef}
               onUpdate={onEditorUpdate}
+              createPageLabel={isProject ? '새 업무' : '새 페이지'}
+              createPromptTitle={isProject ? '새 업무 추가' : '하위 페이지 추가'}
+              createPromptPlaceholder={isProject ? '업무 제목을 입력하세요' : '페이지 제목을 입력하세요'}
+              createErrorPrefix={isProject ? '업무 생성 실패' : '하위 페이지 생성 실패'}
             />
           )}
 
