@@ -923,6 +923,39 @@ async function upsertGitHubPullRequestLink({ itemId, repoFullName, pullRequestPa
   return data;
 }
 
+async function upsertGitHubPullRequestDraftCache({ itemId, repoFullName, issueNumber, issueUrl, branchName, branchUrl, baseBranch, defaultTitle, defaultBody }) {
+  const record = {
+    item_id: itemId,
+    repo_full_name: repoFullName,
+    issue_number: issueNumber,
+    issue_url: issueUrl,
+    branch_name: branchName,
+    branch_url: branchUrl,
+    base_branch: baseBranch,
+    default_title: defaultTitle,
+    default_body: defaultBody,
+    cached_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabaseAdminClient
+    .from('item_github_pull_request_drafts')
+    .upsert(record, { onConflict: 'item_id' })
+    .select('*')
+    .single();
+
+  if (error) {
+    // Silently ignore if table doesn't exist (schema not yet applied)
+    if (error.code === '42P01' || error.message?.includes('item_github_pull_request_drafts')) {
+      console.warn('PR draft cache table not found, skipping cache upsert');
+      return null;
+    }
+    console.error('PR draft cache upsert error:', error);
+    return null;
+  }
+  return data;
+}
+
+
 function extractTicketKeysFromText(...values) {
   const pattern = new RegExp(
     `\\b${escapeRegex(TICKET_KEY_PREFIX)}-(?:[A-Z0-9][A-Z0-9-]*-)?\\d+\\b`,
@@ -2561,6 +2594,19 @@ router.post('/items/:itemId/pull-request/prepare', async (req, res) => {
       item: itemRecord.item,
       issue: { number: issueRecord.issue_number },
       ticket,
+    });
+
+    // Cache draft data for instant loading
+    await upsertGitHubPullRequestDraftCache({
+      itemId,
+      repoFullName: issueRecord.repo_full_name,
+      issueNumber: issueRecord.issue_number,
+      issueUrl: issueRecord.issue_url,
+      branchName: branch.branchName,
+      branchUrl: branch.branchUrl || '',
+      baseBranch: repo.default_branch || 'main',
+      defaultTitle,
+      defaultBody,
     });
 
     res.json({

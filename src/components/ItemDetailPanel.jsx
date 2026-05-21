@@ -43,6 +43,7 @@ import {
   getGitHubStatus,
   getItemGitHubIssues,
   prepareGitHubItemPullRequest,
+  getGitHubItemPullRequestDraftCache,
 } from '../api/githubAPI';
 
 function ItemDetailPanel({
@@ -711,17 +712,42 @@ function ItemDetailPanel({
       return;
     }
 
-    setIsGitHubPullRequestLoading(true);
     setGitHubPullRequestError('');
+
+    // Try to load from cache first (instant load)
+    const cachedDraft = await getGitHubItemPullRequestDraftCache(item.id);
+    if (cachedDraft) {
+      setGitHubPullRequestDraft({
+        repoFullName: cachedDraft.repo_full_name,
+        issueNumber: cachedDraft.issue_number,
+        issueUrl: cachedDraft.issue_url,
+        branchName: cachedDraft.branch_name,
+        branchUrl: cachedDraft.branch_url,
+        base: cachedDraft.base_branch,
+        title: cachedDraft.default_title,
+        body: cachedDraft.default_body,
+        draft: true,
+      });
+      setShowGitHubPullRequestCreator(true);
+      setIsGitHubPullRequestLoading(false);
+    } else {
+      // No cache, show loading state
+      setShowGitHubPullRequestCreator(true);
+      setIsGitHubPullRequestLoading(true);
+    }
+
+    // Fetch fresh data in background
     try {
       const result = await prepareGitHubItemPullRequest(item.id);
       const existingPullRequest = result?.existingPullRequest || null;
       if (existingPullRequest) {
         setGitHubPullRequests((current) => mergeGitHubPullRequests([existingPullRequest], current));
+        setShowGitHubPullRequestCreator(false);
         onShowToast?.('같은 브랜치의 기존 PR이 이미 연결되어 있습니다.');
         return;
       }
 
+      // Update with fresh server data
       setGitHubPullRequestDraft({
         repoFullName: result?.repoFullName || githubIssues[0]?.repo_full_name || '',
         issueNumber: result?.issue?.issueNumber || githubIssues[0]?.issue_number || null,
@@ -733,7 +759,6 @@ function ItemDetailPanel({
         body: result?.defaultBody || '',
         draft: result?.draft !== false,
       });
-      setShowGitHubPullRequestCreator(true);
     } catch (error) {
       setGitHubPullRequestError(error.message || 'GitHub PR 초안을 준비하지 못했습니다.');
       onShowToast?.(error.message || 'GitHub PR 초안을 준비하지 못했습니다.');
@@ -2206,6 +2231,27 @@ function ItemDetailPanel({
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {showGitHubPullRequestCreator && isGitHubPullRequestLoading && !gitHubPullRequestDraft && !isMemo && (
+        <div
+          className="fixed inset-0 z-[121] flex items-center justify-center bg-black/45 px-4 backdrop-blur-sm"
+          onMouseDown={() => {
+            setShowGitHubPullRequestCreator(false);
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl border border-gray-200 bg-white p-8 shadow-2xl dark:border-border-subtle dark:bg-bg-elevated"
+            onMouseDown={stopProp}
+          >
+            <div className="flex flex-col items-center gap-4">
+              <div className="animate-spin rounded-full border-3 border-gray-200 border-t-gray-900 w-12 h-12 dark:border-border-subtle dark:border-t-text-primary" />
+              <div className="text-center">
+                <p className="text-sm font-semibold text-gray-900 dark:text-text-primary">PR 초안 준비 중...</p>
+                <p className="mt-1 text-xs text-gray-500 dark:text-text-secondary">GitHub에서 브랜치와 이슈 정보를 확인하고 있습니다.</p>
+              </div>
             </div>
           </div>
         </div>

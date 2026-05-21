@@ -147,6 +147,20 @@ export async function getGitHubItemPullRequests(itemId) {
   return data?.pullRequests || [];
 }
 
+export async function getGitHubItemPullRequestDraftCache(itemId) {
+  const { data, error } = await supabase
+    .from('item_github_pull_request_drafts')
+    .select('*')
+    .eq('item_id', itemId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Failed to fetch PR draft cache:', error);
+    return null;
+  }
+  return data;
+}
+
 export async function prepareGitHubItemPullRequest(itemId) {
   return serverRequest(`/api/github/items/${itemId}/pull-request/prepare`, {
     method: 'POST',
