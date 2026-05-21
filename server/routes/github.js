@@ -2294,6 +2294,72 @@ router.get('/items/:itemId/branch', async (req, res) => {
       return res.status(404).json({ error: '아이템을 찾을 수 없습니다.' });
     }
 
+    // DB 캐시 확인 (즉시 응답)
+    const cachedBranchName = itemRecord.item?.github_linked_branch_name;
+    const cachedBranchUrl = itemRecord.item?.github_linked_branch_url;
+    const cachedBranchSource = itemRecord.item?.github_branch_source || null;
+    
+    if (cachedBranchName) {
+      res.json({
+        hasLinkedIssue: true,
+        issue: {
+          itemId,
+          repoFullName: issueRecord.repo_full_name,
+          issueNumber: issueRecord.issue_number,
+          issueUrl: issueRecord.issue_url,
+        },
+        hasLinkedBranch: true,
+        linkedBranch: {
+          branchName: cachedBranchName,
+          branchUrl: cachedBranchUrl,
+        },
+        discoveredBranch: null,
+        branch: {
+          branchName: cachedBranchName,
+          branchUrl: cachedBranchUrl,
+        },
+        branchSource: cachedBranchSource,
+        fromCache: true,
+      });
+
+      // 백그라운드에서 API 호출로 최신 정보 갱신 (비동기)
+      setImmediate(async () => {
+        try {
+          const connection = await requireGitHubRepoConnection(user.id);
+          const ticketKey = String(itemRecord.item?.ticket_key || '').trim();
+          const branchState = await getGitHubIssueBranchState(
+            connection.access_token,
+            issueRecord.repo_full_name,
+            issueRecord.issue_number
+          );
+          const matchedLinkedBranch = pickPreferredTicketBranch(branchState.branches, ticketKey);
+          const discoveredBranch = await findRepositoryBranchByTicketKey(
+            connection.access_token,
+            issueRecord.repo_full_name,
+            ticketKey
+          );
+          const primaryBranch = matchedLinkedBranch || discoveredBranch || branchState.branch || null;
+          
+          // 변경 사항이 있으면 DB 업데이트
+          if (primaryBranch && primaryBranch.branchName !== cachedBranchName) {
+            await supabaseAdminClient
+              .from('items')
+              .update({
+                github_linked_branch_name: primaryBranch.branchName,
+                github_linked_branch_url: primaryBranch.branchUrl,
+                github_branch_source: matchedLinkedBranch ? 'linked' : discoveredBranch ? 'discovered' : 'linked-fallback',
+                github_branch_updated_at: new Date().toISOString(),
+              })
+              .eq('id', itemId);
+          }
+        } catch (bgError) {
+          console.warn('Background branch refresh failed:', bgError.message);
+        }
+      });
+      return;
+    }
+
+    // 캐시 없으면 API 호출 (초기 로드)
     const ticketKey = String(itemRecord.item?.ticket_key || '').trim();
     const connection = await requireGitHubRepoConnection(user.id);
     const branchState = await getGitHubIssueBranchState(
@@ -2316,6 +2382,19 @@ router.get('/items/:itemId/branch', async (req, res) => {
           ? 'linked-fallback'
           : null;
 
+    // DB에 저장
+    if (primaryBranch) {
+      await supabaseAdminClient
+        .from('items')
+        .update({
+          github_linked_branch_name: primaryBranch.branchName,
+          github_linked_branch_url: primaryBranch.branchUrl,
+          github_branch_source: branchSource,
+          github_branch_updated_at: new Date().toISOString(),
+        })
+        .eq('id', itemId);
+    }
+
     res.json({
       hasLinkedIssue: true,
       issue: {
@@ -2330,6 +2409,7 @@ router.get('/items/:itemId/branch', async (req, res) => {
       branch: primaryBranch,
       branchSource,
       linkedBranchCount: branchState.totalCount,
+      fromCache: false,
     });
   } catch (error) {
     console.error('GitHub item branch get error:', error);
@@ -2436,6 +2516,19 @@ router.post('/items/:itemId/branch', async (req, res) => {
       issueNumber: issueRecord.issue_number,
       branchName,
     });
+
+    // DB에 branch 정보 저장
+    if (result.branch) {
+      await supabaseAdminClient
+        .from('items')
+        .update({
+          github_linked_branch_name: result.branch.branchName,
+          github_linked_branch_url: result.branch.branchUrl,
+          github_branch_source: 'linked',
+          github_branch_updated_at: new Date().toISOString(),
+        })
+        .eq('id', itemId);
+    }
 
     res.json({
       itemId,
