@@ -9,6 +9,23 @@ export const RELEASE_NOTES_STORAGE_KEY = 'kanban-release-notes-last-seen';
 
 export const RELEASE_NOTES = [
   {
+    id: '2026-05-21-github-pull-request-composer',
+    version: 'v0.10.6',
+    title: 'GitHub PR 작성 흐름 추가',
+    description: '아이템 상세에서 이슈/브랜치에 이어 PR 초안을 열고 템플릿을 수정한 뒤 바로 GitHub PR을 생성할 수 있게 되었습니다.',
+    sections: [
+      {
+        title: '변경',
+        items: [
+          'ItemDetailPanel GitHub 영역에 연결된 PR 표시와 PR 생성 액션 추가',
+          'Quazar 고정 PR 템플릿으로 Motivation / Modified / What Changed / 체크리스트 / closes 이슈 문구 초안 자동 생성',
+          '같은 브랜치의 기존 open PR이 있으면 중복 생성 대신 기존 PR을 우선 연결/안내',
+          'PR 연결 스냅샷 저장용 SQL 문서와 API 경로 추가',
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-05-21-project-detail-task-and-tags',
     version: 'v0.10.5',
     title: '프로젝트 상세 새 업무/태그 흐름 정리',

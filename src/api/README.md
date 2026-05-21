@@ -62,3 +62,4 @@ return data;
 - GitHub 이슈 생성은 `createGitHubIssue(itemId, repoFullName)`로 Express `/api/github/issues`에 위임하며, 연결 결과는 `item_github_issues`에서 조회한다.
 - GitHub linked branch 생성/조회는 `createGitHubIssueBranch()` / `getGitHubIssueBranch()`로 Express `/api/github/issues/:issueNumber/branch`에 위임한다.
 - 아이템 기준 자동 linked branch 생성/조회는 `createGitHubItemBranch()` / `getGitHubItemBranch()`로 Express `/api/github/items/:itemId/branch`에 위임한다.
+- GitHub PR 초안/생성/조회는 `prepareGitHubItemPullRequest()` / `createGitHubItemPullRequest()` / `getGitHubItemPullRequests()`로 Express `/api/github/items/:itemId/pull-request*`에 위임하며, 연결 결과는 `item_github_pull_requests`에서 조회한다.

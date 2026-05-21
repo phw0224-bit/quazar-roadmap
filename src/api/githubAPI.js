@@ -140,6 +140,26 @@ export async function createGitHubItemBranch(itemId) {
   });
 }
 
+export async function getGitHubItemPullRequests(itemId) {
+  const data = await serverRequest(`/api/github/items/${itemId}/pull-requests`, {
+    method: 'GET',
+  });
+  return data?.pullRequests || [];
+}
+
+export async function prepareGitHubItemPullRequest(itemId) {
+  return serverRequest(`/api/github/items/${itemId}/pull-request/prepare`, {
+    method: 'POST',
+  });
+}
+
+export async function createGitHubItemPullRequest(itemId, payload) {
+  return serverRequest(`/api/github/items/${itemId}/pull-request`, {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  });
+}
+
 export async function syncGitHubIssueStatus(itemId, status) {
   return serverRequest('/api/github/issues/sync-status', {
     method: 'POST',
