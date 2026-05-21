@@ -1803,9 +1803,14 @@ function ItemDetailPanel({
                                   복사
                                 </button>
                               </div>
+                            ) : isGitHubBranchLoading ? (
+                              <div className="mt-1 flex items-center gap-2">
+                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 dark:border-border-subtle dark:border-t-blue-400" />
+                                <p className="text-xs font-bold text-gray-500 dark:text-text-secondary">브랜치 확인 중...</p>
+                              </div>
                             ) : (
                               <p className="mt-1 text-xs font-bold text-gray-500 dark:text-text-secondary">
-                                {isGitHubBranchLoading ? '브랜치 연결 상태를 확인하는 중...' : '아직 연결된 브랜치가 없습니다.'}
+                                아직 연결된 브랜치가 없습니다.
                               </p>
                             )}
                             {linkedBranch && githubLinkedBranchSource === 'discovered' && (
@@ -1878,6 +1883,11 @@ function ItemDetailPanel({
                                       </div>
                                     );
                                   })}
+                                </div>
+                              ) : isGitHubPullRequestLoading ? (
+                                <div className="mt-1 flex items-center gap-2">
+                                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 dark:border-border-subtle dark:border-t-blue-400" />
+                                  <p className="text-xs font-bold text-gray-500 dark:text-text-secondary">PR 확인 중...</p>
                                 </div>
                               ) : (
                                 <p className="mt-1 text-xs font-bold text-gray-500 dark:text-text-secondary">
