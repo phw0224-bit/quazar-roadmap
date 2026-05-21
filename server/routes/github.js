@@ -29,6 +29,7 @@ const gitHubResponseCache = new Map();
 const DASHBOARD_LIST_TTL_MS = 2 * 60 * 1000;
 const DASHBOARD_DETAIL_TTL_MS = 60 * 1000;
 const GITHUB_RESPONSE_CACHE_TTL_MS = 5 * 60 * 1000;
+const GITHUB_PULL_REQUESTS_SCHEMA_ERROR_MESSAGE = 'PR 연결 테이블이 아직 DB에 적용되지 않았습니다. docs/GITHUB_PULL_REQUESTS_2026-05-21.sql을 Supabase에 먼저 적용해주세요.';
 
 // ─── 유틸 ────────────────────────────────────────────────────────────────────
 
@@ -224,6 +225,48 @@ async function getExistingGitHubIssueForItem(itemId) {
 
   if (error) throw error;
   return data?.[0] || null;
+}
+
+function isMissingGitHubPullRequestSchemaError(error) {
+  return (
+    error?.code === '42P01'
+    || error?.code === '42703'
+    || error?.message?.includes('item_github_pull_requests')
+    || error?.message?.includes('pull_number')
+  );
+}
+
+async function getExistingGitHubPullRequestsForItem(itemId) {
+  const { data, error } = await supabaseAdminClient
+    .from('item_github_pull_requests')
+    .select('*')
+    .eq('item_id', itemId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    if (isMissingGitHubPullRequestSchemaError(error)) {
+      throw createHttpError(500, GITHUB_PULL_REQUESTS_SCHEMA_ERROR_MESSAGE);
+    }
+    throw error;
+  }
+  return data || [];
+}
+
+async function getGitHubPullRequestRecord(repoFullName, pullNumber) {
+  const { data, error } = await supabaseAdminClient
+    .from('item_github_pull_requests')
+    .select('*')
+    .eq('repo_full_name', repoFullName)
+    .eq('pull_number', pullNumber)
+    .maybeSingle();
+
+  if (error) {
+    if (isMissingGitHubPullRequestSchemaError(error)) {
+      throw createHttpError(500, GITHUB_PULL_REQUESTS_SCHEMA_ERROR_MESSAGE);
+    }
+    throw error;
+  }
+  return data;
 }
 
 async function getGitHubIssueRecord(repoFullName, issueNumber) {
@@ -517,6 +560,48 @@ function buildIssueBody(item, ticket) {
   ].join('\n');
 }
 
+function buildPullRequestBody({ item, issue, ticket }) {
+  const title = String(item?.title || item?.content || '제목 없음').trim();
+  const description = String(item?.description || '').trim();
+  const descriptionPreview = description
+    ? description.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').slice(0, 500)
+    : '여기에 왜 이 PR이 필요했는지, PR을 통해 무엇이 바뀌는지에 대해서 설명해 주세요';
+  const ticketKey = String(ticket?.ticket_key || item?.ticket_key || '').trim();
+
+  return [
+    '## 💡 Motivation and Context',
+    ticketKey ? `- 티켓: ${ticketKey}` : null,
+    title ? `- 아이템: ${title}` : null,
+    `- ${descriptionPreview}`,
+    '',
+    '<br>',
+    '',
+    '## 🔨 Modified',
+    '> 여기에 무엇이 크게 바뀌었는지 설명해 주세요',
+    '  - _여기에 세부 변경사항을 설명해주세요_',
+    '',
+    '<br>',
+    '',
+    '## 🌟 What Changed',
+    '- _여기에 PR 이후 추가로 해야 할 일에 대해서 설명해 주세요_',
+    '',
+    '<br>',
+    '',
+    '---',
+    '',
+    '',
+    '### 📋 커밋 전 체크리스트',
+    '- [ ] 단위 테스트',
+    '- [ ] 수동 테스트',
+    '- [ ] 로컬 확인',
+    '',
+    '<br>',
+    '',
+    '### 🤟🏻 PR로 완료된 이슈',
+    `closes #${issue.number}`,
+  ].filter((line) => line !== null).join('\n');
+}
+
 function parseGitHubScopes(scopeValue) {
   return String(scopeValue || '')
     .split(/[,\s]+/)
@@ -785,6 +870,56 @@ async function upsertGitHubIssueLink({ itemId, repoFullName, issuePayload, userI
     .single();
 
   if (error) throw error;
+  return data;
+}
+
+async function upsertGitHubPullRequestLink({ itemId, repoFullName, pullRequestPayload, userId }) {
+  const existingRecord = await getGitHubPullRequestRecord(repoFullName, pullRequestPayload.number);
+  const record = {
+    item_id: itemId,
+    repo_full_name: repoFullName,
+    pull_number: pullRequestPayload.number,
+    pull_url: pullRequestPayload.html_url,
+    github_pull_request_id: pullRequestPayload.id,
+    pull_title_snapshot: pullRequestPayload.title,
+    pull_state_snapshot: pullRequestPayload.merged_at ? 'merged' : (pullRequestPayload.state || 'open'),
+    head_ref: pullRequestPayload.head?.ref || null,
+    base_ref: pullRequestPayload.base?.ref || null,
+    is_draft: Boolean(pullRequestPayload.draft),
+  };
+
+  if (existingRecord) {
+    const { data, error } = await supabaseAdminClient
+      .from('item_github_pull_requests')
+      .update(record)
+      .eq('id', existingRecord.id)
+      .select('*')
+      .single();
+
+    if (error) {
+      if (isMissingGitHubPullRequestSchemaError(error)) {
+        throw createHttpError(500, GITHUB_PULL_REQUESTS_SCHEMA_ERROR_MESSAGE);
+      }
+      throw error;
+    }
+    return data;
+  }
+
+  const { data, error } = await supabaseAdminClient
+    .from('item_github_pull_requests')
+    .insert({
+      ...record,
+      created_by: userId,
+    })
+    .select('*')
+    .single();
+
+  if (error) {
+    if (isMissingGitHubPullRequestSchemaError(error)) {
+      throw createHttpError(500, GITHUB_PULL_REQUESTS_SCHEMA_ERROR_MESSAGE);
+    }
+    throw error;
+  }
   return data;
 }
 
@@ -1060,6 +1195,29 @@ function pickPreferredTicketBranch(branches, ticketKey) {
   if (exactMatch) return exactMatch;
 
   return branches.find((branch) => branchMatchesTicketKey(branch?.branchName, ticketKey)) || null;
+}
+
+function ensurePullRequestClosingLine(body, issueNumber) {
+  const closingLine = `closes #${issueNumber}`;
+  const normalizedBody = String(body || '').trimEnd();
+  const hasClosingLine = new RegExp(`\\b(?:close|closes|closed|fix|fixes|fixed)\\s+#${Number(issueNumber)}\\b`, 'i')
+    .test(normalizedBody);
+
+  if (hasClosingLine) return normalizedBody;
+  if (!normalizedBody) return closingLine;
+  return `${normalizedBody}\n\n${closingLine}`;
+}
+
+async function findOpenPullRequestByHead(token, repoFullName, branchName) {
+  const { owner } = parseRepoFullName(repoFullName);
+  const pulls = await fetchGitHubJson(
+    `https://api.github.com/repos/${repoFullName}/pulls?state=open&head=${encodeURIComponent(`${owner}:${branchName}`)}&per_page=10`,
+    token
+  );
+  const normalizedBranch = String(branchName || '').trim();
+  return (Array.isArray(pulls) ? pulls : []).find((pull) => (
+    String(pull?.head?.ref || '').trim() === normalizedBranch
+  )) || null;
 }
 
 async function getGitHubIssueBranchState(token, repoFullName, issueNumber) {
@@ -2299,6 +2457,269 @@ router.post('/items/:itemId/branch', async (req, res) => {
   } catch (error) {
     console.error('GitHub item branch create error:', error);
     res.status(error.status || 500).json({ error: error.message || 'GitHub linked branch 생성에 실패했습니다.' });
+  }
+});
+
+router.get('/items/:itemId/pull-requests', async (req, res) => {
+  try {
+    if (!requireServerConfig(res)) return;
+
+    const user = await requireAuthenticatedUser(req, res);
+    if (!user) return;
+
+    const itemId = String(req.params.itemId || '').trim();
+    if (!itemId) {
+      return res.status(400).json({ error: 'itemId가 필요합니다.' });
+    }
+
+    await requireGitHubRepoConnection(user.id);
+    const pullRequests = await getExistingGitHubPullRequestsForItem(itemId);
+    res.json({ pullRequests });
+  } catch (error) {
+    console.error('GitHub item pull requests get error:', error);
+    res.status(error.status || 500).json({ error: error.message || 'GitHub PR 정보를 불러오지 못했습니다.' });
+  }
+});
+
+router.post('/items/:itemId/pull-request/prepare', async (req, res) => {
+  try {
+    if (!requireServerConfig(res)) return;
+
+    const user = await requireAuthenticatedUser(req, res);
+    if (!user) return;
+
+    const itemId = String(req.params.itemId || '').trim();
+    if (!itemId) {
+      return res.status(400).json({ error: 'itemId가 필요합니다.' });
+    }
+
+    const issueRecord = await getExistingGitHubIssueForItem(itemId);
+    if (!issueRecord) {
+      return res.status(404).json({ error: '이 아이템에 연결된 GitHub 이슈를 찾을 수 없습니다.' });
+    }
+
+    const itemRecord = await findItemRecordById(itemId);
+    if (!itemRecord) {
+      return res.status(404).json({ error: '아이템을 찾을 수 없습니다.' });
+    }
+
+    const ticket = await ensureItemTicket(itemRecord);
+    const connection = await requireGitHubRepoConnection(user.id);
+    const repo = await fetchGitHubJson(
+      `https://api.github.com/repos/${issueRecord.repo_full_name}`,
+      connection.access_token
+    );
+
+    if (repo?.archived) {
+      throw createHttpError(409, '보관된 레포에는 PR을 생성할 수 없습니다.');
+    }
+
+    if (!canWriteRepo(repo)) {
+      throw createHttpError(403, '선택한 레포에 PR을 생성할 권한이 없습니다.');
+    }
+
+    const branchState = await getGitHubIssueBranchState(
+      connection.access_token,
+      issueRecord.repo_full_name,
+      issueRecord.issue_number
+    );
+    const ticketKey = String(ticket?.ticket_key || itemRecord.item?.ticket_key || '').trim();
+    const matchedLinkedBranch = pickPreferredTicketBranch(branchState.branches, ticketKey);
+    const discoveredBranch = await findRepositoryBranchByTicketKey(
+      connection.access_token,
+      issueRecord.repo_full_name,
+      ticketKey,
+      repo.html_url
+    );
+    const branch = matchedLinkedBranch || discoveredBranch || branchState.branch || null;
+
+    if (!branch?.branchName) {
+      throw createHttpError(409, '연결된 브랜치가 없어 PR 초안을 만들 수 없습니다. 먼저 브랜치를 생성해주세요.');
+    }
+
+    let existingPullRequest = (await getExistingGitHubPullRequestsForItem(itemId))
+      .find((pullRequest) => String(pullRequest.head_ref || '').trim() === branch.branchName)
+      || null;
+
+    const openPullRequest = await findOpenPullRequestByHead(
+      connection.access_token,
+      issueRecord.repo_full_name,
+      branch.branchName
+    );
+
+    if (openPullRequest) {
+      existingPullRequest = await upsertGitHubPullRequestLink({
+        itemId,
+        repoFullName: issueRecord.repo_full_name,
+        pullRequestPayload: openPullRequest,
+        userId: user.id,
+      });
+    }
+
+    const defaultTitle = `[${ticket.ticket_key}] ${itemRecord.item.title || itemRecord.item.content || '제목 없음'}`;
+    const defaultBody = buildPullRequestBody({
+      item: itemRecord.item,
+      issue: { number: issueRecord.issue_number },
+      ticket,
+    });
+
+    res.json({
+      itemId,
+      repoFullName: issueRecord.repo_full_name,
+      issue: {
+        issueNumber: issueRecord.issue_number,
+        issueUrl: issueRecord.issue_url,
+      },
+      ticket,
+      branch,
+      baseBranch: repo.default_branch || 'main',
+      defaultTitle,
+      defaultBody,
+      draft: true,
+      existingPullRequest,
+    });
+  } catch (error) {
+    console.error('GitHub item pull request prepare error:', error);
+    res.status(error.status || 500).json({ error: error.message || 'GitHub PR 초안을 준비하지 못했습니다.' });
+  }
+});
+
+router.post('/items/:itemId/pull-request', async (req, res) => {
+  try {
+    if (!requireServerConfig(res)) return;
+
+    const user = await requireAuthenticatedUser(req, res);
+    if (!user) return;
+
+    const itemId = String(req.params.itemId || '').trim();
+    if (!itemId) {
+      return res.status(400).json({ error: 'itemId가 필요합니다.' });
+    }
+
+    const issueRecord = await getExistingGitHubIssueForItem(itemId);
+    if (!issueRecord) {
+      return res.status(404).json({ error: '이 아이템에 연결된 GitHub 이슈를 찾을 수 없습니다.' });
+    }
+
+    const itemRecord = await findItemRecordById(itemId);
+    if (!itemRecord) {
+      return res.status(404).json({ error: '아이템을 찾을 수 없습니다.' });
+    }
+
+    const ticket = await ensureItemTicket(itemRecord);
+    const connection = await requireGitHubRepoConnection(user.id);
+    const repo = await fetchGitHubJson(
+      `https://api.github.com/repos/${issueRecord.repo_full_name}`,
+      connection.access_token
+    );
+
+    if (repo?.archived) {
+      throw createHttpError(409, '보관된 레포에는 PR을 생성할 수 없습니다.');
+    }
+
+    if (!canWriteRepo(repo)) {
+      throw createHttpError(403, '선택한 레포에 PR을 생성할 권한이 없습니다.');
+    }
+
+    const branchInfo = await getGitHubIssueBranchState(
+      connection.access_token,
+      issueRecord.repo_full_name,
+      issueRecord.issue_number
+    );
+    const ticketKey = String(ticket?.ticket_key || itemRecord.item?.ticket_key || '').trim();
+    const matchedLinkedBranch = pickPreferredTicketBranch(branchInfo.branches, ticketKey);
+    const discoveredBranch = await findRepositoryBranchByTicketKey(
+      connection.access_token,
+      issueRecord.repo_full_name,
+      ticketKey,
+      repo.html_url
+    );
+    const branch = matchedLinkedBranch || discoveredBranch || branchInfo.branch || null;
+
+    if (!branch?.branchName) {
+      throw createHttpError(409, '연결된 브랜치가 없어 PR을 생성할 수 없습니다. 먼저 브랜치를 생성해주세요.');
+    }
+
+    const existingOpenPullRequest = await findOpenPullRequestByHead(
+      connection.access_token,
+      issueRecord.repo_full_name,
+      branch.branchName
+    );
+
+    if (existingOpenPullRequest) {
+      const linkedPullRequest = await upsertGitHubPullRequestLink({
+        itemId,
+        repoFullName: issueRecord.repo_full_name,
+        pullRequestPayload: existingOpenPullRequest,
+        userId: user.id,
+      });
+
+      return res.status(409).json({
+        error: '같은 브랜치로 이미 열린 PR이 있습니다.',
+        pullRequest: linkedPullRequest,
+      });
+    }
+
+    const requestedTitle = String(req.body?.title || '').trim();
+    const requestedBody = String(req.body?.body || '').trim();
+    const baseBranch = String(req.body?.base || repo.default_branch || 'main').trim();
+    const draft = Boolean(req.body?.draft);
+
+    if (!requestedTitle) {
+      return res.status(400).json({ error: 'PR 제목이 필요합니다.' });
+    }
+
+    if (!baseBranch) {
+      return res.status(400).json({ error: 'base branch가 필요합니다.' });
+    }
+
+    const body = ensurePullRequestClosingLine(
+      requestedBody || buildPullRequestBody({
+        item: itemRecord.item,
+        issue: { number: issueRecord.issue_number },
+        ticket,
+      }),
+      issueRecord.issue_number
+    );
+
+    const createdPullRequest = await fetchGitHubJson(
+      `https://api.github.com/repos/${issueRecord.repo_full_name}/pulls`,
+      connection.access_token,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: requestedTitle,
+          body,
+          head: branch.branchName,
+          base: baseBranch,
+          draft,
+        }),
+      }
+    );
+
+    const linkedPullRequest = await upsertGitHubPullRequestLink({
+      itemId,
+      repoFullName: issueRecord.repo_full_name,
+      pullRequestPayload: createdPullRequest,
+      userId: user.id,
+    });
+
+    res.json({
+      itemId,
+      repoFullName: issueRecord.repo_full_name,
+      issue: {
+        issueNumber: issueRecord.issue_number,
+        issueUrl: issueRecord.issue_url,
+      },
+      branch,
+      pullRequest: linkedPullRequest,
+      body,
+      created: true,
+    });
+  } catch (error) {
+    console.error('GitHub item pull request create error:', error);
+    res.status(error.status || 500).json({ error: error.message || 'GitHub PR 생성에 실패했습니다.' });
   }
 });
 

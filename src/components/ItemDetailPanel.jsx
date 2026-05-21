@@ -32,13 +32,17 @@ import { DEV_REQUEST_STATUSES } from '../lib/devRequestBoard';
 import { usePresenceContext } from '../hooks/usePresenceContext';
 import ItemViewers from './ItemViewers';
 import { ENTITY_TYPES, getEntityLabel } from '../lib/entityModel';
+import { supabase } from '../lib/supabase';
 import {
   createGitHubIssue,
   createGitHubItemBranch,
+  createGitHubItemPullRequest,
   getGitHubRepos,
   getGitHubItemBranch,
+  getGitHubItemPullRequests,
   getGitHubStatus,
   getItemGitHubIssues,
+  prepareGitHubItemPullRequest,
 } from '../api/githubAPI';
 
 function ItemDetailPanel({
@@ -76,15 +80,23 @@ function ItemDetailPanel({
   const [githubStatus, setGitHubStatus] = useState({ connected: false });
   const [githubRepos, setGitHubRepos] = useState([]);
   const [githubIssues, setGitHubIssues] = useState([]);
+  const [gitHubPullRequests, setGitHubPullRequests] = useState([]);
   const [githubLinkedBranch, setGitHubLinkedBranch] = useState(null);
   const [githubLinkedBranchSource, setGitHubLinkedBranchSource] = useState(null);
   const [selectedGitHubRepo, setSelectedGitHubRepo] = useState('');
   const [showGitHubIssueCreator, setShowGitHubIssueCreator] = useState(false);
+  const [showGitHubPullRequestCreator, setShowGitHubPullRequestCreator] = useState(false);
   const [isGitHubLoading, setIsGitHubLoading] = useState(false);
+  const [isGitHubRepoLoading, setIsGitHubRepoLoading] = useState(false);
+  const [isGitHubBranchLoading, setIsGitHubBranchLoading] = useState(false);
   const [isGitHubSubmitting, setIsGitHubSubmitting] = useState(false);
   const [isGitHubBranchSubmitting, setIsGitHubBranchSubmitting] = useState(false);
+  const [isGitHubPullRequestLoading, setIsGitHubPullRequestLoading] = useState(false);
+  const [isGitHubPullRequestSubmitting, setIsGitHubPullRequestSubmitting] = useState(false);
   const [gitHubError, setGitHubError] = useState('');
   const [gitHubBranchError, setGitHubBranchError] = useState('');
+  const [gitHubPullRequestError, setGitHubPullRequestError] = useState('');
+  const [gitHubPullRequestDraft, setGitHubPullRequestDraft] = useState(null);
   const [showShareLinkModal, setShowShareLinkModal] = useState(false);
   const [itemShareLink, setItemShareLink] = useState('');
   const [issuedTicket, setIssuedTicket] = useState({
@@ -140,6 +152,12 @@ function ItemDetailPanel({
     [item.description, '본문'],
     [item.priority, '우선순위'],
   ].filter(([value]) => !`${value || ''}`.trim()).map(([, label]) => label);
+  const mergeGitHubPullRequests = (incoming, current = []) => {
+    const merged = [...incoming, ...current];
+    return [...new Map(
+      merged.map((pullRequest) => [pullRequest.id || `${pullRequest.repo_full_name}-${pullRequest.pull_number}`, pullRequest])
+    ).values()];
+  };
   const isRequestNotified = Boolean(item.notified_at);
   const isRequestSubmittedWithoutNotification = Boolean(item.submitted_at) && !item.notified_at;
 
@@ -150,11 +168,16 @@ function ItemDetailPanel({
     setIsEditingTitle(false);
     setIsEditingDescription(false);
     setShowGitHubIssueCreator(false);
+    setShowGitHubPullRequestCreator(false);
     setGitHubError('');
     setGitHubBranchError('');
+    setGitHubPullRequestError('');
     setGitHubLinkedBranch(null);
     setGitHubLinkedBranchSource(null);
     setIsGitHubBranchSubmitting(false);
+    setIsGitHubPullRequestSubmitting(false);
+    setGitHubPullRequestDraft(null);
+    setGitHubPullRequests([]);
     setIssuedTicket({
       key: item?.ticket_key || '',
       number: item?.ticket_number ?? null,
@@ -170,10 +193,12 @@ function ItemDetailPanel({
           setGitHubStatus({ connected: false });
           setGitHubRepos([]);
           setGitHubIssues([]);
+          setGitHubPullRequests([]);
           setGitHubLinkedBranch(null);
           setGitHubLinkedBranchSource(null);
           setSelectedGitHubRepo('');
           setShowGitHubIssueCreator(false);
+          setShowGitHubPullRequestCreator(false);
         }
         return;
       }
@@ -181,34 +206,21 @@ function ItemDetailPanel({
       setIsGitHubLoading(true);
       setGitHubError('');
       try {
-        const [status, issues] = await Promise.all([
+        const [status, issues, pullRequests] = await Promise.all([
           getGitHubStatus(),
           getItemGitHubIssues(item.id),
+          getGitHubItemPullRequests(item.id),
         ]);
 
         if (!active) return;
 
         setGitHubStatus(status || { connected: false });
-        const issueList = issues || [];
-        setGitHubIssues(issueList);
+        setGitHubIssues(issues || []);
+        setGitHubPullRequests(pullRequests || []);
 
-        if (status?.connected) {
-          const repos = await getGitHubRepos();
-          if (!active) return;
-          setGitHubRepos(repos);
-          setSelectedGitHubRepo((current) => current || repos[0]?.full_name || '');
-
-          if (issueList.length > 0) {
-            const branchResult = await getGitHubItemBranch(item.id);
-            if (!active) return;
-            setGitHubLinkedBranch(branchResult?.branch || null);
-            setGitHubLinkedBranchSource(branchResult?.branchSource || null);
-          } else {
-            setGitHubLinkedBranch(null);
-            setGitHubLinkedBranchSource(null);
-          }
-        } else {
+        if (!status?.connected) {
           setGitHubRepos([]);
+          setGitHubPullRequests([]);
           setGitHubLinkedBranch(null);
           setGitHubLinkedBranchSource(null);
           setSelectedGitHubRepo('');
@@ -224,6 +236,128 @@ function ItemDetailPanel({
     loadGitHubState();
     return () => {
       active = false;
+    };
+  }, [item?.id, isReadOnly, isMemo]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadGitHubBranch = async () => {
+      if (!item?.id || isReadOnly || isMemo || !githubStatus?.connected || githubIssues.length === 0) {
+        if (active) {
+          setGitHubLinkedBranch(null);
+          setGitHubLinkedBranchSource(null);
+          setIsGitHubBranchLoading(false);
+        }
+        return;
+      }
+
+      setIsGitHubBranchLoading(true);
+      setGitHubBranchError('');
+      try {
+        const branchResult = await getGitHubItemBranch(item.id);
+        if (!active) return;
+        setGitHubLinkedBranch(branchResult?.branch || null);
+        setGitHubLinkedBranchSource(branchResult?.branchSource || null);
+      } catch (error) {
+        if (!active) return;
+        setGitHubBranchError(error.message || 'GitHub 브랜치 정보를 불러오지 못했습니다.');
+      } finally {
+        if (active) setIsGitHubBranchLoading(false);
+      }
+    };
+
+    loadGitHubBranch();
+    return () => {
+      active = false;
+    };
+  }, [item?.id, item?.ticket_key, githubStatus?.connected, githubIssues.length, isReadOnly, isMemo]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadGitHubReposIfNeeded = async () => {
+      if (!showGitHubIssueCreator || !githubStatus?.connected || githubIssues.length > 0) {
+        return;
+      }
+
+      setIsGitHubRepoLoading(true);
+      try {
+        const repos = await getGitHubRepos();
+        if (!active) return;
+        setGitHubRepos(repos);
+        setSelectedGitHubRepo((current) => current || repos[0]?.full_name || '');
+      } catch (error) {
+        if (!active) return;
+        setGitHubError(error.message || 'GitHub 레포 목록을 불러오지 못했습니다.');
+      } finally {
+        if (active) setIsGitHubRepoLoading(false);
+      }
+    };
+
+    loadGitHubReposIfNeeded();
+    return () => {
+      active = false;
+    };
+  }, [showGitHubIssueCreator, githubStatus?.connected, githubIssues.length]);
+
+  useEffect(() => {
+    if (!item?.id || isReadOnly || isMemo) return undefined;
+
+    const channel = supabase.channel(`item-github-issues-${item.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'item_github_issues',
+          filter: `item_id=eq.${item.id}`,
+        },
+        async () => {
+          try {
+            const [nextIssues, nextPullRequests] = await Promise.all([
+              getItemGitHubIssues(item.id),
+              getGitHubItemPullRequests(item.id),
+            ]);
+            setGitHubIssues(nextIssues || []);
+            setGitHubPullRequests(nextPullRequests || []);
+          } catch (error) {
+            setGitHubError(error.message || '연결된 GitHub 이슈를 다시 불러오지 못했습니다.');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [item?.id, isReadOnly, isMemo]);
+
+  useEffect(() => {
+    if (!item?.id || isReadOnly || isMemo) return undefined;
+
+    const channel = supabase.channel(`item-github-pull-requests-${item.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'item_github_pull_requests',
+          filter: `item_id=eq.${item.id}`,
+        },
+        async () => {
+          try {
+            const nextPullRequests = await getGitHubItemPullRequests(item.id);
+            setGitHubPullRequests(nextPullRequests || []);
+          } catch (error) {
+            setGitHubPullRequestError(error.message || '연결된 GitHub PR을 다시 불러오지 못했습니다.');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
     };
   }, [item?.id, isReadOnly, isMemo]);
 
@@ -571,6 +705,95 @@ function ItemDetailPanel({
     }
   };
 
+  const handleOpenGitHubPullRequestCreator = async () => {
+    if (!item?.id || !githubLinkedBranch?.branchName || !hasExistingGitHubIssue) {
+      onShowToast?.('먼저 GitHub 이슈와 브랜치를 준비해주세요.');
+      return;
+    }
+
+    setIsGitHubPullRequestLoading(true);
+    setGitHubPullRequestError('');
+    try {
+      const result = await prepareGitHubItemPullRequest(item.id);
+      const existingPullRequest = result?.existingPullRequest || null;
+      if (existingPullRequest) {
+        setGitHubPullRequests((current) => mergeGitHubPullRequests([existingPullRequest], current));
+        onShowToast?.('같은 브랜치의 기존 PR이 이미 연결되어 있습니다.');
+        return;
+      }
+
+      setGitHubPullRequestDraft({
+        repoFullName: result?.repoFullName || githubIssues[0]?.repo_full_name || '',
+        issueNumber: result?.issue?.issueNumber || githubIssues[0]?.issue_number || null,
+        issueUrl: result?.issue?.issueUrl || githubIssues[0]?.issue_url || '',
+        branchName: result?.branch?.branchName || githubLinkedBranch?.branchName || '',
+        branchUrl: result?.branch?.branchUrl || githubLinkedBranch?.branchUrl || '',
+        base: result?.baseBranch || 'main',
+        title: result?.defaultTitle || '',
+        body: result?.defaultBody || '',
+        draft: result?.draft !== false,
+      });
+      setShowGitHubPullRequestCreator(true);
+    } catch (error) {
+      setGitHubPullRequestError(error.message || 'GitHub PR 초안을 준비하지 못했습니다.');
+      onShowToast?.(error.message || 'GitHub PR 초안을 준비하지 못했습니다.');
+    } finally {
+      setIsGitHubPullRequestLoading(false);
+    }
+  };
+
+  const handleCreateGitHubPullRequest = async () => {
+    if (!item?.id || !gitHubPullRequestDraft) {
+      onShowToast?.('PR 초안 정보를 찾지 못했습니다.');
+      return;
+    }
+
+    const issueNumber = Number(gitHubPullRequestDraft.issueNumber || githubIssues[0]?.issue_number);
+    if (!gitHubPullRequestDraft.title?.trim()) {
+      setGitHubPullRequestError('PR 제목을 입력해주세요.');
+      return;
+    }
+
+    let nextBody = String(gitHubPullRequestDraft.body || '').trimEnd();
+    const closingPattern = Number.isFinite(issueNumber)
+      ? new RegExp(`\\b(?:close|closes|closed|fix|fixes|fixed)\\s+#${issueNumber}\\b`, 'i')
+      : null;
+    if (Number.isFinite(issueNumber) && closingPattern && !closingPattern.test(nextBody)) {
+      nextBody = `${nextBody}\n\ncloses #${issueNumber}`.trim();
+      onShowToast?.('이슈 연결을 위해 closes 라인을 다시 추가했습니다.');
+    }
+
+    setIsGitHubPullRequestSubmitting(true);
+    setGitHubPullRequestError('');
+    try {
+      const result = await createGitHubItemPullRequest(item.id, {
+        base: gitHubPullRequestDraft.base,
+        title: gitHubPullRequestDraft.title.trim(),
+        body: nextBody,
+        draft: Boolean(gitHubPullRequestDraft.draft),
+      });
+      if (result?.pullRequest) {
+        setGitHubPullRequests((current) => mergeGitHubPullRequests([result.pullRequest], current));
+      }
+      setGitHubPullRequestDraft((current) => current ? { ...current, body: nextBody } : current);
+      setShowGitHubPullRequestCreator(false);
+      onShowToast?.('GitHub PR이 생성되었습니다.');
+    } catch (error) {
+      if (error.message?.includes('이미 열린 PR')) {
+        try {
+          const nextPullRequests = await getGitHubItemPullRequests(item.id);
+          setGitHubPullRequests(nextPullRequests || []);
+        } catch (refreshError) {
+          console.error('GitHub PR refresh error:', refreshError);
+        }
+      }
+      setGitHubPullRequestError(error.message || 'GitHub PR 생성에 실패했습니다.');
+      onShowToast?.(error.message || 'GitHub PR 생성에 실패했습니다.');
+    } finally {
+      setIsGitHubPullRequestSubmitting(false);
+    }
+  };
+
   const handleSubmitRequest = async () => {
     if (missingRequestFields.length > 0) {
       onShowToast?.(`요청 제출 전에 ${missingRequestFields.join(', ')}을(를) 입력해주세요.`, 'error');
@@ -610,6 +833,10 @@ function ItemDetailPanel({
   }, [item, allItems]);
   const ticketKey = issuedTicket.key || item?.ticket_key || '';
   const hasExistingGitHubIssue = githubIssues.length > 0;
+  const activeGitHubPullRequest = gitHubPullRequests.find((pullRequest) => (
+    pullRequest.pull_state_snapshot === 'open' || pullRequest.is_draft
+  )) || null;
+  const hasActiveGitHubPullRequest = Boolean(activeGitHubPullRequest);
   const needsGitHubAppInstall = Boolean(
     githubStatus?.connected
       && githubStatus?.app?.configured
@@ -1115,6 +1342,21 @@ function ItemDetailPanel({
                   <Github size={14} strokeWidth={2.5} />
                   {hasExistingGitHubIssue ? 'GitHub 이슈 보기' : 'GitHub 이슈 생성하기'}
                 </button>
+                {hasExistingGitHubIssue && (
+                  <button
+                    type="button"
+                    onClick={handleOpenGitHubPullRequestCreator}
+                    disabled={isGitHubPullRequestLoading || !githubLinkedBranch?.branchName}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-black text-gray-600 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border-subtle dark:bg-bg-elevated dark:text-text-secondary dark:hover:border-border-strong dark:hover:bg-bg-hover dark:hover:text-text-primary"
+                  >
+                    <Github size={14} strokeWidth={2.5} />
+                    {isGitHubPullRequestLoading
+                      ? 'PR 초안 준비 중...'
+                      : hasActiveGitHubPullRequest
+                        ? 'GitHub PR 보기'
+                        : 'GitHub PR 생성하기'}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1563,7 +1805,7 @@ function ItemDetailPanel({
                               </div>
                             ) : (
                               <p className="mt-1 text-xs font-bold text-gray-500 dark:text-text-secondary">
-                                아직 연결된 브랜치가 없습니다.
+                                {isGitHubBranchLoading ? '브랜치 연결 상태를 확인하는 중...' : '아직 연결된 브랜치가 없습니다.'}
                               </p>
                             )}
                             {linkedBranch && githubLinkedBranchSource === 'discovered' && (
@@ -1597,12 +1839,76 @@ function ItemDetailPanel({
                             )}
                           </div>
                         </div>
+
+                        <div className="mt-3 rounded-xl bg-gray-50 px-3 py-2 dark:bg-bg-base">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-text-tertiary">
+                                Pull Request
+                              </p>
+                              {gitHubPullRequests.length > 0 ? (
+                                <div className="mt-1 flex flex-col gap-2">
+                                  {gitHubPullRequests.map((pullRequest) => {
+                                    const stateTone = pullRequest.pull_state_snapshot === 'merged'
+                                      ? 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300'
+                                      : pullRequest.pull_state_snapshot === 'open'
+                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
+                                        : 'border-gray-200 bg-white text-gray-600 dark:border-border-subtle dark:bg-bg-hover dark:text-text-secondary';
+                                    return (
+                                      <div key={pullRequest.id || `${pullRequest.repo_full_name}-${pullRequest.pull_number}`} className="flex flex-wrap items-center gap-2">
+                                        <a
+                                          href={pullRequest.pull_url}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="inline-flex min-w-0 items-center gap-2 text-xs font-black text-gray-700 hover:text-brand-600 dark:text-text-secondary dark:hover:text-brand-400"
+                                        >
+                                          <span className="truncate">
+                                            {pullRequest.repo_full_name}#{pullRequest.pull_number}
+                                          </span>
+                                          <ExternalLink size={12} className="shrink-0" />
+                                        </a>
+                                        <span className={`rounded-lg border px-2 py-0.5 text-[10px] font-black uppercase tracking-widest ${stateTone}`}>
+                                          {pullRequest.is_draft ? 'draft' : pullRequest.pull_state_snapshot}
+                                        </span>
+                                        {(pullRequest.base_ref || pullRequest.head_ref) && (
+                                          <span className="text-[11px] font-bold text-gray-500 dark:text-text-secondary">
+                                            {pullRequest.head_ref || '?'} → {pullRequest.base_ref || '?'}
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <p className="mt-1 text-xs font-bold text-gray-500 dark:text-text-secondary">
+                                  아직 연결된 PR이 없습니다.
+                                </p>
+                              )}
+                            </div>
+
+                            {!isReadOnly && linkedBranch && !hasActiveGitHubPullRequest && (
+                              <button
+                                type="button"
+                                onClick={handleOpenGitHubPullRequestCreator}
+                                disabled={isGitHubPullRequestLoading}
+                                className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-[11px] font-black text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-gray-900"
+                              >
+                                {isGitHubPullRequestLoading ? '준비 중...' : 'PR 생성'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     );
                   })}
                   {gitHubBranchError && (
                     <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
                       {gitHubBranchError}
+                    </div>
+                  )}
+                  {gitHubPullRequestError && !showGitHubPullRequestCreator && (
+                    <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                      {gitHubPullRequestError}
                     </div>
                   )}
                 </div>
@@ -1821,9 +2127,12 @@ function ItemDetailPanel({
                       <select
                         value={selectedGitHubRepo}
                         onChange={(e) => setSelectedGitHubRepo(e.target.value)}
+                        disabled={isGitHubRepoLoading}
                         className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-black text-gray-800 dark:border-border-subtle dark:bg-bg-base dark:text-text-primary dark:color-scheme-dark"
                       >
-                        {githubRepos.length === 0 ? (
+                        {isGitHubRepoLoading ? (
+                          <option value="">레포지토리 불러오는 중...</option>
+                        ) : githubRepos.length === 0 ? (
                           <option value="">접근 가능한 레포가 없습니다</option>
                         ) : (
                           githubRepos.map((repo) => (
@@ -1897,6 +2206,154 @@ function ItemDetailPanel({
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {showGitHubPullRequestCreator && !isMemo && gitHubPullRequestDraft && (
+        <div
+          className="fixed inset-0 z-[121] flex items-center justify-center bg-black/45 px-4 backdrop-blur-sm"
+          onMouseDown={() => {
+            if (!isGitHubPullRequestSubmitting) {
+              setShowGitHubPullRequestCreator(false);
+              setGitHubPullRequestError('');
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-3xl rounded-3xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-border-subtle dark:bg-bg-elevated"
+            onMouseDown={stopProp}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.22em] text-gray-400 dark:text-text-tertiary">
+                  <Github size={16} strokeWidth={2.5} />
+                  GitHub
+                </div>
+                <h2 className="mt-2 text-xl font-black text-gray-950 dark:text-text-primary">PR 생성하기</h2>
+                <p className="mt-1 text-sm font-semibold text-gray-500 dark:text-text-secondary">
+                  템플릿 초안을 확인하고 제목/본문/draft 여부를 수정한 뒤 PR을 생성합니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isGitHubPullRequestSubmitting) {
+                    setShowGitHubPullRequestCreator(false);
+                    setGitHubPullRequestError('');
+                  }
+                }}
+                disabled={isGitHubPullRequestSubmitting}
+                className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:text-text-tertiary dark:hover:bg-bg-hover dark:hover:text-text-primary"
+                aria-label="GitHub PR 생성 닫기"
+              >
+                <X size={18} strokeWidth={2.4} />
+              </button>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 dark:border-border-subtle dark:bg-bg-base">
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-text-tertiary">Repository</p>
+                <p className="mt-1 text-sm font-black text-gray-800 dark:text-text-primary">{gitHubPullRequestDraft.repoFullName}</p>
+              </div>
+              <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 dark:border-border-subtle dark:bg-bg-base">
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-text-tertiary">Issue</p>
+                <a
+                  href={gitHubPullRequestDraft.issueUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 inline-flex items-center gap-1 text-sm font-black text-gray-800 hover:text-brand-600 dark:text-text-primary dark:hover:text-brand-400"
+                >
+                  #{gitHubPullRequestDraft.issueNumber}
+                  <ExternalLink size={12} />
+                </a>
+              </div>
+              <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 dark:border-border-subtle dark:bg-bg-base">
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-text-tertiary">Head branch</p>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-black text-gray-800 dark:text-text-primary">{gitHubPullRequestDraft.branchName}</span>
+                  {gitHubPullRequestDraft.branchUrl && (
+                    <a
+                      href={gitHubPullRequestDraft.branchUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-xs font-black text-gray-500 hover:text-brand-600 dark:text-text-secondary dark:hover:text-brand-400"
+                    >
+                      브랜치 보기
+                      <ExternalLink size={12} />
+                    </a>
+                  )}
+                </div>
+              </div>
+              <label className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 dark:border-border-subtle dark:bg-bg-base">
+                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-text-tertiary">Base branch</span>
+                <input
+                  type="text"
+                  value={gitHubPullRequestDraft.base}
+                  onChange={(e) => setGitHubPullRequestDraft((current) => ({ ...current, base: e.target.value }))}
+                  className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-black text-gray-800 outline-none focus:border-brand-400 dark:border-border-subtle dark:bg-bg-hover dark:text-text-primary"
+                />
+              </label>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-4">
+              <label className="flex flex-col gap-2">
+                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-text-tertiary">PR 제목</span>
+                <input
+                  type="text"
+                  value={gitHubPullRequestDraft.title}
+                  onChange={(e) => setGitHubPullRequestDraft((current) => ({ ...current, title: e.target.value }))}
+                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-black text-gray-800 outline-none focus:border-brand-400 dark:border-border-subtle dark:bg-bg-base dark:text-text-primary"
+                />
+              </label>
+
+              <label className="flex flex-col gap-2">
+                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-text-tertiary">PR 본문</span>
+                <textarea
+                  value={gitHubPullRequestDraft.body}
+                  onChange={(e) => setGitHubPullRequestDraft((current) => ({ ...current, body: e.target.value }))}
+                  rows={18}
+                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-800 outline-none focus:border-brand-400 dark:border-border-subtle dark:bg-bg-base dark:text-text-primary"
+                />
+              </label>
+
+              <label className="inline-flex items-center gap-3 text-sm font-black text-gray-700 dark:text-text-secondary">
+                <input
+                  type="checkbox"
+                  checked={Boolean(gitHubPullRequestDraft.draft)}
+                  onChange={(e) => setGitHubPullRequestDraft((current) => ({ ...current, draft: e.target.checked }))}
+                  className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-400 dark:border-border-subtle dark:bg-bg-base"
+                />
+                Draft PR로 생성
+              </label>
+            </div>
+
+            {gitHubPullRequestError && (
+              <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                {gitHubPullRequestError}
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowGitHubPullRequestCreator(false);
+                  setGitHubPullRequestError('');
+                }}
+                disabled={isGitHubPullRequestSubmitting}
+                className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-black text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border-subtle dark:text-text-secondary dark:hover:bg-bg-hover"
+              >
+                닫기
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateGitHubPullRequest}
+                disabled={isGitHubPullRequestSubmitting || !gitHubPullRequestDraft.title.trim() || !gitHubPullRequestDraft.base.trim()}
+                className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-black text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-gray-900"
+              >
+                {isGitHubPullRequestSubmitting ? 'PR 생성 중...' : (gitHubPullRequestDraft.draft ? 'Draft PR 생성' : 'PR 생성')}
+              </button>
             </div>
           </div>
         </div>
