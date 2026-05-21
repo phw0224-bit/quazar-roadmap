@@ -157,6 +157,13 @@ async function fetchGitHubJson(url, token, init = {}) {
         : 'GitHub API rate limit exceeded. 잠시 후 다시 시도해주세요.';
     }
 
+    // 422 Validation Failed 에러는 errors 배열의 상세 정보 포함
+    if (response.status === 422 && data?.errors?.length > 0) {
+      const firstError = data.errors[0];
+      const fieldInfo = firstError.field ? ` (${firstError.field})` : '';
+      message = `${message} - ${firstError.message}${fieldInfo}`;
+    }
+
     const error = new Error(message);
     error.status = response.status;
     error.payload = data;
