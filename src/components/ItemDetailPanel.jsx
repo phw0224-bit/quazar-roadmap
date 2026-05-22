@@ -12,7 +12,7 @@
  * - 댓글 목록 (CommentSection)
  * - 브레드크럼 네비게이션 (parent_item_id 체인 추적)
  */
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   ChevronsRight, Maximize2, ChevronRight, Trash2,
   Clock, Users, Building2, Tag, Link2, Plus, X,
@@ -86,6 +86,8 @@ function ItemDetailPanel({
   const [selectedGitHubRepo, setSelectedGitHubRepo] = useState('');
   const [showGitHubIssueCreator, setShowGitHubIssueCreator] = useState(false);
   const [showGitHubPullRequestCreator, setShowGitHubPullRequestCreator] = useState(false);
+  const [gitHubSyncStatus, setGitHubSyncStatus] = useState('idle');
+  const [gitHubReloadToken, setGitHubReloadToken] = useState(0);
   const [isGitHubLoading, setIsGitHubLoading] = useState(false);
   const [isGitHubRepoLoading, setIsGitHubRepoLoading] = useState(false);
   const [isGitHubBranchLoading, setIsGitHubBranchLoading] = useState(false);
@@ -172,8 +174,17 @@ function ItemDetailPanel({
     setGitHubError('');
     setGitHubBranchError('');
     setGitHubPullRequestError('');
-    setGitHubLinkedBranch(null);
-    setGitHubLinkedBranchSource(null);
+    setGitHubSyncStatus('idle');
+    const cachedBranchName = item?.github_linked_branch_name;
+    const cachedBranchUrl = item?.github_linked_branch_url;
+    const cachedBranchSource = item?.github_branch_source || null;
+    if (cachedBranchName) {
+      setGitHubLinkedBranch({ branchName: cachedBranchName, branchUrl: cachedBranchUrl || null });
+      setGitHubLinkedBranchSource(cachedBranchSource);
+    } else {
+      setGitHubLinkedBranch(null);
+      setGitHubLinkedBranchSource(null);
+    }
     setIsGitHubBranchSubmitting(false);
     setIsGitHubPullRequestSubmitting(false);
     setGitHubPullRequestDraft(null);
@@ -183,6 +194,12 @@ function ItemDetailPanel({
       number: item?.ticket_number ?? null,
     });
   }, [item]);
+
+  const handleRetryGitHubSync = useCallback(() => {
+    setGitHubError('');
+    setGitHubSyncStatus('loading');
+    setGitHubReloadToken((current) => current + 1);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -199,12 +216,14 @@ function ItemDetailPanel({
           setSelectedGitHubRepo('');
           setShowGitHubIssueCreator(false);
           setShowGitHubPullRequestCreator(false);
+          setGitHubSyncStatus('idle');
         }
         return;
       }
 
       setIsGitHubLoading(true);
       setGitHubError('');
+      setGitHubSyncStatus('loading');
       try {
         const [status, issues, pullRequests] = await Promise.all([
           getGitHubStatus(),
@@ -217,6 +236,7 @@ function ItemDetailPanel({
         setGitHubStatus(status || { connected: false });
         setGitHubIssues(issues || []);
         setGitHubPullRequests(pullRequests || []);
+        setGitHubSyncStatus((issues || []).length > 0 ? 'loaded' : 'empty');
 
         if (!status?.connected) {
           setGitHubRepos([]);
@@ -228,6 +248,7 @@ function ItemDetailPanel({
       } catch (error) {
         if (!active) return;
         setGitHubError(error.message || 'GitHub 정보를 불러오지 못했습니다.');
+        setGitHubSyncStatus('error');
       } finally {
         if (active) setIsGitHubLoading(false);
       }
@@ -237,7 +258,7 @@ function ItemDetailPanel({
     return () => {
       active = false;
     };
-  }, [item?.id, isReadOnly, isMemo]);
+  }, [item?.id, isReadOnly, isMemo, gitHubReloadToken]);
 
   useEffect(() => {
     let active = true;
@@ -833,6 +854,18 @@ function ItemDetailPanel({
   }, [item, allItems]);
   const ticketKey = issuedTicket.key || item?.ticket_key || '';
   const hasExistingGitHubIssue = githubIssues.length > 0;
+  const isGitHubSyncLoading = gitHubSyncStatus === 'loading';
+  const isGitHubSyncError = gitHubSyncStatus === 'error';
+  const isGitHubSyncEmpty = gitHubSyncStatus === 'empty';
+  const isGitHubSyncLoaded = gitHubSyncStatus === 'loaded';
+  const shouldShowGitHubActions = !isReadOnly && !isMemo;
+  const shouldRenderGitHubSection = !isMemo && (
+    isGitHubSyncLoading
+    || isGitHubSyncError
+    || isGitHubSyncEmpty
+    || hasExistingGitHubIssue
+    || isGitHubSubmitting
+  );
   const activeGitHubPullRequest = gitHubPullRequests.find((pullRequest) => (
     pullRequest.pull_state_snapshot === 'open' || pullRequest.is_draft
   )) || null;
@@ -1329,33 +1362,57 @@ function ItemDetailPanel({
                 }}
               />
             )}
-            {!isReadOnly && !isMemo && (
+            {shouldShowGitHubActions && (
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setGitHubError('');
-                    setShowGitHubIssueCreator(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-black text-gray-600 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:border-border-subtle dark:bg-bg-elevated dark:text-text-secondary dark:hover:border-border-strong dark:hover:bg-bg-hover dark:hover:text-text-primary"
-                >
-                  <Github size={14} strokeWidth={2.5} />
-                  {hasExistingGitHubIssue ? 'GitHub 이슈 보기' : 'GitHub 이슈 생성하기'}
-                </button>
-                {hasExistingGitHubIssue && (
-                  <button
-                    type="button"
-                    onClick={handleOpenGitHubPullRequestCreator}
-                    disabled={isGitHubPullRequestLoading || !githubLinkedBranch?.branchName}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-black text-gray-600 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border-subtle dark:bg-bg-elevated dark:text-text-secondary dark:hover:border-border-strong dark:hover:bg-bg-hover dark:hover:text-text-primary"
-                  >
-                    <Github size={14} strokeWidth={2.5} />
-                    {isGitHubPullRequestLoading
-                      ? 'PR 초안 준비 중...'
-                      : hasActiveGitHubPullRequest
-                        ? 'GitHub PR 보기'
-                        : 'GitHub PR 생성하기'}
-                  </button>
+                {isGitHubSyncLoading && (
+                  <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-black text-gray-500 shadow-sm dark:border-border-subtle dark:bg-bg-elevated dark:text-text-secondary">
+                    <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 dark:border-border-subtle dark:border-t-blue-400" />
+                    GitHub 연동 정보를 불러오는 중...
+                  </div>
+                )}
+                {isGitHubSyncError && (
+                  <>
+                    <div className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-black text-red-600 shadow-sm dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                      GitHub 연동 정보를 불러오지 못했습니다.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRetryGitHubSync}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3 py-1.5 text-xs font-black text-red-600 shadow-sm transition-colors hover:border-red-300 hover:bg-red-50 dark:border-red-500/40 dark:bg-bg-elevated dark:text-red-300 dark:hover:bg-red-500/10"
+                    >
+                      다시 시도
+                    </button>
+                  </>
+                )}
+                {(isGitHubSyncLoaded || isGitHubSyncEmpty) && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGitHubError('');
+                        setShowGitHubIssueCreator(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-black text-gray-600 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:border-border-subtle dark:bg-bg-elevated dark:text-text-secondary dark:hover:border-border-strong dark:hover:bg-bg-hover dark:hover:text-text-primary"
+                    >
+                      <Github size={14} strokeWidth={2.5} />
+                      {hasExistingGitHubIssue ? 'GitHub 이슈 보기' : 'GitHub 이슈 생성하기'}
+                    </button>
+                    {hasExistingGitHubIssue && (
+                      <button
+                        type="button"
+                        onClick={handleOpenGitHubPullRequestCreator}
+                        disabled={isGitHubPullRequestLoading || !githubLinkedBranch?.branchName}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-black text-gray-600 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border-subtle dark:bg-bg-elevated dark:text-text-secondary dark:hover:border-border-strong dark:hover:bg-bg-hover dark:hover:text-text-primary"
+                      >
+                        <Github size={14} strokeWidth={2.5} />
+                        {isGitHubPullRequestLoading
+                          ? 'PR 초안 준비 중...'
+                          : hasActiveGitHubPullRequest
+                            ? 'GitHub PR 보기'
+                            : 'GitHub PR 생성하기'}
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -1734,192 +1791,222 @@ function ItemDetailPanel({
               </div>
             </div>
 
-            {(hasExistingGitHubIssue || isGitHubSubmitting) && (
+            {shouldRenderGitHubSection && (
               <div className="flex items-start min-h-[48px] group">
                 <div className="w-48 flex items-center gap-3 text-gray-400 dark:text-text-tertiary shrink-0 pt-2.5">
                   <Github size={18} strokeWidth={2.5} />
                   <span className="text-[13px] font-black uppercase tracking-widest">GitHub</span>
                 </div>
                 <div className="flex-1 flex flex-col gap-2 px-3 py-2 rounded-xl bg-white dark:bg-bg-hover border border-gray-100 dark:border-border-subtle">
-                  {githubIssues.map((issue) => {
-                    const linkedBranch = githubLinkedBranch;
-                    const isCreatingBranch = isGitHubBranchSubmitting;
-
-                    return (
-                      <div
-                        key={issue.id || `${issue.repo_full_name}-${issue.issue_number}`}
-                        className="rounded-xl border border-gray-100 px-3 py-3 dark:border-border-subtle"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <a
-                            href={issue.issue_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex min-w-0 items-center gap-2 flex-wrap text-sm text-gray-700 dark:text-text-secondary hover:text-brand-600 dark:hover:text-brand-400"
-                          >
-                            <span className="font-bold truncate">
-                              {issue.repo_full_name}#{issue.issue_number}
-                            </span>
-                            {(issue.ticket_key || ticketKey) && (
-                              <span className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-bg-base text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-text-secondary">
-                                {issue.ticket_key || ticketKey}
-                              </span>
-                            )}
-                          </a>
-                          <ExternalLink size={14} className="shrink-0 text-gray-400 dark:text-text-tertiary" />
-                        </div>
-
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-gray-50 px-3 py-2 dark:bg-bg-base">
-                          <div className="min-w-0">
-                            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-text-tertiary">
-                              Linked Branch
-                            </p>
-                            {linkedBranch ? (
-                              <div className="mt-1 flex flex-wrap items-center gap-2">
-                                <span className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-black text-gray-700 dark:border-border-subtle dark:bg-bg-hover dark:text-text-primary">
-                                  {linkedBranch.branchName}
-                                </span>
-                                {githubLinkedBranchSource === 'discovered' && (
-                                  <span className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-                                    자동 탐색
-                                  </span>
-                                )}
-                                {githubLinkedBranchSource === 'linked-fallback' && (
-                                  <span className="rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300">
-                                    linked branch
-                                  </span>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    const copied = await copyTextToClipboard(linkedBranch.branchName);
-                                    if (copied) {
-                                      onShowToast?.('브랜치명이 복사되었습니다.');
-                                    }
-                                  }}
-                                  className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-[11px] font-black text-gray-600 transition-colors hover:bg-white dark:border-border-subtle dark:text-text-secondary dark:hover:bg-bg-hover"
-                                >
-                                  <Copy size={12} strokeWidth={2.6} />
-                                  복사
-                                </button>
-                              </div>
-                            ) : isGitHubBranchLoading ? (
-                              <div className="mt-1 flex items-center gap-2">
-                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 dark:border-border-subtle dark:border-t-blue-400" />
-                                <p className="text-xs font-bold text-gray-500 dark:text-text-secondary">브랜치 확인 중...</p>
-                              </div>
-                            ) : (
-                              <p className="mt-1 text-xs font-bold text-gray-500 dark:text-text-secondary">
-                                아직 연결된 브랜치가 없습니다.
-                              </p>
-                            )}
-                            {linkedBranch && githubLinkedBranchSource === 'discovered' && (
-                              <p className="mt-2 text-xs font-bold text-amber-700 dark:text-amber-300">
-                                ticket 기준으로 레포 브랜치를 자동 탐색해 표시했습니다. GitHub 이슈의 Development 영역에는 아직 직접 연결되지 않았을 수 있습니다.
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            {linkedBranch?.branchUrl && (
-                              <a
-                                href={linkedBranch.branchUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-black text-gray-600 transition-colors hover:bg-white dark:border-border-subtle dark:text-text-secondary dark:hover:bg-bg-hover"
-                              >
-                                <ExternalLink size={12} strokeWidth={2.6} />
-                                브랜치 보기
-                              </a>
-                            )}
-                            {!isReadOnly && !linkedBranch && (
-                              <button
-                                type="button"
-                                onClick={handleCreateGitHubBranch}
-                                disabled={isCreatingBranch}
-                                className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-[11px] font-black text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-gray-900"
-                              >
-                                {isCreatingBranch ? '생성 중...' : '브랜치 생성'}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="mt-3 rounded-xl bg-gray-50 px-3 py-2 dark:bg-bg-base">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-text-tertiary">
-                                Pull Request
-                              </p>
-                              {gitHubPullRequests.length > 0 ? (
-                                <div className="mt-1 flex flex-col gap-2">
-                                  {gitHubPullRequests.map((pullRequest) => {
-                                    const stateTone = pullRequest.pull_state_snapshot === 'merged'
-                                      ? 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300'
-                                      : pullRequest.pull_state_snapshot === 'open'
-                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
-                                        : 'border-gray-200 bg-white text-gray-600 dark:border-border-subtle dark:bg-bg-hover dark:text-text-secondary';
-                                    return (
-                                      <div key={pullRequest.id || `${pullRequest.repo_full_name}-${pullRequest.pull_number}`} className="flex flex-wrap items-center gap-2">
-                                        <a
-                                          href={pullRequest.pull_url}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          className="inline-flex min-w-0 items-center gap-2 text-xs font-black text-gray-700 hover:text-brand-600 dark:text-text-secondary dark:hover:text-brand-400"
-                                        >
-                                          <span className="truncate">
-                                            {pullRequest.repo_full_name}#{pullRequest.pull_number}
-                                          </span>
-                                          <ExternalLink size={12} className="shrink-0" />
-                                        </a>
-                                        <span className={`rounded-lg border px-2 py-0.5 text-[10px] font-black uppercase tracking-widest ${stateTone}`}>
-                                          {pullRequest.is_draft ? 'draft' : pullRequest.pull_state_snapshot}
-                                        </span>
-                                        {(pullRequest.base_ref || pullRequest.head_ref) && (
-                                          <span className="text-[11px] font-bold text-gray-500 dark:text-text-secondary">
-                                            {pullRequest.head_ref || '?'} → {pullRequest.base_ref || '?'}
-                                          </span>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              ) : isGitHubPullRequestLoading ? (
-                                <div className="mt-1 flex items-center gap-2">
-                                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 dark:border-border-subtle dark:border-t-blue-400" />
-                                  <p className="text-xs font-bold text-gray-500 dark:text-text-secondary">PR 확인 중...</p>
-                                </div>
-                              ) : (
-                                <p className="mt-1 text-xs font-bold text-gray-500 dark:text-text-secondary">
-                                  아직 연결된 PR이 없습니다.
-                                </p>
-                              )}
-                            </div>
-
-                            {!isReadOnly && linkedBranch && !hasActiveGitHubPullRequest && (
-                              <button
-                                type="button"
-                                onClick={handleOpenGitHubPullRequestCreator}
-                                disabled={isGitHubPullRequestLoading}
-                                className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-[11px] font-black text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-gray-900"
-                              >
-                                {isGitHubPullRequestLoading ? '준비 중...' : 'PR 생성'}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {gitHubBranchError && (
-                    <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
-                      {gitHubBranchError}
+                  {isGitHubSyncLoading && (
+                    <div className="flex items-center gap-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-xs font-bold text-gray-500 dark:border-border-subtle dark:bg-bg-base dark:text-text-secondary">
+                      <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 dark:border-border-subtle dark:border-t-blue-400" />
+                      GitHub 연동 정보를 불러오는 중입니다...
                     </div>
                   )}
-                  {gitHubPullRequestError && !showGitHubPullRequestCreator && (
-                    <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
-                      {gitHubPullRequestError}
+                  {isGitHubSyncError && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                      <span>{gitHubError || 'GitHub 연동 정보를 불러오지 못했습니다.'}</span>
+                      <button
+                        type="button"
+                        onClick={handleRetryGitHubSync}
+                        className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-2.5 py-1 text-[11px] font-black text-red-600 transition-colors hover:bg-red-50 dark:border-red-500/40 dark:bg-bg-elevated dark:text-red-300 dark:hover:bg-red-500/10"
+                      >
+                        다시 시도
+                      </button>
                     </div>
+                  )}
+                  {(isGitHubSyncLoaded || isGitHubSyncEmpty) && (
+                    <>
+                      {(hasExistingGitHubIssue || isGitHubSubmitting) ? (
+                        <>
+                          {githubIssues.map((issue) => {
+                            const linkedBranch = githubLinkedBranch;
+                            const isCreatingBranch = isGitHubBranchSubmitting;
+
+                            return (
+                              <div
+                                key={issue.id || `${issue.repo_full_name}-${issue.issue_number}`}
+                                className="rounded-xl border border-gray-100 px-3 py-3 dark:border-border-subtle"
+                              >
+                                <div className="flex items-center justify-between gap-3">
+                                  <a
+                                    href={issue.issue_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="flex min-w-0 items-center gap-2 flex-wrap text-sm text-gray-700 dark:text-text-secondary hover:text-brand-600 dark:hover:text-brand-400"
+                                  >
+                                    <span className="font-bold truncate">
+                                      {issue.repo_full_name}#{issue.issue_number}
+                                    </span>
+                                    {(issue.ticket_key || ticketKey) && (
+                                      <span className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-bg-base text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-text-secondary">
+                                        {issue.ticket_key || ticketKey}
+                                      </span>
+                                    )}
+                                  </a>
+                                  <ExternalLink size={14} className="shrink-0 text-gray-400 dark:text-text-tertiary" />
+                                </div>
+
+                                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-gray-50 px-3 py-2 dark:bg-bg-base">
+                                  <div className="min-w-0">
+                                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-text-tertiary">
+                                      Linked Branch
+                                    </p>
+                                    {linkedBranch ? (
+                                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                                        <span className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-black text-gray-700 dark:border-border-subtle dark:bg-bg-hover dark:text-text-primary">
+                                          {linkedBranch.branchName}
+                                        </span>
+                                        {githubLinkedBranchSource === 'discovered' && (
+                                          <span className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                                            자동 탐색
+                                          </span>
+                                        )}
+                                        {githubLinkedBranchSource === 'linked-fallback' && (
+                                          <span className="rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300">
+                                            linked branch
+                                          </span>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={async () => {
+                                            const copied = await copyTextToClipboard(linkedBranch.branchName);
+                                            if (copied) {
+                                              onShowToast?.('브랜치명이 복사되었습니다.');
+                                            }
+                                          }}
+                                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-[11px] font-black text-gray-600 transition-colors hover:bg-white dark:border-border-subtle dark:text-text-secondary dark:hover:bg-bg-hover"
+                                        >
+                                          <Copy size={12} strokeWidth={2.6} />
+                                          복사
+                                        </button>
+                                      </div>
+                                    ) : isGitHubBranchLoading ? (
+                                      <div className="mt-1 flex items-center gap-2">
+                                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 dark:border-border-subtle dark:border-t-blue-400" />
+                                        <p className="text-xs font-bold text-gray-500 dark:text-text-secondary">브랜치 확인 중...</p>
+                                      </div>
+                                    ) : (
+                                      <p className="mt-1 text-xs font-bold text-gray-500 dark:text-text-secondary">
+                                        아직 연결된 브랜치가 없습니다.
+                                      </p>
+                                    )}
+                                    {linkedBranch && githubLinkedBranchSource === 'discovered' && (
+                                      <p className="mt-2 text-xs font-bold text-amber-700 dark:text-amber-300">
+                                        ticket 기준으로 레포 브랜치를 자동 탐색해 표시했습니다. GitHub 이슈의 Development 영역에는 아직 직접 연결되지 않았을 수 있습니다.
+                                      </p>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    {linkedBranch?.branchUrl && (
+                                      <a
+                                        href={linkedBranch.branchUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-black text-gray-600 transition-colors hover:bg-white dark:border-border-subtle dark:text-text-secondary dark:hover:bg-bg-hover"
+                                      >
+                                        <ExternalLink size={12} strokeWidth={2.6} />
+                                        브랜치 보기
+                                      </a>
+                                    )}
+                                    {!isReadOnly && !linkedBranch && (
+                                      <button
+                                        type="button"
+                                        onClick={handleCreateGitHubBranch}
+                                        disabled={isCreatingBranch}
+                                        className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-[11px] font-black text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-gray-900"
+                                      >
+                                        {isCreatingBranch ? '생성 중...' : '브랜치 생성'}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="mt-3 rounded-xl bg-gray-50 px-3 py-2 dark:bg-bg-base">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-text-tertiary">
+                                        Pull Request
+                                      </p>
+                                      {gitHubPullRequests.length > 0 ? (
+                                        <div className="mt-1 flex flex-col gap-2">
+                                          {gitHubPullRequests.map((pullRequest) => {
+                                            const stateTone = pullRequest.pull_state_snapshot === 'merged'
+                                              ? 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300'
+                                              : pullRequest.pull_state_snapshot === 'open'
+                                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
+                                                : 'border-gray-200 bg-white text-gray-600 dark:border-border-subtle dark:bg-bg-hover dark:text-text-secondary';
+                                            return (
+                                              <div key={pullRequest.id || `${pullRequest.repo_full_name}-${pullRequest.pull_number}`} className="flex flex-wrap items-center gap-2">
+                                                <a
+                                                  href={pullRequest.pull_url}
+                                                  target="_blank"
+                                                  rel="noreferrer"
+                                                  className="inline-flex min-w-0 items-center gap-2 text-xs font-black text-gray-700 hover:text-brand-600 dark:text-text-secondary dark:hover:text-brand-400"
+                                                >
+                                                  <span className="truncate">
+                                                    {pullRequest.repo_full_name}#{pullRequest.pull_number}
+                                                  </span>
+                                                  <ExternalLink size={12} className="shrink-0" />
+                                                </a>
+                                                <span className={`rounded-lg border px-2 py-0.5 text-[10px] font-black uppercase tracking-widest ${stateTone}`}>
+                                                  {pullRequest.is_draft ? 'draft' : pullRequest.pull_state_snapshot}
+                                                </span>
+                                                {(pullRequest.base_ref || pullRequest.head_ref) && (
+                                                  <span className="text-[11px] font-bold text-gray-500 dark:text-text-secondary">
+                                                    {pullRequest.head_ref || '?'} → {pullRequest.base_ref || '?'}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      ) : isGitHubPullRequestLoading ? (
+                                        <div className="mt-1 flex items-center gap-2">
+                                          <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 dark:border-border-subtle dark:border-t-blue-400" />
+                                          <p className="text-xs font-bold text-gray-500 dark:text-text-secondary">PR 확인 중...</p>
+                                        </div>
+                                      ) : (
+                                        <p className="mt-1 text-xs font-bold text-gray-500 dark:text-text-secondary">
+                                          아직 연결된 PR이 없습니다.
+                                        </p>
+                                      )}
+                                    </div>
+
+                                    {!isReadOnly && linkedBranch && !hasActiveGitHubPullRequest && (
+                                      <button
+                                        type="button"
+                                        onClick={handleOpenGitHubPullRequestCreator}
+                                        disabled={isGitHubPullRequestLoading}
+                                        className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-3 py-1.5 text-[11px] font-black text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-gray-900"
+                                      >
+                                        {isGitHubPullRequestLoading ? '준비 중...' : 'PR 생성'}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {gitHubBranchError && (
+                            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                              {gitHubBranchError}
+                            </div>
+                          )}
+                          {gitHubPullRequestError && !showGitHubPullRequestCreator && (
+                            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                              {gitHubPullRequestError}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-[13px] font-bold text-gray-500 dark:text-text-secondary">
+                          연결된 GitHub 이슈가 없습니다.
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
