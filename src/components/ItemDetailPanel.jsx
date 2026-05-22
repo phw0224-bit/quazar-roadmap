@@ -175,9 +175,9 @@ function ItemDetailPanel({
     setGitHubBranchError('');
     setGitHubPullRequestError('');
     setGitHubSyncStatus('idle');
-    const cachedBranchName = item?.github_linked_branch_name;
-    const cachedBranchUrl = item?.github_linked_branch_url;
-    const cachedBranchSource = item?.github_branch_source || null;
+    const cachedBranchName = item?.ticket_key ? item?.github_linked_branch_name : null;
+    const cachedBranchUrl = item?.ticket_key ? item?.github_linked_branch_url : null;
+    const cachedBranchSource = item?.ticket_key ? (item?.github_branch_source || null) : null;
     if (cachedBranchName) {
       setGitHubLinkedBranch({ branchName: cachedBranchName, branchUrl: cachedBranchUrl || null });
       setGitHubLinkedBranchSource(cachedBranchSource);
@@ -223,10 +223,26 @@ function ItemDetailPanel({
 
       setIsGitHubLoading(true);
       setGitHubError('');
-      setGitHubSyncStatus('loading');
+      const hasGitHubTicket = Boolean(item?.ticket_key);
+      if (hasGitHubTicket) {
+        setGitHubSyncStatus('loading');
+      } else {
+        setGitHubSyncStatus('empty');
+        setGitHubIssues([]);
+        setGitHubPullRequests([]);
+        setGitHubLinkedBranch(null);
+        setGitHubLinkedBranchSource(null);
+      }
       try {
+        const statusPromise = getGitHubStatus();
+        if (!hasGitHubTicket) {
+          const status = await statusPromise;
+          if (!active) return;
+          setGitHubStatus(status || { connected: false });
+          return;
+        }
         const [status, issues, pullRequests] = await Promise.all([
-          getGitHubStatus(),
+          statusPromise,
           getItemGitHubIssues(item.id),
           getGitHubItemPullRequests(item.id),
         ]);
@@ -248,7 +264,9 @@ function ItemDetailPanel({
       } catch (error) {
         if (!active) return;
         setGitHubError(error.message || 'GitHub 정보를 불러오지 못했습니다.');
-        setGitHubSyncStatus('error');
+        if (hasGitHubTicket) {
+          setGitHubSyncStatus('error');
+        }
       } finally {
         if (active) setIsGitHubLoading(false);
       }
@@ -858,13 +876,14 @@ function ItemDetailPanel({
   const isGitHubSyncError = gitHubSyncStatus === 'error';
   const isGitHubSyncEmpty = gitHubSyncStatus === 'empty';
   const isGitHubSyncLoaded = gitHubSyncStatus === 'loaded';
+  const hasGitHubTicket = Boolean(item?.ticket_key);
+  const shouldShowGitHubLoadingIndicator = isGitHubSyncLoading && hasGitHubTicket;
+  const shouldAllowIssueActionsWhileLoading = !hasGitHubTicket;
   const shouldShowGitHubActions = !isReadOnly && !isMemo;
   const shouldRenderGitHubSection = !isMemo && (
-    isGitHubSyncLoading
-    || isGitHubSyncError
-    || isGitHubSyncEmpty
-    || hasExistingGitHubIssue
+    hasGitHubTicket
     || isGitHubSubmitting
+    || isGitHubSyncError
   );
   const activeGitHubPullRequest = gitHubPullRequests.find((pullRequest) => (
     pullRequest.pull_state_snapshot === 'open' || pullRequest.is_draft
@@ -1364,7 +1383,7 @@ function ItemDetailPanel({
             )}
             {shouldShowGitHubActions && (
               <div className="flex flex-wrap items-center gap-2">
-                {isGitHubSyncLoading && (
+                {shouldShowGitHubLoadingIndicator && (
                   <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-black text-gray-500 shadow-sm dark:border-border-subtle dark:bg-bg-elevated dark:text-text-secondary">
                     <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 dark:border-border-subtle dark:border-t-blue-400" />
                     GitHub 연동 정보를 불러오는 중...
@@ -1384,7 +1403,7 @@ function ItemDetailPanel({
                     </button>
                   </>
                 )}
-                {(isGitHubSyncLoaded || isGitHubSyncEmpty) && (
+                {(isGitHubSyncLoaded || isGitHubSyncEmpty || shouldAllowIssueActionsWhileLoading) && (
                   <>
                     <button
                       type="button"
@@ -1798,7 +1817,7 @@ function ItemDetailPanel({
                   <span className="text-[13px] font-black uppercase tracking-widest">GitHub</span>
                 </div>
                 <div className="flex-1 flex flex-col gap-2 px-3 py-2 rounded-xl bg-white dark:bg-bg-hover border border-gray-100 dark:border-border-subtle">
-                  {isGitHubSyncLoading && (
+                  {shouldShowGitHubLoadingIndicator && (
                     <div className="flex items-center gap-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-xs font-bold text-gray-500 dark:border-border-subtle dark:bg-bg-base dark:text-text-secondary">
                       <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 dark:border-border-subtle dark:border-t-blue-400" />
                       GitHub 연동 정보를 불러오는 중입니다...
