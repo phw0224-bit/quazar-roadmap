@@ -858,11 +858,15 @@ function ItemDetailPanel({
   const isGitHubSyncError = gitHubSyncStatus === 'error';
   const isGitHubSyncEmpty = gitHubSyncStatus === 'empty';
   const isGitHubSyncLoaded = gitHubSyncStatus === 'loaded';
+  const hasCachedGitHubSignal = Boolean(
+    item?.ticket_key || item?.github_linked_branch_name || item?.github_linked_branch_url
+  );
+  const shouldShowGitHubLoadingIndicator = isGitHubSyncLoading && (hasExistingGitHubIssue || hasCachedGitHubSignal);
+  const shouldAllowIssueActionsWhileLoading = isGitHubSyncLoading && !shouldShowGitHubLoadingIndicator;
   const shouldShowGitHubActions = !isReadOnly && !isMemo;
   const shouldRenderGitHubSection = !isMemo && (
-    isGitHubSyncLoading
+    shouldShowGitHubLoadingIndicator
     || isGitHubSyncError
-    || isGitHubSyncEmpty
     || hasExistingGitHubIssue
     || isGitHubSubmitting
   );
@@ -1364,7 +1368,7 @@ function ItemDetailPanel({
             )}
             {shouldShowGitHubActions && (
               <div className="flex flex-wrap items-center gap-2">
-                {isGitHubSyncLoading && (
+                {shouldShowGitHubLoadingIndicator && (
                   <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-black text-gray-500 shadow-sm dark:border-border-subtle dark:bg-bg-elevated dark:text-text-secondary">
                     <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 dark:border-border-subtle dark:border-t-blue-400" />
                     GitHub 연동 정보를 불러오는 중...
@@ -1384,7 +1388,7 @@ function ItemDetailPanel({
                     </button>
                   </>
                 )}
-                {(isGitHubSyncLoaded || isGitHubSyncEmpty) && (
+                {(isGitHubSyncLoaded || isGitHubSyncEmpty || shouldAllowIssueActionsWhileLoading) && (
                   <>
                     <button
                       type="button"
@@ -1798,7 +1802,7 @@ function ItemDetailPanel({
                   <span className="text-[13px] font-black uppercase tracking-widest">GitHub</span>
                 </div>
                 <div className="flex-1 flex flex-col gap-2 px-3 py-2 rounded-xl bg-white dark:bg-bg-hover border border-gray-100 dark:border-border-subtle">
-                  {isGitHubSyncLoading && (
+                  {shouldShowGitHubLoadingIndicator && (
                     <div className="flex items-center gap-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-xs font-bold text-gray-500 dark:border-border-subtle dark:bg-bg-base dark:text-text-secondary">
                       <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 dark:border-border-subtle dark:border-t-blue-400" />
                       GitHub 연동 정보를 불러오는 중입니다...
