@@ -65,3 +65,4 @@ export const GITHUB_STATE_SECRET =
 export const GITHUB_WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET || '';
 export const TICKET_KEY_PREFIX = process.env.TICKET_KEY_PREFIX || 'QZR';
 export const GOOGLE_CHAT_DEV_REQUEST_WEBHOOK_URL = process.env.GOOGLE_CHAT_DEV_REQUEST_WEBHOOK_URL || '';
+export const MCP_SHARED_TOKEN = process.env.MCP_SHARED_TOKEN || '';

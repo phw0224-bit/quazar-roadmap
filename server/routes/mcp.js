@@ -1,0 +1,278 @@
+import { Router } from 'express';
+
+import { MCP_SHARED_TOKEN } from '../lib/config.js';
+import { supabaseAdminClient } from '../lib/supabase.js';
+import { createQuazarItemService } from '../lib/quazarMcpItems.js';
+
+function getBearerToken(headers = {}) {
+  const authHeader = headers.authorization || headers.Authorization || '';
+  return authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+}
+
+function getSharedService() {
+  if (!supabaseAdminClient) {
+    const error = new Error('Supabase server configuration is missing.');
+    error.code = 'INTERNAL_ERROR';
+    error.status = 500;
+    throw error;
+  }
+
+  return createQuazarItemService(supabaseAdminClient);
+}
+
+function requireAuthorizedRequest(expectedToken, req, res) {
+  const token = getBearerToken(req.headers || {});
+  if (!expectedToken || token !== expectedToken) {
+    res.status(401).json({
+      code: 'UNAUTHORIZED',
+      message: 'Unauthorized MCP request.',
+    });
+    return false;
+  }
+
+  return true;
+}
+
+function sendRouteError(res, error, fallbackMessage) {
+  const status = Number.isInteger(error?.status) ? error.status : 500;
+  const payload = {
+    code: error?.code || 'INTERNAL_ERROR',
+    message: error?.message || fallbackMessage,
+  };
+
+  if (Array.isArray(error?.candidates)) {
+    payload.candidates = error.candidates;
+  }
+
+  return res.status(status).json(payload);
+}
+
+export function createMcpItemsHandler({ expectedToken, createItem }) {
+  return async function handleMcpItems(req, res) {
+    if (!requireAuthorizedRequest(expectedToken, req, res)) return;
+
+    try {
+      const payload = {
+        ...(req.body || {}),
+        description: typeof req.body?.description === 'string' ? req.body.description : '',
+        tags: Array.isArray(req.body?.tags) ? req.body.tags : [],
+      };
+      const result = await createItem(payload);
+      return res.status(200).json(result);
+    } catch (error) {
+      return sendRouteError(res, error, 'Failed to create Quazar item.');
+    }
+  };
+}
+
+export function createMcpProjectsHandler({ expectedToken, listProjects }) {
+  return async function handleMcpProjects(req, res) {
+    if (!requireAuthorizedRequest(expectedToken, req, res)) return;
+
+    try {
+      const limitValue = Number(req.query?.limit);
+      const payload = {
+        boardType: typeof req.query?.boardType === 'string' ? req.query.boardType : '',
+        query: typeof req.query?.query === 'string' ? req.query.query : '',
+        limit: Number.isInteger(limitValue) ? limitValue : undefined,
+      };
+      const result = await listProjects(payload);
+      return res.status(200).json(result);
+    } catch (error) {
+      return sendRouteError(res, error, 'Failed to list Quazar projects.');
+    }
+  };
+}
+
+export function createMcpProjectCreateHandler({ expectedToken, createProject }) {
+  return async function handleMcpProjectCreate(req, res) {
+    if (!requireAuthorizedRequest(expectedToken, req, res)) return;
+
+    try {
+      const payload = {
+        boardType: typeof req.body?.boardType === 'string' ? req.body.boardType : '',
+        title: typeof req.body?.title === 'string' ? req.body.title : '',
+        sectionId: req.body?.sectionId === null
+          ? null
+          : typeof req.body?.sectionId === 'string'
+            ? req.body.sectionId
+            : undefined,
+        tags: Array.isArray(req.body?.tags) ? req.body.tags : [],
+      };
+      const result = await createProject(payload);
+      return res.status(200).json(result);
+    } catch (error) {
+      return sendRouteError(res, error, 'Failed to create Quazar project.');
+    }
+  };
+}
+
+export function createMcpProjectDetailHandler({ expectedToken, getProject }) {
+  return async function handleMcpProjectDetail(req, res) {
+    if (!requireAuthorizedRequest(expectedToken, req, res)) return;
+
+    try {
+      const payload = {
+        boardType: typeof req.query?.boardType === 'string' ? req.query.boardType : '',
+        projectId: typeof req.params?.projectId === 'string' ? req.params.projectId : '',
+      };
+      const result = await getProject(payload);
+      return res.status(200).json(result);
+    } catch (error) {
+      return sendRouteError(res, error, 'Failed to get Quazar project.');
+    }
+  };
+}
+
+export function createMcpProjectUpdateHandler({ expectedToken, updateProject }) {
+  return async function handleMcpProjectUpdate(req, res) {
+    if (!requireAuthorizedRequest(expectedToken, req, res)) return;
+
+    try {
+      const payload = {
+        boardType: typeof req.body?.boardType === 'string' ? req.body.boardType : '',
+        projectId: typeof req.params?.projectId === 'string' ? req.params.projectId : '',
+      };
+
+      if (Object.prototype.hasOwnProperty.call(req.body || {}, 'title')) {
+        payload.title = req.body.title;
+      }
+      if (Object.prototype.hasOwnProperty.call(req.body || {}, 'tags')) {
+        payload.tags = req.body.tags;
+      }
+      if (Object.prototype.hasOwnProperty.call(req.body || {}, 'isCompleted')) {
+        payload.isCompleted = req.body.isCompleted;
+      }
+
+      const result = await updateProject(payload);
+      return res.status(200).json(result);
+    } catch (error) {
+      return sendRouteError(res, error, 'Failed to update Quazar project.');
+    }
+  };
+}
+
+function parseTagQuery(rawValue) {
+  if (Array.isArray(rawValue)) {
+    return rawValue
+      .flatMap((value) => String(value).split(','))
+      .map((value) => value.trim())
+      .filter(Boolean);
+  }
+
+  if (typeof rawValue === 'string') {
+    return rawValue.split(',').map((value) => value.trim()).filter(Boolean);
+  }
+
+  return [];
+}
+
+export function createMcpItemSearchHandler({ expectedToken, searchItems }) {
+  return async function handleMcpItemSearch(req, res) {
+    if (!requireAuthorizedRequest(expectedToken, req, res)) return;
+
+    try {
+      const limitValue = Number(req.query?.limit);
+      const payload = {
+        boardType: typeof req.query?.boardType === 'string' ? req.query.boardType : '',
+        query: typeof req.query?.query === 'string' ? req.query.query : '',
+        projectName: typeof req.query?.projectName === 'string' ? req.query.projectName : '',
+        status: typeof req.query?.status === 'string' ? req.query.status : '',
+        tags: parseTagQuery(req.query?.tags),
+        limit: Number.isInteger(limitValue) ? limitValue : undefined,
+        includeCompletedProjects: req.query?.includeCompletedProjects === 'false'
+          ? false
+          : req.query?.includeCompletedProjects === 'true'
+            ? true
+            : undefined,
+      };
+      const result = await searchItems(payload);
+      return res.status(200).json(result);
+    } catch (error) {
+      return sendRouteError(res, error, 'Failed to search Quazar items.');
+    }
+  };
+}
+
+export function createMcpItemDetailHandler({ expectedToken, getItem }) {
+  return async function handleMcpItemDetail(req, res) {
+    if (!requireAuthorizedRequest(expectedToken, req, res)) return;
+
+    try {
+      const payload = {
+        boardType: typeof req.query?.boardType === 'string' ? req.query.boardType : '',
+        itemId: typeof req.params?.itemId === 'string' ? req.params.itemId : '',
+      };
+      const result = await getItem(payload);
+      return res.status(200).json(result);
+    } catch (error) {
+      return sendRouteError(res, error, 'Failed to get Quazar item.');
+    }
+  };
+}
+
+export function createMcpItemUpdateHandler({ expectedToken, updateItem }) {
+  return async function handleMcpItemUpdate(req, res) {
+    if (!requireAuthorizedRequest(expectedToken, req, res)) return;
+
+    try {
+      const payload = {
+        ...(req.body || {}),
+        itemId: typeof req.params?.itemId === 'string' ? req.params.itemId : '',
+      };
+
+      if (Object.prototype.hasOwnProperty.call(req.body || {}, 'tags') && !Array.isArray(req.body?.tags)) {
+        payload.tags = req.body?.tags;
+      } else if (Array.isArray(req.body?.tags)) {
+        payload.tags = req.body.tags;
+      }
+
+      const result = await updateItem(payload);
+      return res.status(200).json(result);
+    } catch (error) {
+      return sendRouteError(res, error, 'Failed to update Quazar item.');
+    }
+  };
+}
+
+export const mcpRouter = Router();
+
+mcpRouter.get('/api/mcp/projects', createMcpProjectsHandler({
+  expectedToken: MCP_SHARED_TOKEN,
+  listProjects: (payload) => getSharedService().listProjects(payload),
+}));
+
+mcpRouter.post('/api/mcp/projects', createMcpProjectCreateHandler({
+  expectedToken: MCP_SHARED_TOKEN,
+  createProject: (payload) => getSharedService().createProject(payload),
+}));
+
+mcpRouter.get('/api/mcp/projects/:projectId', createMcpProjectDetailHandler({
+  expectedToken: MCP_SHARED_TOKEN,
+  getProject: (payload) => getSharedService().getProject(payload),
+}));
+
+mcpRouter.patch('/api/mcp/projects/:projectId', createMcpProjectUpdateHandler({
+  expectedToken: MCP_SHARED_TOKEN,
+  updateProject: (payload) => getSharedService().updateProject(payload),
+}));
+
+mcpRouter.get('/api/mcp/items', createMcpItemSearchHandler({
+  expectedToken: MCP_SHARED_TOKEN,
+  searchItems: (payload) => getSharedService().searchItems(payload),
+}));
+
+mcpRouter.get('/api/mcp/items/:itemId', createMcpItemDetailHandler({
+  expectedToken: MCP_SHARED_TOKEN,
+  getItem: (payload) => getSharedService().getItem(payload),
+}));
+
+mcpRouter.post('/api/mcp/items', createMcpItemsHandler({
+  expectedToken: MCP_SHARED_TOKEN,
+  createItem: (payload) => getSharedService().createItem(payload),
+}));
+
+mcpRouter.patch('/api/mcp/items/:itemId', createMcpItemUpdateHandler({
+  expectedToken: MCP_SHARED_TOKEN,
+  updateItem: (payload) => getSharedService().updateItem(payload),
+}));
