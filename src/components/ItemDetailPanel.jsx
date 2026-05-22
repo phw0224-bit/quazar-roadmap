@@ -175,9 +175,9 @@ function ItemDetailPanel({
     setGitHubBranchError('');
     setGitHubPullRequestError('');
     setGitHubSyncStatus('idle');
-    const cachedBranchName = item?.github_linked_branch_name;
-    const cachedBranchUrl = item?.github_linked_branch_url;
-    const cachedBranchSource = item?.github_branch_source || null;
+    const cachedBranchName = item?.ticket_key ? item?.github_linked_branch_name : null;
+    const cachedBranchUrl = item?.ticket_key ? item?.github_linked_branch_url : null;
+    const cachedBranchSource = item?.ticket_key ? (item?.github_branch_source || null) : null;
     if (cachedBranchName) {
       setGitHubLinkedBranch({ branchName: cachedBranchName, branchUrl: cachedBranchUrl || null });
       setGitHubLinkedBranchSource(cachedBranchSource);
@@ -223,10 +223,26 @@ function ItemDetailPanel({
 
       setIsGitHubLoading(true);
       setGitHubError('');
-      setGitHubSyncStatus('loading');
+      const hasGitHubTicket = Boolean(item?.ticket_key);
+      if (hasGitHubTicket) {
+        setGitHubSyncStatus('loading');
+      } else {
+        setGitHubSyncStatus('empty');
+        setGitHubIssues([]);
+        setGitHubPullRequests([]);
+        setGitHubLinkedBranch(null);
+        setGitHubLinkedBranchSource(null);
+      }
       try {
+        const statusPromise = getGitHubStatus();
+        if (!hasGitHubTicket) {
+          const status = await statusPromise;
+          if (!active) return;
+          setGitHubStatus(status || { connected: false });
+          return;
+        }
         const [status, issues, pullRequests] = await Promise.all([
-          getGitHubStatus(),
+          statusPromise,
           getItemGitHubIssues(item.id),
           getGitHubItemPullRequests(item.id),
         ]);
@@ -248,7 +264,9 @@ function ItemDetailPanel({
       } catch (error) {
         if (!active) return;
         setGitHubError(error.message || 'GitHub 정보를 불러오지 못했습니다.');
-        setGitHubSyncStatus('error');
+        if (hasGitHubTicket) {
+          setGitHubSyncStatus('error');
+        }
       } finally {
         if (active) setIsGitHubLoading(false);
       }
@@ -858,17 +876,14 @@ function ItemDetailPanel({
   const isGitHubSyncError = gitHubSyncStatus === 'error';
   const isGitHubSyncEmpty = gitHubSyncStatus === 'empty';
   const isGitHubSyncLoaded = gitHubSyncStatus === 'loaded';
-  const hasCachedGitHubSignal = Boolean(
-    item?.ticket_key || item?.github_linked_branch_name || item?.github_linked_branch_url
-  );
-  const shouldShowGitHubLoadingIndicator = isGitHubSyncLoading && (hasExistingGitHubIssue || hasCachedGitHubSignal);
-  const shouldAllowIssueActionsWhileLoading = isGitHubSyncLoading && !shouldShowGitHubLoadingIndicator;
+  const hasGitHubTicket = Boolean(item?.ticket_key);
+  const shouldShowGitHubLoadingIndicator = isGitHubSyncLoading && hasGitHubTicket;
+  const shouldAllowIssueActionsWhileLoading = !hasGitHubTicket;
   const shouldShowGitHubActions = !isReadOnly && !isMemo;
   const shouldRenderGitHubSection = !isMemo && (
-    shouldShowGitHubLoadingIndicator
-    || isGitHubSyncError
-    || hasExistingGitHubIssue
+    hasGitHubTicket
     || isGitHubSubmitting
+    || isGitHubSyncError
   );
   const activeGitHubPullRequest = gitHubPullRequests.find((pullRequest) => (
     pullRequest.pull_state_snapshot === 'open' || pullRequest.is_draft
