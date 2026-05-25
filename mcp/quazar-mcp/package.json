@@ -1,0 +1,27 @@
+{
+  "name": "@quazar/quazar-mcp",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Internal MCP server for creating Quazar items.",
+  "type": "module",
+  "bin": {
+    "quazar-mcp": "./server.js"
+  },
+  "files": [
+    "README.md",
+    "package.json",
+    "quazarClient.js",
+    "server.js"
+  ],
+  "scripts": {
+    "start": "node ./server.js",
+    "test": "node --test ./quazarClient.test.js ./server.test.js ./package.test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.5",
+    "zod": "^3.25.76"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

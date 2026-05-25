@@ -1,0 +1,7 @@
+interface:
+  display_name: "Quazar Workflow"
+  short_description: "Quazar 자연어 작업 흐름 오케스트레이션"
+  default_prompt: "Use $quazar-workflow to plan and run a Quazar section/project/item/GitHub workflow with a dry-run first."
+
+policy:
+  allow_implicit_invocation: true
