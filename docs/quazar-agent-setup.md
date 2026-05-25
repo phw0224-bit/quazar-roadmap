@@ -75,11 +75,17 @@ Codex/Claude의 MCP 설정에 아래 항목을 추가한다.
 
 ## 4. 스킬 설치
 
-배포받은 `quazar-workflow` 폴더를 개인 스킬 디렉터리에 복사한다.
+repo 안의 `skills/quazar-workflow` 폴더를 개인 스킬 디렉터리에 복사한다.
 
 최소 필요 파일:
 - `SKILL.md`
 - `agents/openai.yaml`
+
+원본 경로:
+
+```text
+/path/to/quazar-roadmap/skills/quazar-workflow
+```
 
 ### Windows
 

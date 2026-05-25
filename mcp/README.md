@@ -63,7 +63,7 @@ npm install -g C:\Users\uguls\Documents\quazar-roadmap\mcp\quazar-mcp
 
 아래 폴더를 각자 개인 스킬 디렉터리에 복사한다.
 
-- 원본: `C:\Users\uguls\.agents\skills\quazar-workflow`
+- 원본: `skills/quazar-workflow`
 - 대상: `~/.agents/skills/quazar-workflow`
 
 최소 필요 파일:
