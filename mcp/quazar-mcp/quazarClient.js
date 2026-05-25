@@ -26,10 +26,24 @@ async function requestJson({ baseUrl, token, fetchImpl = fetch }, path, init) {
     throw createError(data?.code || 'REQUEST_FAILED', data?.message || 'Quazar API request failed.', {
       status: response.status,
       candidates: data?.candidates,
+      issue: data?.issue,
+      branch: data?.branch,
     });
   }
 
   return data;
+}
+
+async function requestJsonAllowAlreadyExists({ baseUrl, token, fetchImpl = fetch }, path, init, mapExisting) {
+  try {
+    return await requestJson({ baseUrl, token, fetchImpl }, path, init);
+  } catch (error) {
+    if (error?.status === 409 && typeof mapExisting === 'function') {
+      const mapped = mapExisting(error);
+      if (mapped) return mapped;
+    }
+    throw error;
+  }
 }
 
 export async function createQuazarItemViaApi(
@@ -61,6 +75,7 @@ export async function createQuazarProjectViaApi(
     boardType: payload.boardType,
     title: payload.title,
     sectionId: payload.sectionId === undefined ? null : payload.sectionId,
+    sectionName: typeof payload.sectionName === 'string' ? payload.sectionName : '',
     tags: Array.isArray(payload.tags) ? payload.tags : [],
   };
 
@@ -70,6 +85,59 @@ export async function createQuazarProjectViaApi(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
+  });
+}
+
+export async function listQuazarSectionsViaApi(
+  { baseUrl, token, fetchImpl = fetch },
+  payload,
+) {
+  const params = new URLSearchParams({
+    boardType: payload.boardType,
+  });
+
+  if (typeof payload.query === 'string' && payload.query.trim()) {
+    params.set('query', payload.query);
+  }
+
+  if (payload.limit !== undefined) {
+    params.set('limit', String(payload.limit));
+  }
+
+  return requestJson({ baseUrl, token, fetchImpl }, `/api/mcp/sections?${params.toString()}`, {
+    method: 'GET',
+  });
+}
+
+export async function createQuazarSectionViaApi(
+  { baseUrl, token, fetchImpl = fetch },
+  payload,
+) {
+  const body = {
+    boardType: payload.boardType,
+    title: payload.title,
+  };
+
+  return requestJson({ baseUrl, token, fetchImpl }, '/api/mcp/sections', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function resolveQuazarSectionViaApi(
+  { baseUrl, token, fetchImpl = fetch },
+  payload,
+) {
+  const params = new URLSearchParams({
+    boardType: payload.boardType,
+    sectionName: payload.sectionName,
+  });
+
+  return requestJson({ baseUrl, token, fetchImpl }, `/api/mcp/sections/resolve?${params.toString()}`, {
+    method: 'GET',
   });
 }
 
@@ -90,6 +158,20 @@ export async function listQuazarProjectsViaApi(
   }
 
   return requestJson({ baseUrl, token, fetchImpl }, `/api/mcp/projects?${params.toString()}`, {
+    method: 'GET',
+  });
+}
+
+export async function resolveQuazarProjectViaApi(
+  { baseUrl, token, fetchImpl = fetch },
+  payload,
+) {
+  const params = new URLSearchParams({
+    boardType: payload.boardType,
+    projectName: payload.projectName,
+  });
+
+  return requestJson({ baseUrl, token, fetchImpl }, `/api/mcp/projects/resolve?${params.toString()}`, {
     method: 'GET',
   });
 }
@@ -245,37 +327,61 @@ export async function createQuazarItemGitHubIssueViaApi(
     body.repoFullName = payload.repoFullName.trim();
   }
 
-  return requestJson({ baseUrl, token, fetchImpl }, '/api/github/issues', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+  return requestJsonAllowAlreadyExists(
+    { baseUrl, token, fetchImpl },
+    '/api/github/issues',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
     },
-    body: JSON.stringify(body),
-  });
+    (error) => {
+      if (!error?.issue) return null;
+      return {
+        ok: true,
+        status: 'ALREADY_EXISTS',
+        issue: error.issue,
+        ticket: null,
+        labelSync: null,
+      };
+    }
+  );
 }
 
 export async function createQuazarItemGitHubBranchViaApi(
   { baseUrl, token, fetchImpl = fetch },
   payload,
 ) {
-  return requestJson(
+  const result = await requestJson(
     { baseUrl, token, fetchImpl },
     `/api/github/items/${encodeURIComponent(payload.itemId)}/branch`,
     {
       method: 'POST',
     }
   );
+  return {
+    ok: true,
+    status: result?.created ? 'CREATED' : 'ALREADY_EXISTS',
+    ...result,
+  };
 }
 
 export async function getQuazarItemGitHubBranchViaApi(
   { baseUrl, token, fetchImpl = fetch },
   payload,
 ) {
-  return requestJson(
+  const result = await requestJson(
     { baseUrl, token, fetchImpl },
     `/api/github/items/${encodeURIComponent(payload.itemId)}/branch`,
     {
       method: 'GET',
     }
   );
+  return {
+    ok: true,
+    status: 'FOUND',
+    ...result,
+  };
 }

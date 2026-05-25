@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { z } from 'zod';
 
 import {
+  createQuazarSectionViaApi,
   createQuazarItemGitHubBranchViaApi,
   createQuazarItemGitHubIssueViaApi,
   createQuazarProjectViaApi,
@@ -13,7 +14,10 @@ import {
   getQuazarProjectViaApi,
   getQuazarItemViaApi,
   getQuazarItemGitHubBranchViaApi,
+  listQuazarSectionsViaApi,
   listQuazarProjectsViaApi,
+  resolveQuazarSectionViaApi,
+  resolveQuazarProjectViaApi,
   searchQuazarItemsViaApi,
   updateQuazarProjectViaApi,
   updateQuazarItemViaApi,
@@ -33,6 +37,47 @@ export async function runCreateQuazarItemTool(args, { createItem }) {
     content: [{
       type: 'text',
       text: `Created Quazar item ${result.itemId} in ${result.projectTitle} (${result.boardType}).`,
+    }],
+    structuredContent: result,
+  };
+}
+
+export async function runListQuazarSectionsTool(args, { listSections }) {
+  const result = await listSections(args);
+  const sectionLines = result.sections.map((section) => `- ${section.title} (${section.id})`);
+
+  return {
+    content: [{
+      type: 'text',
+      text: sectionLines.length > 0
+        ? `Found ${result.count} Quazar sections in ${result.boardType}:\n${sectionLines.join('\n')}`
+        : `No Quazar sections matched in ${result.boardType}.`,
+    }],
+    structuredContent: result,
+  };
+}
+
+export async function runCreateQuazarSectionTool(args, { createSection }) {
+  const result = await createSection(args);
+  return {
+    content: [{
+      type: 'text',
+      text: `Created Quazar section ${result.sectionId}: ${result.title} (${result.boardType}).`,
+    }],
+    structuredContent: result,
+  };
+}
+
+export async function runResolveQuazarSectionTool(args, { resolveSection }) {
+  const result = await resolveSection(args);
+  return {
+    content: [{
+      type: 'text',
+      text: result.status === 'FOUND'
+        ? `Resolved Quazar section ${result.section.title} (${result.section.sectionId}) in ${result.boardType}.`
+        : result.status === 'AMBIGUOUS'
+          ? `Multiple Quazar sections matched "${result.sectionName}" in ${result.boardType}.`
+          : `No Quazar section matched "${result.sectionName}" in ${result.boardType}.`,
     }],
     structuredContent: result,
   };
@@ -64,9 +109,24 @@ export async function runListQuazarProjectsTool(args, { listProjects }) {
   };
 }
 
+export async function runResolveQuazarProjectTool(args, { resolveProject }) {
+  const result = await resolveProject(args);
+  return {
+    content: [{
+      type: 'text',
+      text: result.status === 'FOUND'
+        ? `Resolved Quazar project ${result.project.title} (${result.project.projectId}) in ${result.boardType}.`
+        : result.status === 'AMBIGUOUS'
+          ? `Multiple Quazar projects matched "${result.projectName}" in ${result.boardType}.`
+          : `No Quazar project matched "${result.projectName}" in ${result.boardType}.`,
+    }],
+    structuredContent: result,
+  };
+}
+
 export async function runSearchQuazarItemsTool(args, { searchItems }) {
   const result = await searchItems(args);
-  const itemLines = result.items.map((item) => `- ${item.title} [${item.status || 'none'}] (${item.projectTitle})`);
+  const itemLines = result.items.map((item) => `- ${item.title} [${item.itemStatus || 'none'}] (${item.projectTitle})`);
 
   return {
     content: [{
@@ -84,7 +144,7 @@ export async function runGetQuazarItemTool(args, { getItem }) {
   return {
     content: [{
       type: 'text',
-      text: `Quazar item ${result.itemId}: ${result.title} in ${result.projectTitle} (${result.boardType}, status: ${result.status || 'none'}).`,
+      text: `Quazar item ${result.itemId}: ${result.title} in ${result.projectTitle} (${result.boardType}, status: ${result.itemStatus || 'none'}).`,
     }],
     structuredContent: result,
   };
@@ -95,7 +155,7 @@ export async function runUpdateQuazarItemTool(args, { updateItem }) {
   return {
     content: [{
       type: 'text',
-      text: `Updated Quazar item ${result.itemId}: ${result.title} (${result.status || 'none'}) in ${result.projectTitle}.`,
+      text: `Updated Quazar item ${result.itemId}: ${result.title} (${result.itemStatus || 'none'}) in ${result.projectTitle}.`,
     }],
     structuredContent: result,
   };
@@ -164,6 +224,8 @@ export function buildSuggestedCheckoutCommands(branchName) {
 
 function mapGitHubIssueToolResult(result, repoSource) {
   return {
+    ok: result?.ok ?? true,
+    status: result?.status || 'CREATED',
     itemId: result?.issue?.item_id || null,
     repoFullName: result?.issue?.repo_full_name || null,
     repoSource,
@@ -178,6 +240,8 @@ function mapGitHubIssueToolResult(result, repoSource) {
 function mapGitHubBranchToolResult(result) {
   const branchName = result?.branchName || result?.branch?.branchName || null;
   return {
+    ok: result?.ok ?? true,
+    status: result?.status || (result?.created ? 'CREATED' : 'FOUND'),
     itemId: result?.itemId || null,
     repoFullName: result?.repoFullName || result?.issue?.repoFullName || null,
     issueNumber: result?.issueNumber || result?.issue?.issueNumber || null,
@@ -212,7 +276,9 @@ export async function runCreateQuazarItemGitHubIssueTool(args, { createGitHubIss
   return {
     content: [{
       type: 'text',
-      text: `Created GitHub issue ${structuredContent.issueNumber} for Quazar item ${structuredContent.itemId} in ${structuredContent.repoFullName} (${structuredContent.ticketKey}).`,
+      text: structuredContent.status === 'ALREADY_EXISTS'
+        ? `Reused existing GitHub issue ${structuredContent.issueNumber} for Quazar item ${structuredContent.itemId} in ${structuredContent.repoFullName}.`
+        : `Created GitHub issue ${structuredContent.issueNumber} for Quazar item ${structuredContent.itemId} in ${structuredContent.repoFullName} (${structuredContent.ticketKey}).`,
     }],
     structuredContent,
   };
@@ -225,7 +291,9 @@ export async function runCreateQuazarItemGitHubBranchTool(args, { createGitHubBr
   return {
     content: [{
       type: 'text',
-      text: `Prepared GitHub branch ${structuredContent.branchName || 'unknown'} for Quazar item ${structuredContent.itemId} in ${structuredContent.repoFullName}.`,
+      text: structuredContent.status === 'ALREADY_EXISTS'
+        ? `Reused GitHub branch ${structuredContent.branchName || 'unknown'} for Quazar item ${structuredContent.itemId} in ${structuredContent.repoFullName}.`
+        : `Prepared GitHub branch ${structuredContent.branchName || 'unknown'} for Quazar item ${structuredContent.itemId} in ${structuredContent.repoFullName}.`,
     }],
     structuredContent,
   };
@@ -247,11 +315,15 @@ export async function runGetQuazarItemGitHubBranchTool(args, { getGitHubBranch }
 }
 
 export function createQuazarMcpServer({
+  createSection,
+  resolveSection,
   createProject,
   getProject,
   updateProject,
   createItem,
+  listSections,
   listProjects,
+  resolveProject,
   searchItems,
   getItem,
   updateItem,
@@ -262,7 +334,7 @@ export function createQuazarMcpServer({
 }) {
   const server = new McpServer({
     name: 'quazar-item-mcp',
-    version: '1.6.0',
+    version: '1.7.0',
   });
 
   server.registerTool('create_quazar_item', {
@@ -276,6 +348,8 @@ export function createQuazarMcpServer({
       tags: z.array(z.string()).optional().describe('Optional tags'),
     },
     outputSchema: {
+      ok: z.boolean(),
+      status: z.string(),
       itemId: z.string(),
       projectId: z.string(),
       projectTitle: z.string(),
@@ -285,6 +359,72 @@ export function createQuazarMcpServer({
     },
   }, async (args) => runCreateQuazarItemTool(args, { createItem }));
 
+  server.registerTool('list_quazar_sections', {
+    title: 'List Quazar Sections',
+    description: 'List Quazar board sections, optionally filtered by query.',
+    inputSchema: {
+      boardType: z.enum(['main', '개발팀', 'AI팀', '지원팀']).describe('Quazar board type'),
+      query: z.string().optional().describe('Optional partial section title filter'),
+      limit: z.number().int().positive().max(100).optional().describe('Maximum number of sections to return'),
+    },
+    outputSchema: {
+      ok: z.boolean(),
+      status: z.string(),
+      boardType: z.string(),
+      count: z.number().int(),
+      sections: z.array(z.object({
+        id: z.string(),
+        title: z.string(),
+        boardType: z.string(),
+        orderIndex: z.number().int(),
+      })),
+    },
+  }, async (args) => runListQuazarSectionsTool(args, { listSections }));
+
+  server.registerTool('create_quazar_section', {
+    title: 'Create Quazar Section',
+    description: 'Create a Quazar section in a board.',
+    inputSchema: {
+      boardType: z.enum(['main', '개발팀', 'AI팀', '지원팀']).describe('Quazar board type'),
+      title: z.string().min(1).describe('Section title'),
+    },
+    outputSchema: {
+      ok: z.boolean(),
+      status: z.string(),
+      sectionId: z.string(),
+      title: z.string(),
+      boardType: z.string(),
+      orderIndex: z.number().int(),
+    },
+  }, async (args) => runCreateQuazarSectionTool(args, { createSection }));
+
+  server.registerTool('resolve_quazar_section', {
+    title: 'Resolve Quazar Section',
+    description: 'Resolve one Quazar section by exact normalized title match without creating anything.',
+    inputSchema: {
+      boardType: z.enum(['main', '개발팀', 'AI팀', '지원팀']).describe('Quazar board type'),
+      sectionName: z.string().min(1).describe('Exact section title to resolve after normalization'),
+    },
+    outputSchema: {
+      ok: z.boolean(),
+      status: z.enum(['FOUND', 'NOT_FOUND', 'AMBIGUOUS']),
+      boardType: z.string(),
+      sectionName: z.string(),
+      section: z.object({
+        sectionId: z.string(),
+        title: z.string(),
+        boardType: z.string(),
+        orderIndex: z.number().int().nullable(),
+      }).nullable(),
+      candidates: z.array(z.object({
+        sectionId: z.string(),
+        title: z.string(),
+        boardType: z.string(),
+        orderIndex: z.number().int().nullable(),
+      })),
+    },
+  }, async (args) => runResolveQuazarSectionTool(args, { resolveSection }));
+
   server.registerTool('create_quazar_project', {
     title: 'Create Quazar Project',
     description: 'Create a Quazar project column in a board.',
@@ -292,8 +432,11 @@ export function createQuazarMcpServer({
       boardType: z.enum(['main', '개발팀', 'AI팀', '지원팀']).describe('Quazar board type'),
       title: z.string().min(1).describe('Project title'),
       sectionId: z.string().optional().nullable().describe('Optional target section id'),
+      sectionName: z.string().optional().describe('Optional target section title resolved by exact normalized match'),
     },
     outputSchema: {
+      ok: z.boolean(),
+      status: z.string(),
       projectId: z.string(),
       title: z.string(),
       isCompleted: z.boolean(),
@@ -313,6 +456,8 @@ export function createQuazarMcpServer({
       limit: z.number().int().positive().max(100).optional().describe('Maximum number of projects to return'),
     },
     outputSchema: {
+      ok: z.boolean(),
+      status: z.string(),
       boardType: z.string(),
       count: z.number().int(),
       projects: z.array(z.object({
@@ -321,6 +466,35 @@ export function createQuazarMcpServer({
       })),
     },
   }, async (args) => runListQuazarProjectsTool(args, { listProjects }));
+
+  server.registerTool('resolve_quazar_project', {
+    title: 'Resolve Quazar Project',
+    description: 'Resolve one Quazar project by exact normalized title match without creating anything.',
+    inputSchema: {
+      boardType: z.enum(['main', '개발팀', 'AI팀', '지원팀']).describe('Quazar board type'),
+      projectName: z.string().min(1).describe('Exact project title to resolve after normalization'),
+    },
+    outputSchema: {
+      ok: z.boolean(),
+      status: z.enum(['FOUND', 'NOT_FOUND', 'AMBIGUOUS']),
+      boardType: z.string(),
+      projectName: z.string(),
+      project: z.object({
+        projectId: z.string(),
+        title: z.string(),
+        sectionId: z.string().nullable(),
+        isCompleted: z.boolean(),
+        boardType: z.string(),
+      }).nullable(),
+      candidates: z.array(z.object({
+        projectId: z.string(),
+        title: z.string(),
+        sectionId: z.string().nullable(),
+        isCompleted: z.boolean(),
+        boardType: z.string(),
+      })),
+    },
+  }, async (args) => runResolveQuazarProjectTool(args, { resolveProject }));
 
   server.registerTool('search_quazar_items', {
     title: 'Search Quazar Items',
@@ -335,13 +509,15 @@ export function createQuazarMcpServer({
       includeCompletedProjects: z.boolean().optional().describe('Whether completed projects should be included'),
     },
     outputSchema: {
+      ok: z.boolean(),
+      status: z.string(),
       boardType: z.string(),
       count: z.number().int(),
       items: z.array(z.object({
         itemId: z.string(),
         title: z.string(),
         description: z.string(),
-        status: z.string(),
+        itemStatus: z.string(),
         priority: z.string(),
         tags: z.array(z.string()),
         projectId: z.string().nullable(),
@@ -358,10 +534,12 @@ export function createQuazarMcpServer({
       itemId: z.string().min(1).describe('Quazar item id'),
     },
     outputSchema: {
+      ok: z.boolean(),
+      status: z.string(),
       itemId: z.string(),
       title: z.string(),
       description: z.string(),
-      status: z.string(),
+      itemStatus: z.string(),
       priority: z.string(),
       tags: z.array(z.string()),
       projectId: z.string().nullable(),
@@ -379,6 +557,8 @@ export function createQuazarMcpServer({
       projectId: z.string().min(1).describe('Quazar project id'),
     },
     outputSchema: {
+      ok: z.boolean(),
+      status: z.string(),
       projectId: z.string(),
       title: z.string(),
       isCompleted: z.boolean(),
@@ -401,10 +581,12 @@ export function createQuazarMcpServer({
       tags: z.array(z.string()).optional().describe('Optional replacement tags'),
     },
     outputSchema: {
+      ok: z.boolean(),
+      status: z.string(),
       itemId: z.string(),
       title: z.string(),
       description: z.string(),
-      status: z.string(),
+      itemStatus: z.string(),
       priority: z.string(),
       tags: z.array(z.string()),
       projectId: z.string().nullable(),
@@ -424,6 +606,8 @@ export function createQuazarMcpServer({
       isCompleted: z.boolean().optional().describe('Optional completion state'),
     },
     outputSchema: {
+      ok: z.boolean(),
+      status: z.string(),
       projectId: z.string(),
       title: z.string(),
       isCompleted: z.boolean(),
@@ -442,6 +626,8 @@ export function createQuazarMcpServer({
       repoFullName: z.string().optional().describe('Optional GitHub owner/repo. Falls back to the current workspace origin remote.'),
     },
     outputSchema: {
+      ok: z.boolean(),
+      status: z.string(),
       itemId: z.string().nullable(),
       repoFullName: z.string().nullable(),
       repoSource: z.enum(['explicit', 'workspace']),
@@ -468,6 +654,8 @@ export function createQuazarMcpServer({
       itemId: z.string().min(1).describe('Quazar item id'),
     },
     outputSchema: {
+      ok: z.boolean(),
+      status: z.string(),
       itemId: z.string().nullable(),
       repoFullName: z.string().nullable(),
       issueNumber: z.number().int().nullable(),
@@ -490,6 +678,8 @@ export function createQuazarMcpServer({
       itemId: z.string().min(1).describe('Quazar item id'),
     },
     outputSchema: {
+      ok: z.boolean(),
+      status: z.string(),
       itemId: z.string().nullable(),
       repoFullName: z.string().nullable(),
       issueNumber: z.number().int().nullable(),
@@ -512,11 +702,15 @@ export async function main() {
   const baseUrl = requireEnv('QUAZAR_API_BASE_URL');
   const token = requireEnv('MCP_SHARED_TOKEN');
   const server = createQuazarMcpServer({
+    createSection: (payload) => createQuazarSectionViaApi({ baseUrl, token }, payload),
+    resolveSection: (payload) => resolveQuazarSectionViaApi({ baseUrl, token }, payload),
     createProject: (payload) => createQuazarProjectViaApi({ baseUrl, token }, payload),
     getProject: (payload) => getQuazarProjectViaApi({ baseUrl, token }, payload),
     updateProject: (payload) => updateQuazarProjectViaApi({ baseUrl, token }, payload),
     createItem: (payload) => createQuazarItemViaApi({ baseUrl, token }, payload),
+    listSections: (payload) => listQuazarSectionsViaApi({ baseUrl, token }, payload),
     listProjects: (payload) => listQuazarProjectsViaApi({ baseUrl, token }, payload),
+    resolveProject: (payload) => resolveQuazarProjectViaApi({ baseUrl, token }, payload),
     searchItems: (payload) => searchQuazarItemsViaApi({ baseUrl, token }, payload),
     getItem: (payload) => getQuazarItemViaApi({ baseUrl, token }, payload),
     updateItem: (payload) => updateQuazarItemViaApi({ baseUrl, token }, payload),

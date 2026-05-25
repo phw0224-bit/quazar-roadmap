@@ -24,6 +24,7 @@ function requireAuthorizedRequest(expectedToken, req, res) {
   const token = getBearerToken(req.headers || {});
   if (!expectedToken || token !== expectedToken) {
     res.status(401).json({
+      ok: false,
       code: 'UNAUTHORIZED',
       message: 'Unauthorized MCP request.',
     });
@@ -36,6 +37,7 @@ function requireAuthorizedRequest(expectedToken, req, res) {
 function sendRouteError(res, error, fallbackMessage) {
   const status = Number.isInteger(error?.status) ? error.status : 500;
   const payload = {
+    ok: false,
     code: error?.code || 'INTERNAL_ERROR',
     message: error?.message || fallbackMessage,
   };
@@ -45,6 +47,67 @@ function sendRouteError(res, error, fallbackMessage) {
   }
 
   return res.status(status).json(payload);
+}
+
+function sendRouteSuccess(res, status, result) {
+  return res.status(200).json({
+    ok: true,
+    status,
+    ...(result || {}),
+  });
+}
+
+export function createMcpSectionsHandler({ expectedToken, listSections }) {
+  return async function handleMcpSections(req, res) {
+    if (!requireAuthorizedRequest(expectedToken, req, res)) return;
+
+    try {
+      const limitValue = Number(req.query?.limit);
+      const payload = {
+        boardType: typeof req.query?.boardType === 'string' ? req.query.boardType : '',
+        query: typeof req.query?.query === 'string' ? req.query.query : '',
+        limit: Number.isInteger(limitValue) ? limitValue : undefined,
+      };
+      const result = await listSections(payload);
+      return sendRouteSuccess(res, 'FOUND', result);
+    } catch (error) {
+      return sendRouteError(res, error, 'Failed to list Quazar sections.');
+    }
+  };
+}
+
+export function createMcpSectionResolveHandler({ expectedToken, resolveSection }) {
+  return async function handleMcpSectionResolve(req, res) {
+    if (!requireAuthorizedRequest(expectedToken, req, res)) return;
+
+    try {
+      const payload = {
+        boardType: typeof req.query?.boardType === 'string' ? req.query.boardType : '',
+        sectionName: typeof req.query?.sectionName === 'string' ? req.query.sectionName : '',
+      };
+      const result = await resolveSection(payload);
+      return sendRouteSuccess(res, 'FOUND', result);
+    } catch (error) {
+      return sendRouteError(res, error, 'Failed to resolve Quazar section.');
+    }
+  };
+}
+
+export function createMcpSectionCreateHandler({ expectedToken, createSection }) {
+  return async function handleMcpSectionCreate(req, res) {
+    if (!requireAuthorizedRequest(expectedToken, req, res)) return;
+
+    try {
+      const payload = {
+        boardType: typeof req.body?.boardType === 'string' ? req.body.boardType : '',
+        title: typeof req.body?.title === 'string' ? req.body.title : '',
+      };
+      const result = await createSection(payload);
+      return sendRouteSuccess(res, 'CREATED', result);
+    } catch (error) {
+      return sendRouteError(res, error, 'Failed to create Quazar section.');
+    }
+  };
 }
 
 export function createMcpItemsHandler({ expectedToken, createItem }) {
@@ -58,7 +121,7 @@ export function createMcpItemsHandler({ expectedToken, createItem }) {
         tags: Array.isArray(req.body?.tags) ? req.body.tags : [],
       };
       const result = await createItem(payload);
-      return res.status(200).json(result);
+      return sendRouteSuccess(res, 'CREATED', result);
     } catch (error) {
       return sendRouteError(res, error, 'Failed to create Quazar item.');
     }
@@ -77,9 +140,26 @@ export function createMcpProjectsHandler({ expectedToken, listProjects }) {
         limit: Number.isInteger(limitValue) ? limitValue : undefined,
       };
       const result = await listProjects(payload);
-      return res.status(200).json(result);
+      return sendRouteSuccess(res, 'FOUND', result);
     } catch (error) {
       return sendRouteError(res, error, 'Failed to list Quazar projects.');
+    }
+  };
+}
+
+export function createMcpProjectResolveHandler({ expectedToken, resolveProject }) {
+  return async function handleMcpProjectResolve(req, res) {
+    if (!requireAuthorizedRequest(expectedToken, req, res)) return;
+
+    try {
+      const payload = {
+        boardType: typeof req.query?.boardType === 'string' ? req.query.boardType : '',
+        projectName: typeof req.query?.projectName === 'string' ? req.query.projectName : '',
+      };
+      const result = await resolveProject(payload);
+      return sendRouteSuccess(res, 'FOUND', result);
+    } catch (error) {
+      return sendRouteError(res, error, 'Failed to resolve Quazar project.');
     }
   };
 }
@@ -97,10 +177,11 @@ export function createMcpProjectCreateHandler({ expectedToken, createProject }) 
           : typeof req.body?.sectionId === 'string'
             ? req.body.sectionId
             : undefined,
+        sectionName: typeof req.body?.sectionName === 'string' ? req.body.sectionName : '',
         tags: Array.isArray(req.body?.tags) ? req.body.tags : [],
       };
       const result = await createProject(payload);
-      return res.status(200).json(result);
+      return sendRouteSuccess(res, 'CREATED', result);
     } catch (error) {
       return sendRouteError(res, error, 'Failed to create Quazar project.');
     }
@@ -117,7 +198,7 @@ export function createMcpProjectDetailHandler({ expectedToken, getProject }) {
         projectId: typeof req.params?.projectId === 'string' ? req.params.projectId : '',
       };
       const result = await getProject(payload);
-      return res.status(200).json(result);
+      return sendRouteSuccess(res, 'FOUND', result);
     } catch (error) {
       return sendRouteError(res, error, 'Failed to get Quazar project.');
     }
@@ -145,7 +226,7 @@ export function createMcpProjectUpdateHandler({ expectedToken, updateProject }) 
       }
 
       const result = await updateProject(payload);
-      return res.status(200).json(result);
+      return sendRouteSuccess(res, 'UPDATED', result);
     } catch (error) {
       return sendRouteError(res, error, 'Failed to update Quazar project.');
     }
@@ -187,7 +268,7 @@ export function createMcpItemSearchHandler({ expectedToken, searchItems }) {
             : undefined,
       };
       const result = await searchItems(payload);
-      return res.status(200).json(result);
+      return sendRouteSuccess(res, 'FOUND', result);
     } catch (error) {
       return sendRouteError(res, error, 'Failed to search Quazar items.');
     }
@@ -204,7 +285,7 @@ export function createMcpItemDetailHandler({ expectedToken, getItem }) {
         itemId: typeof req.params?.itemId === 'string' ? req.params.itemId : '',
       };
       const result = await getItem(payload);
-      return res.status(200).json(result);
+      return sendRouteSuccess(res, 'FOUND', result);
     } catch (error) {
       return sendRouteError(res, error, 'Failed to get Quazar item.');
     }
@@ -228,7 +309,7 @@ export function createMcpItemUpdateHandler({ expectedToken, updateItem }) {
       }
 
       const result = await updateItem(payload);
-      return res.status(200).json(result);
+      return sendRouteSuccess(res, 'UPDATED', result);
     } catch (error) {
       return sendRouteError(res, error, 'Failed to update Quazar item.');
     }
@@ -237,9 +318,29 @@ export function createMcpItemUpdateHandler({ expectedToken, updateItem }) {
 
 export const mcpRouter = Router();
 
+mcpRouter.get('/api/mcp/sections', createMcpSectionsHandler({
+  expectedToken: MCP_SHARED_TOKEN,
+  listSections: (payload) => getSharedService().listSections(payload),
+}));
+
+mcpRouter.get('/api/mcp/sections/resolve', createMcpSectionResolveHandler({
+  expectedToken: MCP_SHARED_TOKEN,
+  resolveSection: (payload) => getSharedService().resolveSection(payload),
+}));
+
+mcpRouter.post('/api/mcp/sections', createMcpSectionCreateHandler({
+  expectedToken: MCP_SHARED_TOKEN,
+  createSection: (payload) => getSharedService().createSection(payload),
+}));
+
 mcpRouter.get('/api/mcp/projects', createMcpProjectsHandler({
   expectedToken: MCP_SHARED_TOKEN,
   listProjects: (payload) => getSharedService().listProjects(payload),
+}));
+
+mcpRouter.get('/api/mcp/projects/resolve', createMcpProjectResolveHandler({
+  expectedToken: MCP_SHARED_TOKEN,
+  resolveProject: (payload) => getSharedService().resolveProject(payload),
 }));
 
 mcpRouter.post('/api/mcp/projects', createMcpProjectCreateHandler({

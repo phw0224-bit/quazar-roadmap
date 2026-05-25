@@ -2,8 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  createMcpSectionCreateHandler,
+  createMcpSectionResolveHandler,
+  createMcpSectionsHandler,
   createMcpProjectCreateHandler,
   createMcpProjectDetailHandler,
+  createMcpProjectResolveHandler,
   createMcpProjectUpdateHandler,
   createMcpItemDetailHandler,
   createMcpItemSearchHandler,
@@ -44,6 +48,7 @@ test('createMcpItemsHandler rejects requests with an invalid bearer token', asyn
 
   assert.equal(res.statusCode, 401);
   assert.deepEqual(res.body, {
+    ok: false,
     code: 'UNAUTHORIZED',
     message: 'Unauthorized MCP request.',
   });
@@ -89,6 +94,8 @@ test('createMcpItemsHandler returns item payload from the domain service', async
 
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body, {
+    ok: true,
+    status: 'CREATED',
     itemId: 'item-1',
     projectId: 'project-a',
     projectTitle: '온보딩 개선',
@@ -125,6 +132,7 @@ test('createMcpItemsHandler maps domain errors to JSON responses', async () => {
 
   assert.equal(res.statusCode, 409);
   assert.deepEqual(res.body, {
+    ok: false,
     code: 'PROJECT_AMBIGUOUS',
     message: 'Project match is ambiguous.',
     candidates: [{ id: 'project-a', title: '온보딩 개선' }],
@@ -159,9 +167,133 @@ test('createMcpProjectsHandler returns filtered project lookup results', async (
 
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body, {
+    ok: true,
+    status: 'FOUND',
     boardType: '개발팀',
     count: 1,
     projects: [{ id: 'project-a', title: '온보딩 개선' }],
+  });
+});
+
+test('createMcpSectionsHandler returns filtered section lookup results', async () => {
+  const res = createMockResponse();
+  const handler = createMcpSectionsHandler({
+    expectedToken: 'shared-secret',
+    listSections: async ({ boardType, query, limit }) => {
+      assert.deepEqual(
+        { boardType, query, limit },
+        { boardType: '개발팀', query: 'DPP', limit: 10 }
+      );
+
+      return {
+        boardType,
+        count: 1,
+        sections: [{ id: 'section-a', title: 'DPP', boardType, orderIndex: 0 }],
+      };
+    },
+  });
+
+  await handler(
+    {
+      headers: { authorization: 'Bearer shared-secret' },
+      query: { boardType: '개발팀', query: 'DPP', limit: '10' },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, {
+    ok: true,
+    status: 'FOUND',
+    boardType: '개발팀',
+    count: 1,
+    sections: [{ id: 'section-a', title: 'DPP', boardType: '개발팀', orderIndex: 0 }],
+  });
+});
+
+test('createMcpSectionResolveHandler returns AMBIGUOUS as a successful resolve response', async () => {
+  const res = createMockResponse();
+  const handler = createMcpSectionResolveHandler({
+    expectedToken: 'shared-secret',
+    resolveSection: async (payload) => {
+      assert.deepEqual(payload, {
+        boardType: '개발팀',
+        sectionName: 'DPP',
+      });
+
+      return {
+        boardType: '개발팀',
+        status: 'AMBIGUOUS',
+        sectionName: 'DPP',
+        section: null,
+        candidates: [
+          { sectionId: 'section-a', title: 'DPP', boardType: '개발팀', orderIndex: 0 },
+          { sectionId: 'section-b', title: 'DPP', boardType: '개발팀', orderIndex: 1 },
+        ],
+      };
+    },
+  });
+
+  await handler(
+    {
+      headers: { authorization: 'Bearer shared-secret' },
+      query: { boardType: '개발팀', sectionName: 'DPP' },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, {
+    ok: true,
+    status: 'AMBIGUOUS',
+    boardType: '개발팀',
+    sectionName: 'DPP',
+    section: null,
+    candidates: [
+      { sectionId: 'section-a', title: 'DPP', boardType: '개발팀', orderIndex: 0 },
+      { sectionId: 'section-b', title: 'DPP', boardType: '개발팀', orderIndex: 1 },
+    ],
+  });
+});
+
+test('createMcpSectionCreateHandler returns created section detail', async () => {
+  const res = createMockResponse();
+  const handler = createMcpSectionCreateHandler({
+    expectedToken: 'shared-secret',
+    createSection: async (payload) => {
+      assert.deepEqual(payload, {
+        boardType: '개발팀',
+        title: 'DPP',
+      });
+
+      return {
+        sectionId: 'section-a',
+        title: 'DPP',
+        boardType: '개발팀',
+        orderIndex: 0,
+      };
+    },
+  });
+
+  await handler(
+    {
+      headers: { authorization: 'Bearer shared-secret' },
+      body: {
+        boardType: '개발팀',
+        title: 'DPP',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, {
+    ok: true,
+    status: 'CREATED',
+    sectionId: 'section-a',
+    title: 'DPP',
+    boardType: '개발팀',
+    orderIndex: 0,
   });
 });
 
@@ -206,6 +338,8 @@ test('createMcpItemSearchHandler parses query filters and returns summaries', as
 
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body, {
+    ok: true,
+    status: 'FOUND',
     boardType: '개발팀',
     count: 1,
     items: [{ itemId: 'item-1', title: '온보딩 문서 정리' }],
@@ -241,6 +375,8 @@ test('createMcpItemDetailHandler returns normalized item detail', async () => {
 
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body, {
+    ok: true,
+    status: 'FOUND',
     itemId: 'item-1',
     title: '요약 개선',
     description: '상세',
@@ -281,6 +417,7 @@ test('createMcpItemUpdateHandler normalizes patch body and maps errors', async (
 
   assert.equal(res.statusCode, 404);
   assert.deepEqual(res.body, {
+    ok: false,
     code: 'ITEM_NOT_FOUND',
     message: 'Item was not found.',
   });
@@ -295,6 +432,7 @@ test('createMcpProjectCreateHandler returns created project detail', async () =>
         boardType: '개발팀',
         title: '신규 온보딩 프로젝트',
         sectionId: 'section-a',
+        sectionName: 'DPP',
         tags: ['docs'],
       });
 
@@ -312,6 +450,7 @@ test('createMcpProjectCreateHandler returns created project detail', async () =>
         boardType: '개발팀',
         title: '신규 온보딩 프로젝트',
         sectionId: 'section-a',
+        sectionName: 'DPP',
         tags: ['docs'],
       },
     },
@@ -320,8 +459,73 @@ test('createMcpProjectCreateHandler returns created project detail', async () =>
 
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body, {
+    ok: true,
+    status: 'CREATED',
     projectId: 'project-a',
     title: '신규 온보딩 프로젝트',
+  });
+});
+
+test('createMcpProjectResolveHandler returns FOUND project detail as a successful resolve response', async () => {
+  const res = createMockResponse();
+  const handler = createMcpProjectResolveHandler({
+    expectedToken: 'shared-secret',
+    resolveProject: async (payload) => {
+      assert.deepEqual(payload, {
+        boardType: '개발팀',
+        projectName: '박형우',
+      });
+
+      return {
+        boardType: '개발팀',
+        status: 'FOUND',
+        projectName: '박형우',
+        project: {
+          projectId: 'project-phw',
+          title: '박형우',
+          sectionId: 'section-dpp',
+          isCompleted: false,
+          boardType: '개발팀',
+        },
+        candidates: [{
+          projectId: 'project-phw',
+          title: '박형우',
+          sectionId: 'section-dpp',
+          isCompleted: false,
+          boardType: '개발팀',
+        }],
+      };
+    },
+  });
+
+  await handler(
+    {
+      headers: { authorization: 'Bearer shared-secret' },
+      query: { boardType: '개발팀', projectName: '박형우' },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, {
+    ok: true,
+    status: 'FOUND',
+    boardType: '개발팀',
+    projectName: '박형우',
+    project: {
+      projectId: 'project-phw',
+      title: '박형우',
+      sectionId: 'section-dpp',
+      isCompleted: false,
+      boardType: '개발팀',
+    },
+    candidates: [{
+      projectId: 'project-phw',
+      title: '박형우',
+      sectionId: 'section-dpp',
+      isCompleted: false,
+      boardType: '개발팀',
+    }],
   });
 });
 
@@ -353,6 +557,8 @@ test('createMcpProjectDetailHandler returns normalized project detail', async ()
 
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body, {
+    ok: true,
+    status: 'FOUND',
     projectId: 'project-a',
     title: 'LLM 개선',
   });
@@ -392,6 +598,7 @@ test('createMcpProjectUpdateHandler normalizes patch body and maps errors', asyn
 
   assert.equal(res.statusCode, 404);
   assert.deepEqual(res.body, {
+    ok: false,
     code: 'PROJECT_NOT_FOUND',
     message: 'Project was not found.',
   });

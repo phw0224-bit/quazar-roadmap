@@ -2,20 +2,32 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  createQuazarSection,
+  createQuazarSectionLookup,
+  resolveQuazarSection,
   createQuazarItem,
   createQuazarItemSearch,
   createQuazarItemUpdate,
   createQuazarProject,
   createQuazarProjectUpdate,
   createQuazarProjectLookup,
+  resolveQuazarProject,
+  filterSectionsByQuery,
+  findMatchingSections,
   findMatchingProjects,
   filterProjectsByQuery,
   formatQuazarItemDetail,
   formatQuazarProjectDetail,
+  formatQuazarSectionDetail,
   normalizeProjectName,
+  normalizeSectionName,
+  validateCreateQuazarSectionInput,
+  validateResolveQuazarSectionInput,
+  validateListQuazarSectionsInput,
   validateCreateQuazarItemInput,
   validateCreateQuazarProjectInput,
   validateGetQuazarProjectInput,
+  validateResolveQuazarProjectInput,
   validateGetQuazarItemInput,
   validateSearchQuazarItemsInput,
   validateUpdateQuazarItemInput,
@@ -85,6 +97,162 @@ test('filterProjectsByQuery returns normalized partial title matches', () => {
       { id: 'project-b', title: '온보딩 문서 정리' },
     ]
   );
+});
+
+test('normalizeSectionName collapses whitespace and lowercases values', () => {
+  assert.equal(normalizeSectionName('  DPP   Backend  '), 'dpp backend');
+});
+
+test('validateListQuazarSectionsInput applies defaults for lookup', () => {
+  assert.deepEqual(
+    validateListQuazarSectionsInput({
+      boardType: '개발팀',
+      query: ' DPP ',
+    }),
+    {
+      boardType: '개발팀',
+      query: 'DPP',
+      limit: 20,
+    }
+  );
+});
+
+test('validateCreateQuazarSectionInput trims boardType and title', () => {
+  assert.deepEqual(
+    validateCreateQuazarSectionInput({
+      boardType: ' 개발팀 ',
+      title: ' DPP ',
+    }),
+    {
+      boardType: '개발팀',
+      title: 'DPP',
+    }
+  );
+});
+
+test('validateResolveQuazarSectionInput trims boardType and sectionName', () => {
+  assert.deepEqual(
+    validateResolveQuazarSectionInput({
+      boardType: ' 개발팀 ',
+      sectionName: ' DPP ',
+    }),
+    {
+      boardType: '개발팀',
+      sectionName: 'DPP',
+    }
+  );
+});
+
+test('findMatchingSections returns exact normalized title matches', () => {
+  const sections = [
+    { id: 'section-a', title: 'DPP' },
+    { id: 'section-b', title: ' DPP ' },
+    { id: 'section-c', title: '플랫폼' },
+  ];
+
+  assert.deepEqual(
+    findMatchingSections(sections, ' dpp '),
+    [
+      { id: 'section-a', title: 'DPP' },
+      { id: 'section-b', title: ' DPP ' },
+    ]
+  );
+});
+
+test('filterSectionsByQuery returns normalized partial title matches', () => {
+  const sections = [
+    { id: 'section-a', title: 'DPP' },
+    { id: 'section-b', title: 'DPP Backend' },
+    { id: 'section-c', title: '플랫폼' },
+  ];
+
+  assert.deepEqual(
+    filterSectionsByQuery(sections, ' dpp '),
+    [
+      { id: 'section-a', title: 'DPP' },
+      { id: 'section-b', title: 'DPP Backend' },
+    ]
+  );
+});
+
+test('createQuazarSectionLookup filters by query and limit', async () => {
+  const lookup = createQuazarSectionLookup({
+    listSections: async ({ boardType }) => {
+      assert.equal(boardType, '개발팀');
+      return [
+        { id: 'section-a', title: 'DPP', board_type: '개발팀', order_index: 0 },
+        { id: 'section-b', title: 'DPP Backend', board_type: '개발팀', order_index: 1 },
+        { id: 'section-c', title: '플랫폼', board_type: '개발팀', order_index: 2 },
+      ];
+    },
+  });
+
+  const result = await lookup({
+    boardType: '개발팀',
+    query: 'DPP',
+    limit: 1,
+  });
+
+  assert.deepEqual(result, {
+    boardType: '개발팀',
+    count: 1,
+    sections: [
+      { id: 'section-a', title: 'DPP', boardType: '개발팀', orderIndex: 0 },
+    ],
+  });
+});
+
+test('createQuazarSection returns normalized created section detail', async () => {
+  const result = await createQuazarSection({
+    payload: {
+      boardType: '개발팀',
+      title: 'DPP',
+    },
+    insertSection: async (payload) => {
+      assert.deepEqual(payload, {
+        boardType: '개발팀',
+        title: 'DPP',
+      });
+
+      return {
+        id: 'section-a',
+        title: 'DPP',
+        board_type: '개발팀',
+        order_index: 2,
+      };
+    },
+  });
+
+  assert.deepEqual(result, {
+    sectionId: 'section-a',
+    title: 'DPP',
+    boardType: '개발팀',
+    orderIndex: 2,
+  });
+});
+
+test('resolveQuazarSection returns AMBIGUOUS without throwing', async () => {
+  const result = await resolveQuazarSection({
+    payload: {
+      boardType: '개발팀',
+      sectionName: 'DPP',
+    },
+    listSections: async () => [
+      { id: 'section-a', title: 'DPP', board_type: '개발팀', order_index: 0 },
+      { id: 'section-b', title: ' DPP ', board_type: '개발팀', order_index: 1 },
+    ],
+  });
+
+  assert.deepEqual(result, {
+    boardType: '개발팀',
+    status: 'AMBIGUOUS',
+    sectionName: 'DPP',
+    section: null,
+    candidates: [
+      { sectionId: 'section-a', title: 'DPP', boardType: '개발팀', orderIndex: 0 },
+      { sectionId: 'section-b', title: ' DPP ', boardType: '개발팀', orderIndex: 1 },
+    ],
+  });
 });
 
 test('createQuazarProjectLookup filters by query and limit', async () => {
@@ -267,7 +435,7 @@ test('createQuazarItemSearch returns project-scoped summaries', async () => {
       itemId: 'item-1',
       title: '온보딩 문서 정리',
       description: '설명',
-      status: 'todo',
+      itemStatus: 'todo',
       priority: 'high',
       tags: ['docs'],
       projectId: 'project-a',
@@ -327,7 +495,7 @@ test('formatQuazarItemDetail normalizes item shape', () => {
       itemId: 'item-1',
       title: '온보딩 문서 정리',
       description: '',
-      status: 'todo',
+      itemStatus: 'todo',
       priority: '',
       tags: [],
       projectId: 'project-a',
@@ -412,7 +580,7 @@ test('createQuazarItemUpdate returns normalized updated item detail', async () =
     itemId: 'item-7',
     title: '응대 문구 정리',
     description: '최신 설명',
-    status: 'done',
+    itemStatus: 'done',
     priority: 'medium',
     tags: [],
     projectId: 'project-z',
@@ -433,6 +601,24 @@ test('validateCreateQuazarProjectInput applies defaults for optional fields', ()
       boardType: '개발팀',
       title: '신규 온보딩 프로젝트',
       sectionId: null,
+      sectionName: '',
+      tags: [],
+    }
+  );
+});
+
+test('validateCreateQuazarProjectInput preserves optional sectionName', () => {
+  assert.deepEqual(
+    validateCreateQuazarProjectInput({
+      boardType: '개발팀',
+      title: '신규 온보딩 프로젝트',
+      sectionName: ' DPP ',
+    }),
+    {
+      boardType: '개발팀',
+      title: '신규 온보딩 프로젝트',
+      sectionId: null,
+      sectionName: 'DPP',
       tags: [],
     }
   );
@@ -480,6 +666,81 @@ test('createQuazarProject returns normalized created project detail', async () =
   });
 });
 
+test('createQuazarProject resolves sectionName before insert', async () => {
+  const result = await createQuazarProject({
+    payload: {
+      boardType: '개발팀',
+      title: 'Pinata 작업',
+      sectionName: 'DPP',
+    },
+    listSections: async ({ boardType }) => {
+      assert.equal(boardType, '개발팀');
+      return [
+        { id: 'section-dpp', title: 'DPP' },
+      ];
+    },
+    insertProject: async (payload) => {
+      assert.deepEqual(payload, {
+        boardType: '개발팀',
+        title: 'Pinata 작업',
+        sectionId: 'section-dpp',
+        tags: [],
+      });
+
+      return {
+        id: 'project-dpp',
+        title: 'Pinata 작업',
+        tags: [],
+        is_completed: false,
+        section_id: 'section-dpp',
+        order_index: 0,
+        created_at: '2026-05-22T00:00:00.000Z',
+      };
+    },
+  });
+
+  assert.equal(result.sectionId, 'section-dpp');
+});
+
+test('createQuazarProject returns SECTION_NOT_FOUND when sectionName does not match', async () => {
+  await assert.rejects(
+    createQuazarProject({
+      payload: {
+        boardType: '개발팀',
+        title: 'Pinata 작업',
+        sectionName: 'DPP',
+      },
+      listSections: async () => [{ id: 'section-a', title: '플랫폼' }],
+      insertProject: async () => {
+        throw new Error('should not insert');
+      },
+    }),
+    (error) => error?.code === 'SECTION_NOT_FOUND'
+  );
+});
+
+test('createQuazarProject returns SECTION_AMBIGUOUS when sectionName matches multiple sections', async () => {
+  await assert.rejects(
+    createQuazarProject({
+      payload: {
+        boardType: '개발팀',
+        title: 'Pinata 작업',
+        sectionName: 'DPP',
+      },
+      listSections: async () => [
+        { id: 'section-a', title: 'DPP' },
+        { id: 'section-b', title: ' DPP ' },
+      ],
+      insertProject: async () => {
+        throw new Error('should not insert');
+      },
+    }),
+    (error) => error?.code === 'SECTION_AMBIGUOUS'
+      && Array.isArray(error.candidates)
+      && error.candidates.length === 2
+  );
+});
+
 test('validateGetQuazarProjectInput trims board type and project id', () => {
   assert.deepEqual(
     validateGetQuazarProjectInput({
@@ -489,6 +750,19 @@ test('validateGetQuazarProjectInput trims board type and project id', () => {
     {
       boardType: 'AI팀',
       projectId: 'project-a',
+    }
+  );
+});
+
+test('validateResolveQuazarProjectInput trims boardType and projectName', () => {
+  assert.deepEqual(
+    validateResolveQuazarProjectInput({
+      boardType: ' 개발팀 ',
+      projectName: ' 박형우 ',
+    }),
+    {
+      boardType: '개발팀',
+      projectName: '박형우',
     }
   );
 });
@@ -515,6 +789,55 @@ test('formatQuazarProjectDetail normalizes project shape', () => {
       orderIndex: 1,
       createdAt: '2026-05-20T00:00:00.000Z',
       updatedAt: '2026-05-21T00:00:00.000Z',
+    }
+  );
+});
+
+test('resolveQuazarProject returns FOUND project detail without throwing', async () => {
+  const result = await resolveQuazarProject({
+    payload: {
+      boardType: '개발팀',
+      projectName: '박형우',
+    },
+    listProjects: async () => [
+      { id: 'project-phw', title: '박형우', section_id: 'section-dpp', is_completed: false, board_type: '개발팀' },
+    ],
+  });
+
+  assert.deepEqual(result, {
+    boardType: '개발팀',
+    status: 'FOUND',
+    projectName: '박형우',
+    project: {
+      projectId: 'project-phw',
+      title: '박형우',
+      sectionId: 'section-dpp',
+      isCompleted: false,
+      boardType: '개발팀',
+    },
+    candidates: [{
+      projectId: 'project-phw',
+      title: '박형우',
+      sectionId: 'section-dpp',
+      isCompleted: false,
+      boardType: '개발팀',
+    }],
+  });
+});
+
+test('formatQuazarSectionDetail normalizes section shape', () => {
+  assert.deepEqual(
+    formatQuazarSectionDetail({
+      id: 'section-a',
+      title: 'DPP',
+      board_type: '개발팀',
+      order_index: 3,
+    }),
+    {
+      sectionId: 'section-a',
+      title: 'DPP',
+      boardType: '개발팀',
+      orderIndex: 3,
     }
   );
 });

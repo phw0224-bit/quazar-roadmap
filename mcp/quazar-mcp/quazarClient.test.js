@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  createQuazarSectionViaApi,
   createQuazarProjectViaApi,
   createQuazarItemViaApi,
   createQuazarItemGitHubBranchViaApi,
@@ -9,7 +10,10 @@ import {
   getQuazarProjectViaApi,
   getQuazarItemViaApi,
   getQuazarItemGitHubBranchViaApi,
+  listQuazarSectionsViaApi,
   listQuazarProjectsViaApi,
+  resolveQuazarSectionViaApi,
+  resolveQuazarProjectViaApi,
   searchQuazarItemsViaApi,
   updateQuazarProjectViaApi,
   updateQuazarItemViaApi,
@@ -23,6 +27,8 @@ test('createQuazarItemViaApi posts normalized payload with default tags and cont
     fetchImpl: async (url, init) => {
       calls.push({ url, init });
       return new Response(JSON.stringify({
+        ok: true,
+        status: 'CREATED',
         itemId: 'item-1',
         projectId: 'project-a',
         projectTitle: '온보딩 개선',
@@ -41,6 +47,8 @@ test('createQuazarItemViaApi posts normalized payload with default tags and cont
   });
 
   assert.deepEqual(result, {
+    ok: true,
+    status: 'CREATED',
     itemId: 'item-1',
     projectId: 'project-a',
     projectTitle: '온보딩 개선',
@@ -68,6 +76,7 @@ test('createQuazarItemViaApi throws JSON API errors with the server code', async
       baseUrl: 'http://localhost:3001',
       token: 'shared-secret',
       fetchImpl: async () => new Response(JSON.stringify({
+        ok: false,
         code: 'PROJECT_NOT_FOUND',
         message: 'Project was not found.',
       }), {
@@ -84,6 +93,109 @@ test('createQuazarItemViaApi throws JSON API errors with the server code', async
   );
 });
 
+test('listQuazarSectionsViaApi sends boardType, query, and limit params', async () => {
+  const calls = [];
+  const result = await listQuazarSectionsViaApi({
+    baseUrl: 'http://localhost:3001',
+    token: 'shared-secret',
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      return new Response(JSON.stringify({
+        ok: true,
+        status: 'FOUND',
+        boardType: '개발팀',
+        count: 1,
+        sections: [{ id: 'section-a', title: 'DPP', boardType: '개발팀', orderIndex: 0 }],
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+  }, {
+    boardType: '개발팀',
+    query: 'DP',
+    limit: 10,
+  });
+
+  assert.deepEqual(result, {
+    ok: true,
+    status: 'FOUND',
+    boardType: '개발팀',
+    count: 1,
+    sections: [{ id: 'section-a', title: 'DPP', boardType: '개발팀', orderIndex: 0 }],
+  });
+  assert.equal(calls[0].url, 'http://localhost:3001/api/mcp/sections?boardType=%EA%B0%9C%EB%B0%9C%ED%8C%80&query=DP&limit=10');
+  assert.equal(calls[0].init.method, 'GET');
+});
+
+test('createQuazarSectionViaApi posts normalized section payload', async () => {
+  const calls = [];
+  const result = await createQuazarSectionViaApi({
+    baseUrl: 'http://localhost:3001',
+    token: 'shared-secret',
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      return new Response(JSON.stringify({
+        ok: true,
+        status: 'CREATED',
+        sectionId: 'section-a',
+        title: 'DPP',
+        boardType: '개발팀',
+        orderIndex: 0,
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+  }, {
+    boardType: '개발팀',
+    title: 'DPP',
+  });
+
+  assert.deepEqual(result, {
+    ok: true,
+    status: 'CREATED',
+    sectionId: 'section-a',
+    title: 'DPP',
+    boardType: '개발팀',
+    orderIndex: 0,
+  });
+  assert.deepEqual(JSON.parse(calls[0].init.body), {
+    boardType: '개발팀',
+    title: 'DPP',
+  });
+});
+
+test('resolveQuazarSectionViaApi requests exact section resolution params', async () => {
+  const calls = [];
+  const result = await resolveQuazarSectionViaApi({
+    baseUrl: 'http://localhost:3001',
+    token: 'shared-secret',
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      return new Response(JSON.stringify({
+        ok: true,
+        status: 'FOUND',
+        boardType: '개발팀',
+        sectionName: 'DPP',
+        section: { sectionId: 'section-a', title: 'DPP', boardType: '개발팀', orderIndex: 0 },
+        candidates: [{ sectionId: 'section-a', title: 'DPP', boardType: '개발팀', orderIndex: 0 }],
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+  }, {
+    boardType: '개발팀',
+    sectionName: 'DPP',
+  });
+
+  assert.equal(calls[0].url, 'http://localhost:3001/api/mcp/sections/resolve?boardType=%EA%B0%9C%EB%B0%9C%ED%8C%80&sectionName=DPP');
+  assert.equal(calls[0].init.method, 'GET');
+  assert.equal(result.status, 'FOUND');
+  assert.equal(result.section.sectionId, 'section-a');
+});
+
 test('listQuazarProjectsViaApi sends boardType, query, and limit params', async () => {
   const calls = [];
   const result = await listQuazarProjectsViaApi({
@@ -92,6 +204,8 @@ test('listQuazarProjectsViaApi sends boardType, query, and limit params', async 
     fetchImpl: async (url, init) => {
       calls.push({ url, init });
       return new Response(JSON.stringify({
+        ok: true,
+        status: 'FOUND',
         boardType: '개발팀',
         count: 1,
         projects: [{ id: 'project-a', title: '온보딩 개선' }],
@@ -107,6 +221,8 @@ test('listQuazarProjectsViaApi sends boardType, query, and limit params', async 
   });
 
   assert.deepEqual(result, {
+    ok: true,
+    status: 'FOUND',
     boardType: '개발팀',
     count: 1,
     projects: [{ id: 'project-a', title: '온보딩 개선' }],
@@ -118,6 +234,38 @@ test('listQuazarProjectsViaApi sends boardType, query, and limit params', async 
   assert.equal(calls[0].init.headers.Authorization, 'Bearer shared-secret');
 });
 
+test('resolveQuazarProjectViaApi requests exact project resolution params', async () => {
+  const calls = [];
+  const result = await resolveQuazarProjectViaApi({
+    baseUrl: 'http://localhost:3001',
+    token: 'shared-secret',
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      return new Response(JSON.stringify({
+        ok: true,
+        status: 'AMBIGUOUS',
+        boardType: '개발팀',
+        projectName: '박형우',
+        project: null,
+        candidates: [
+          { projectId: 'project-a', title: '박형우', sectionId: 'section-dpp', isCompleted: false, boardType: '개발팀' },
+        ],
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+  }, {
+    boardType: '개발팀',
+    projectName: '박형우',
+  });
+
+  assert.equal(calls[0].url, 'http://localhost:3001/api/mcp/projects/resolve?boardType=%EA%B0%9C%EB%B0%9C%ED%8C%80&projectName=%EB%B0%95%ED%98%95%EC%9A%B0');
+  assert.equal(calls[0].init.method, 'GET');
+  assert.equal(result.status, 'AMBIGUOUS');
+  assert.equal(result.candidates.length, 1);
+});
+
 test('searchQuazarItemsViaApi sends supported filters as query params', async () => {
   const calls = [];
   const result = await searchQuazarItemsViaApi({
@@ -126,6 +274,8 @@ test('searchQuazarItemsViaApi sends supported filters as query params', async ()
     fetchImpl: async (url, init) => {
       calls.push({ url, init });
       return new Response(JSON.stringify({
+        ok: true,
+        status: 'FOUND',
         boardType: '개발팀',
         count: 1,
         items: [{ itemId: 'item-1', title: '온보딩 문서 정리' }],
@@ -145,6 +295,8 @@ test('searchQuazarItemsViaApi sends supported filters as query params', async ()
   });
 
   assert.deepEqual(result, {
+    ok: true,
+    status: 'FOUND',
     boardType: '개발팀',
     count: 1,
     items: [{ itemId: 'item-1', title: '온보딩 문서 정리' }],
@@ -164,6 +316,8 @@ test('getQuazarItemViaApi requests item detail by board and id', async () => {
     fetchImpl: async (url, init) => {
       calls.push({ url, init });
       return new Response(JSON.stringify({
+        ok: true,
+        status: 'FOUND',
         itemId: 'item-1',
         title: '요약 개선',
       }), {
@@ -177,6 +331,8 @@ test('getQuazarItemViaApi requests item detail by board and id', async () => {
   });
 
   assert.deepEqual(result, {
+    ok: true,
+    status: 'FOUND',
     itemId: 'item-1',
     title: '요약 개선',
   });
@@ -193,6 +349,7 @@ test('updateQuazarItemViaApi patches safe-core fields and forwards API errors', 
       fetchImpl: async (url, init) => {
         calls.push({ url, init });
         return new Response(JSON.stringify({
+          ok: false,
           code: 'ITEM_NOT_FOUND',
           message: 'Item was not found.',
         }), {
@@ -226,6 +383,8 @@ test('createQuazarProjectViaApi posts normalized project payload', async () => {
     fetchImpl: async (url, init) => {
       calls.push({ url, init });
       return new Response(JSON.stringify({
+        ok: true,
+        status: 'CREATED',
         projectId: 'project-a',
         title: '신규 온보딩 프로젝트',
       }), {
@@ -240,6 +399,8 @@ test('createQuazarProjectViaApi posts normalized project payload', async () => {
   });
 
   assert.deepEqual(result, {
+    ok: true,
+    status: 'CREATED',
     projectId: 'project-a',
     title: '신규 온보딩 프로젝트',
   });
@@ -249,7 +410,40 @@ test('createQuazarProjectViaApi posts normalized project payload', async () => {
     boardType: '개발팀',
     title: '신규 온보딩 프로젝트',
     sectionId: null,
+    sectionName: '',
     tags: ['docs'],
+  });
+});
+
+test('createQuazarProjectViaApi includes sectionName when provided', async () => {
+  const calls = [];
+  await createQuazarProjectViaApi({
+    baseUrl: 'http://localhost:3001',
+    token: 'shared-secret',
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      return new Response(JSON.stringify({
+        ok: true,
+        status: 'CREATED',
+        projectId: 'project-a',
+        title: '신규 온보딩 프로젝트',
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+  }, {
+    boardType: '개발팀',
+    title: '신규 온보딩 프로젝트',
+    sectionName: 'DPP',
+  });
+
+  assert.deepEqual(JSON.parse(calls[0].init.body), {
+    boardType: '개발팀',
+    title: '신규 온보딩 프로젝트',
+    sectionId: null,
+    sectionName: 'DPP',
+    tags: [],
   });
 });
 
@@ -261,6 +455,8 @@ test('getQuazarProjectViaApi requests project detail by board and id', async () 
     fetchImpl: async (url, init) => {
       calls.push({ url, init });
       return new Response(JSON.stringify({
+        ok: true,
+        status: 'FOUND',
         projectId: 'project-a',
         title: 'LLM 개선',
       }), {
@@ -274,6 +470,8 @@ test('getQuazarProjectViaApi requests project detail by board and id', async () 
   });
 
   assert.deepEqual(result, {
+    ok: true,
+    status: 'FOUND',
     projectId: 'project-a',
     title: 'LLM 개선',
   });
@@ -289,6 +487,8 @@ test('updateQuazarProjectViaApi patches safe-core project fields', async () => {
     fetchImpl: async (url, init) => {
       calls.push({ url, init });
       return new Response(JSON.stringify({
+        ok: true,
+        status: 'UPDATED',
         projectId: 'project-z',
         title: 'CS 운영 개선',
       }), {
@@ -320,6 +520,8 @@ test('createQuazarItemGitHubIssueViaApi posts itemId with optional repoFullName'
     fetchImpl: async (url, init) => {
       calls.push({ url, init });
       return new Response(JSON.stringify({
+        ok: true,
+        status: 'CREATED',
         issue: {
           item_id: 'item-55',
           repo_full_name: 'phw0224-bit/quazar-roadmap',
@@ -347,6 +549,8 @@ test('createQuazarItemGitHubIssueViaApi posts itemId with optional repoFullName'
   });
 
   assert.equal(result.issue.issue_number, 31);
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 'CREATED');
   assert.equal(calls[0].url, 'http://localhost:3001/api/github/issues');
   assert.equal(calls[0].init.method, 'POST');
   assert.deepEqual(JSON.parse(calls[0].init.body), {
@@ -362,7 +566,7 @@ test('createQuazarItemGitHubIssueViaApi omits repoFullName when not provided', a
     token: 'shared-secret',
     fetchImpl: async (url, init) => {
       calls.push({ url, init });
-      return new Response(JSON.stringify({ ok: true }), {
+      return new Response(JSON.stringify({ ok: true, status: 'CREATED' }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -376,6 +580,42 @@ test('createQuazarItemGitHubIssueViaApi omits repoFullName when not provided', a
   });
 });
 
+test('createQuazarItemGitHubIssueViaApi reuses existing linked issue as ALREADY_EXISTS', async () => {
+  const result = await createQuazarItemGitHubIssueViaApi({
+    baseUrl: 'http://localhost:3001',
+    token: 'shared-secret',
+    fetchImpl: async () => new Response(JSON.stringify({
+      ok: false,
+      code: 'GITHUB_ISSUE_ALREADY_EXISTS',
+      message: 'Issue already linked.',
+      issue: {
+        item_id: 'item-55',
+        repo_full_name: 'phw0224-bit/quazar-roadmap',
+        issue_number: 31,
+        issue_url: 'https://github.com/phw0224-bit/quazar-roadmap/issues/31',
+      },
+    }), {
+      status: 409,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+  }, {
+    itemId: 'item-55',
+  });
+
+  assert.deepEqual(result, {
+    ok: true,
+    status: 'ALREADY_EXISTS',
+    issue: {
+      item_id: 'item-55',
+      repo_full_name: 'phw0224-bit/quazar-roadmap',
+      issue_number: 31,
+      issue_url: 'https://github.com/phw0224-bit/quazar-roadmap/issues/31',
+    },
+    ticket: null,
+    labelSync: null,
+  });
+});
+
 test('createQuazarItemGitHubBranchViaApi posts to the item branch endpoint', async () => {
   const calls = [];
   const result = await createQuazarItemGitHubBranchViaApi({
@@ -386,7 +626,14 @@ test('createQuazarItemGitHubBranchViaApi posts to the item branch endpoint', asy
       return new Response(JSON.stringify({
         itemId: 'item-77',
         repoFullName: 'phw0224-bit/quazar-roadmap',
+        issueNumber: 77,
+        issueUrl: 'https://github.com/phw0224-bit/quazar-roadmap/issues/77',
+        hasLinkedIssue: true,
+        hasLinkedBranch: true,
         branchName: 'QZR-77',
+        branchUrl: 'https://github.com/phw0224-bit/quazar-roadmap/tree/QZR-77',
+        created: true,
+        branchSource: 'linked',
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -397,8 +644,39 @@ test('createQuazarItemGitHubBranchViaApi posts to the item branch endpoint', asy
   });
 
   assert.equal(result.branchName, 'QZR-77');
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 'CREATED');
   assert.equal(calls[0].url, 'http://localhost:3001/api/github/items/item-77/branch');
   assert.equal(calls[0].init.method, 'POST');
+});
+
+test('createQuazarItemGitHubBranchViaApi returns ALREADY_EXISTS when branch already exists', async () => {
+  const result = await createQuazarItemGitHubBranchViaApi({
+    baseUrl: 'http://localhost:3001',
+    token: 'shared-secret',
+    fetchImpl: async () => new Response(JSON.stringify({
+      itemId: 'item-77',
+      repoFullName: 'phw0224-bit/quazar-roadmap',
+      issueNumber: 77,
+      issueUrl: 'https://github.com/phw0224-bit/quazar-roadmap/issues/77',
+      hasLinkedIssue: true,
+      hasLinkedBranch: true,
+      branchName: 'QZR-77',
+      branchUrl: 'https://github.com/phw0224-bit/quazar-roadmap/tree/QZR-77',
+      created: false,
+      branchSource: 'linked',
+      fromCache: true,
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+  }, {
+    itemId: 'item-77',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 'ALREADY_EXISTS');
+  assert.equal(result.branchName, 'QZR-77');
 });
 
 test('getQuazarItemGitHubBranchViaApi requests the item branch endpoint', async () => {
@@ -424,6 +702,8 @@ test('getQuazarItemGitHubBranchViaApi requests the item branch endpoint', async 
     itemId: 'item-77',
   });
 
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 'FOUND');
   assert.equal(result.branch.branchName, 'QZR-77');
   assert.equal(calls[0].url, 'http://localhost:3001/api/github/items/item-77/branch');
   assert.equal(calls[0].init.method, 'GET');

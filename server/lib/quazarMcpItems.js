@@ -75,6 +75,35 @@ export function normalizeProjectName(value) {
     .toLowerCase();
 }
 
+export function normalizeSectionName(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
+export function validateListQuazarSectionsInput(payload = {}) {
+  return {
+    boardType: requireBoardType(payload.boardType),
+    query: normalizeOptionalString(payload.query),
+    limit: normalizeLimit(payload.limit, 20, 100),
+  };
+}
+
+export function validateCreateQuazarSectionInput(payload = {}) {
+  return {
+    boardType: requireBoardType(payload.boardType),
+    title: requireNonEmptyString(payload.title, 'title'),
+  };
+}
+
+export function validateResolveQuazarSectionInput(payload = {}) {
+  return {
+    boardType: requireBoardType(payload.boardType),
+    sectionName: requireNonEmptyString(payload.sectionName, 'sectionName'),
+  };
+}
+
 export function validateCreateQuazarItemInput(payload = {}) {
   const boardType = requireBoardType(payload.boardType);
   const projectName = requireNonEmptyString(payload.projectName, 'projectName');
@@ -154,12 +183,14 @@ export function validateCreateQuazarProjectInput(payload = {}) {
   const sectionId = payload.sectionId === undefined || payload.sectionId === null
     ? null
     : requireNonEmptyString(payload.sectionId, 'sectionId');
+  const sectionName = normalizeOptionalString(payload.sectionName);
   const tags = payload.tags === undefined ? [] : requireStringArray(payload.tags, 'tags');
 
   return {
     boardType,
     title,
     sectionId,
+    sectionName,
     tags: normalizeTags(tags),
   };
 }
@@ -168,6 +199,13 @@ export function validateGetQuazarProjectInput(payload = {}) {
   return {
     boardType: requireBoardType(payload.boardType),
     projectId: requireNonEmptyString(payload.projectId, 'projectId'),
+  };
+}
+
+export function validateResolveQuazarProjectInput(payload = {}) {
+  return {
+    boardType: requireBoardType(payload.boardType),
+    projectName: requireNonEmptyString(payload.projectName, 'projectName'),
   };
 }
 
@@ -207,11 +245,23 @@ export function findMatchingProjects(projects = [], projectName) {
   return projects.filter((project) => normalizeProjectName(project?.title) === normalizedProjectName);
 }
 
+export function findMatchingSections(sections = [], sectionName) {
+  const normalizedSectionName = normalizeSectionName(sectionName);
+  return sections.filter((section) => normalizeSectionName(section?.title) === normalizedSectionName);
+}
+
 export function filterProjectsByQuery(projects = [], query = '') {
   const normalizedQuery = normalizeProjectName(query);
   if (!normalizedQuery) return projects;
 
   return projects.filter((project) => normalizeProjectName(project?.title).includes(normalizedQuery));
+}
+
+export function filterSectionsByQuery(sections = [], query = '') {
+  const normalizedQuery = normalizeSectionName(query);
+  if (!normalizedQuery) return sections;
+
+  return sections.filter((section) => normalizeSectionName(section?.title).includes(normalizedQuery));
 }
 
 function resolveProjectMatch(projects, projectName) {
@@ -233,12 +283,32 @@ function resolveProjectMatch(projects, projectName) {
   return matches[0];
 }
 
+function resolveSectionMatch(sections, sectionName) {
+  const matches = findMatchingSections(sections, sectionName);
+
+  if (matches.length === 0) {
+    throw createError('SECTION_NOT_FOUND', 404, 'Section was not found.');
+  }
+
+  if (matches.length > 1) {
+    throw createError('SECTION_AMBIGUOUS', 409, 'Section match is ambiguous.', {
+      candidates: matches.map((section) => ({
+        id: section.id,
+        title: section.title,
+        boardType: section.board_type || section.boardType || '',
+      })),
+    });
+  }
+
+  return matches[0];
+}
+
 export function formatQuazarItemDetail(item, boardType) {
   return {
     itemId: item.id,
     title: item.title || '',
     description: item.description || '',
-    status: item.status || '',
+    itemStatus: item.status || '',
     priority: item.priority || '',
     tags: Array.isArray(item.tags) ? item.tags : [],
     projectId: item.project_id || null,
@@ -263,12 +333,21 @@ export function formatQuazarProjectDetail(project, boardType) {
   };
 }
 
+export function formatQuazarSectionDetail(section) {
+  return {
+    sectionId: section.id,
+    title: section.title || '',
+    boardType: section.board_type || section.boardType || '',
+    orderIndex: Number.isInteger(section.order_index) ? section.order_index : null,
+  };
+}
+
 function formatQuazarItemSummary(item) {
   return {
     itemId: item.id,
     title: item.title || '',
     description: item.description || '',
-    status: item.status || '',
+    itemStatus: item.status || '',
     priority: item.priority || '',
     tags: Array.isArray(item.tags) ? item.tags : [],
     projectId: item.project_id || null,
@@ -314,6 +393,108 @@ export function createQuazarProjectLookup({ listProjects }) {
       boardType,
       count: matches.length,
       projects: matches,
+    };
+  };
+}
+
+export async function resolveQuazarSection({ payload, listSections }) {
+  const validated = validateResolveQuazarSectionInput(payload);
+  const sections = await listSections({ boardType: validated.boardType });
+  const matches = findMatchingSections(sections, validated.sectionName)
+    .map((section) => ({
+      sectionId: section.id,
+      title: section.title,
+      boardType: section.board_type || section.boardType || validated.boardType,
+      orderIndex: Number.isInteger(section.order_index) ? section.order_index : null,
+    }));
+
+  if (matches.length === 0) {
+    return {
+      boardType: validated.boardType,
+      status: 'NOT_FOUND',
+      sectionName: validated.sectionName,
+      section: null,
+      candidates: [],
+    };
+  }
+
+  if (matches.length > 1) {
+    return {
+      boardType: validated.boardType,
+      status: 'AMBIGUOUS',
+      sectionName: validated.sectionName,
+      section: null,
+      candidates: matches,
+    };
+  }
+
+  return {
+    boardType: validated.boardType,
+    status: 'FOUND',
+    sectionName: validated.sectionName,
+    section: matches[0],
+    candidates: matches,
+  };
+}
+
+export async function resolveQuazarProject({ payload, listProjects }) {
+  const validated = validateResolveQuazarProjectInput(payload);
+  const projects = await listProjects({ boardType: validated.boardType });
+  const matches = findMatchingProjects(projects, validated.projectName)
+    .map((project) => ({
+      projectId: project.id,
+      title: project.title,
+      sectionId: project.section_id || project.sectionId || null,
+      isCompleted: Boolean(project.is_completed ?? project.isCompleted),
+      boardType: project.board_type || project.boardType || validated.boardType,
+    }));
+
+  if (matches.length === 0) {
+    return {
+      boardType: validated.boardType,
+      status: 'NOT_FOUND',
+      projectName: validated.projectName,
+      project: null,
+      candidates: [],
+    };
+  }
+
+  if (matches.length > 1) {
+    return {
+      boardType: validated.boardType,
+      status: 'AMBIGUOUS',
+      projectName: validated.projectName,
+      project: null,
+      candidates: matches,
+    };
+  }
+
+  return {
+    boardType: validated.boardType,
+    status: 'FOUND',
+    projectName: validated.projectName,
+    project: matches[0],
+    candidates: matches,
+  };
+}
+
+export function createQuazarSectionLookup({ listSections }) {
+  return async function lookupSections(payload = {}) {
+    const validated = validateListQuazarSectionsInput(payload);
+    const sections = await listSections({ boardType: validated.boardType });
+    const matches = filterSectionsByQuery(sections, validated.query)
+      .slice(0, validated.limit)
+      .map((section) => ({
+        id: section.id,
+        title: section.title,
+        boardType: section.board_type || section.boardType || validated.boardType,
+        orderIndex: Number.isInteger(section.order_index) ? section.order_index : null,
+      }));
+
+    return {
+      boardType: validated.boardType,
+      count: matches.length,
+      sections: matches,
     };
   };
 }
@@ -392,9 +573,27 @@ export async function createQuazarItemUpdate({ payload, getItem, updateItem }) {
   return formatQuazarItemDetail(updatedItem, validated.boardType);
 }
 
-export async function createQuazarProject({ payload, insertProject }) {
+export async function createQuazarSection({ payload, insertSection }) {
+  const validated = validateCreateQuazarSectionInput(payload);
+  const section = await insertSection(validated);
+  return formatQuazarSectionDetail(section);
+}
+
+export async function createQuazarProject({ payload, insertProject, listSections = null }) {
   const validated = validateCreateQuazarProjectInput(payload);
-  const project = await insertProject(validated);
+  let sectionId = validated.sectionId;
+
+  if (!sectionId && validated.sectionName) {
+    const sections = await listSections?.({ boardType: validated.boardType }) || [];
+    sectionId = resolveSectionMatch(sections, validated.sectionName).id;
+  }
+
+  const project = await insertProject({
+    boardType: validated.boardType,
+    title: validated.title,
+    sectionId,
+    tags: validated.tags,
+  });
   return formatQuazarProjectDetail(project, validated.boardType);
 }
 
@@ -448,6 +647,20 @@ async function selectProjectsForBoard(supabase, boardType, includeCompletedProje
   }
 
   const { data, error } = await query;
+  if (error) {
+    throw createError('INTERNAL_ERROR', 500, error.message);
+  }
+
+  return data || [];
+}
+
+async function selectSectionsForBoard(supabase, boardType) {
+  const { data, error } = await supabase
+    .from('sections')
+    .select('id, title, board_type, order_index')
+    .eq('board_type', boardType)
+    .order('order_index', { ascending: true });
+
   if (error) {
     throw createError('INTERNAL_ERROR', 500, error.message);
   }
@@ -511,6 +724,8 @@ export function createQuazarItemService(supabase) {
 
   const listProjectsForBoard = async ({ boardType, includeCompletedProjects = true }) =>
     selectProjectsForBoard(supabase, boardType, includeCompletedProjects);
+  const listSectionsForBoard = async ({ boardType }) =>
+    selectSectionsForBoard(supabase, boardType);
 
   const hydrateProjectTitle = async (boardType, item) => {
     if (!item) return null;
@@ -525,10 +740,65 @@ export function createQuazarItemService(supabase) {
   };
 
   return {
+    async resolveSection(payload) {
+      return resolveQuazarSection({
+        payload,
+        listSections: ({ boardType }) => listSectionsForBoard({ boardType }),
+      });
+    },
+
+    async listSections(payload) {
+      return createQuazarSectionLookup({
+        listSections: ({ boardType }) => listSectionsForBoard({ boardType }),
+      })(payload);
+    },
+
+    async createSection(payload) {
+      return createQuazarSection({
+        payload,
+        insertSection: async ({ boardType, title }) => {
+          const { data: existingSections, error: existingError } = await supabase
+            .from('sections')
+            .select('order_index')
+            .eq('board_type', boardType)
+            .order('order_index', { ascending: false })
+            .limit(1);
+
+          if (existingError) {
+            throw createError('INTERNAL_ERROR', 500, existingError.message);
+          }
+
+          const nextOrder = existingSections?.[0] ? existingSections[0].order_index + 1 : 0;
+          const { data, error } = await supabase
+            .from('sections')
+            .insert([{
+              title,
+              board_type: boardType,
+              order_index: nextOrder,
+            }])
+            .select('id, title, board_type, order_index')
+            .single();
+
+          if (error) {
+            throw createError('INTERNAL_ERROR', 500, error.message);
+          }
+
+          return data;
+        },
+      });
+    },
+
     async listProjects(payload) {
       return createQuazarProjectLookup({
         listProjects: ({ boardType }) => listProjectsForBoard({ boardType, includeCompletedProjects: true }),
       })(payload);
+    },
+
+    async resolveProject(payload) {
+      return resolveQuazarProject({
+        payload,
+        listProjects: ({ boardType }) => listProjectsForBoard({ boardType, includeCompletedProjects: true }),
+      });
     },
 
     async createItem(payload) {
@@ -642,6 +912,7 @@ export function createQuazarItemService(supabase) {
     async createProject(payload) {
       return createQuazarProject({
         payload,
+        listSections: ({ boardType }) => listSectionsForBoard({ boardType }),
         insertProject: async ({ boardType, title, sectionId, tags }) => {
           const { data: existingProjects, error: existingError } = await supabase
             .from(getProjectsTable(boardType))
