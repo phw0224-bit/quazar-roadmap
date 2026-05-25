@@ -197,6 +197,9 @@ export async function createWorkflowDryRun(input, deps) {
     project: projectResolution.project,
     projectResolution,
     itemDraft,
+    requiresDraftReview: true,
+    itemDraftApproved: false,
+    reviewPrompt: '아이템 초안입니다. 제목, 태그, 본문 방향이 괜찮은지 의견을 주세요. 승인 전에는 생성하지 않습니다.',
     shouldCreateGitHubIssue: parsed.shouldCreateGitHubIssue,
     shouldCreateGitHubBranch: parsed.shouldCreateGitHubBranch,
     requiresConfirmation,
@@ -209,6 +212,12 @@ export async function executeWorkflowPlan(plan, deps) {
   if (!plan?.project?.projectTitle || plan?.canExecute === false) {
     const error = new Error('Workflow plan is not ready to execute.');
     error.code = 'INVALID_WORKFLOW_PLAN';
+    throw error;
+  }
+
+  if (plan?.itemDraftApproved !== true) {
+    const error = new Error('Item draft review is required before execution.');
+    error.code = 'ITEM_DRAFT_REVIEW_REQUIRED';
     throw error;
   }
 

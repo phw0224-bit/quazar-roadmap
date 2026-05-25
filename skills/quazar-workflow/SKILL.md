@@ -24,8 +24,8 @@ Do not compress the whole request into one opaque MCP call.
 Always do this:
 1. Resolve context from the user's natural language.
 2. Build a dry-run plan first.
-3. Show or state the intended execution plan.
-4. Execute MCP steps only after the plan is clear.
+3. Show the item draft and ask for the user's opinion.
+4. Execute MCP steps only after the user approves or revises the draft.
 5. Ask `해당 브랜치로 체크아웃하시겠습니까?` after branch creation if checkout guidance exists.
 
 ## Use This Flow
@@ -68,6 +68,7 @@ The dry-run should:
 - resolve section candidates
 - resolve project candidates
 - build an item draft using the `개발` template
+- mark the draft as review-required before any create call
 - identify whether GitHub issue creation and branch creation are intended
 - identify whether `repoFullName` is explicit or should fall back to workspace git remote
 
@@ -76,6 +77,8 @@ If a section or project is ambiguous, do not guess. Present the candidates and a
 If a section is missing, do not auto-create it silently. State that the section was not found and ask whether to create it.
 
 If a project is missing, do not invent one silently. Ask whether to create it under the resolved section.
+
+Even when section and project resolution are complete, do not create the item immediately. Show the item draft first and ask the user whether to proceed or what to change.
 
 ## MCP Tool Order
 
@@ -147,8 +150,9 @@ After branch creation:
 When handling a user request with this skill, keep the response sequence tight:
 
 1. Dry-run summary
-2. Missing or ambiguous choices, if any
-3. Execution result after approval
-4. Final checkout question if branch info exists
+2. Item draft review request
+3. Missing or ambiguous choices, if any
+4. Execution result after approval
+5. Final checkout question if branch info exists
 
 Do not hide the plan. The user should always be able to see what will be created before mutation starts.

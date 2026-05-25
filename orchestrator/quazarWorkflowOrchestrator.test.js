@@ -63,7 +63,10 @@ test('createWorkflowDryRun resolves resources and produces an execution plan wit
   assert.equal(plan.project.projectId, 'project-phw');
   assert.equal(plan.projectResolution.status, 'FOUND');
   assert.equal(plan.requiresConfirmation, false);
+  assert.equal(plan.requiresDraftReview, true);
+  assert.equal(plan.itemDraftApproved, false);
   assert.equal(plan.canExecute, true);
+  assert.match(plan.reviewPrompt, /초안/);
   assert.deepEqual(plan.steps.map((step) => step.type), [
     'use-section',
     'use-project',
@@ -102,6 +105,7 @@ test('createWorkflowDryRun keeps ambiguous matches visible instead of picking th
   assert.equal(plan.sectionResolution.candidates.length, 2);
   assert.equal(plan.projectResolution.status, 'NOT_FOUND');
   assert.equal(plan.requiresConfirmation, true);
+  assert.equal(plan.requiresDraftReview, true);
   assert.equal(plan.canExecute, false);
 });
 
@@ -151,6 +155,7 @@ test('executeWorkflowPlan executes item, issue, and branch steps in order and re
     shouldCreateGitHubIssue: true,
     shouldCreateGitHubBranch: true,
     canExecute: true,
+    itemDraftApproved: true,
   }, {
     createItem: async (payload) => {
       calls.push(['createItem', payload]);
@@ -222,5 +227,28 @@ test('executeWorkflowPlan blocks execution when the dry-run plan is not executab
       },
     }),
     (error) => error?.code === 'INVALID_WORKFLOW_PLAN'
+  );
+});
+
+test('executeWorkflowPlan blocks execution until the user approves the item draft', async () => {
+  await assert.rejects(
+    executeWorkflowPlan({
+      ok: true,
+      status: 'PLANNED',
+      boardType: '개발팀',
+      project: { projectId: 'project-phw', projectTitle: '박형우' },
+      itemDraft: {
+        title: 'Pinata IPFS 임시 업로드 구현',
+        description: '## 개발',
+        tags: ['개발'],
+      },
+      canExecute: true,
+      itemDraftApproved: false,
+    }, {
+      createItem: async () => {
+        throw new Error('should not be called');
+      },
+    }),
+    (error) => error?.code === 'ITEM_DRAFT_REVIEW_REQUIRED'
   );
 });
