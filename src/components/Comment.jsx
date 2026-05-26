@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Edit2, Trash2, CornerDownRight } from 'lucide-react';
+import { Edit2, Trash2, Github } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ProfileAvatar from './ProfileAvatar';
@@ -16,6 +16,7 @@ export default function Comment({
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(comment.content);
   const editTextareaRef = useRef(null);
+  const isGitHubReviewComment = comment.source === 'github_review';
 
   const adjustEditTextareaHeight = () => {
     const textarea = editTextareaRef.current;
@@ -75,16 +76,19 @@ export default function Comment({
     return { date: `${year}.${month}.${day}`, time: `${hours}:${minutes}` };
   };
 
-  const userName = comment.profiles?.name || '익명 사용자';
+  const userName = isGitHubReviewComment
+    ? comment.source_metadata?.reviewer_name || comment.source_metadata?.reviewer_login || 'GitHub Reviewer'
+    : comment.profiles?.name || '익명 사용자';
   const userDept = comment.profiles?.department ? ` (${comment.profiles.department})` : '';
   const moodEmoji = comment.profiles?.customization?.moodEmoji || comment.profiles?.customization?.mood_emoji || '';
+  const reviewStateLabel = comment.source_metadata?.review_state_label || 'Review';
 
   return (
     <div className="group flex flex-col gap-2 transition-all duration-300 ease-notion p-4 rounded-2xl hover:bg-gray-50/50 dark:hover:bg-bg-hover/30 border border-transparent hover:border-gray-100 dark:hover:border-border-subtle" onPointerDown={e => e.stopPropagation()}>
       <div className="flex items-center gap-3">
         <ProfileAvatar
           name={userName}
-          customization={comment.profiles?.customization}
+          customization={isGitHubReviewComment ? null : comment.profiles?.customization}
           size="sm"
           showMood={false}
           className="shrink-0"
@@ -92,8 +96,15 @@ export default function Comment({
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-black text-gray-900 dark:text-text-primary truncate">{userName}</span>
-            {moodEmoji && <span className="text-sm leading-none">{moodEmoji}</span>}
-            <span className="text-[11px] font-black text-gray-400 dark:text-text-tertiary uppercase tracking-widest">{userDept}</span>
+            {!isGitHubReviewComment && moodEmoji && <span className="text-sm leading-none">{moodEmoji}</span>}
+            {isGitHubReviewComment ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-gray-900 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-white dark:bg-white dark:text-gray-900">
+                <Github size={10} strokeWidth={3} />
+                {reviewStateLabel}
+              </span>
+            ) : (
+              <span className="text-[11px] font-black text-gray-400 dark:text-text-tertiary uppercase tracking-widest">{userDept}</span>
+            )}
           </div>
           <div className="flex items-center gap-2 mt-1">
             <span className="text-sm font-bold text-gray-500 dark:text-text-secondary">{formatDate(comment.created_at).date}</span>
@@ -102,29 +113,31 @@ export default function Comment({
           </div>
         </div>
         
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 ml-auto">
-          <button
-            className="p-2 hover:bg-white dark:hover:bg-bg-hover rounded-lg text-gray-400 dark:text-text-tertiary hover:text-brand-500 dark:hover:text-brand-400 transition-all cursor-pointer shadow-sm border border-transparent hover:border-gray-100 dark:hover:border-border-subtle"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsEditing(true);
-              setEditedText(comment.content);
-            }}
-            title="수정"
-          >
-            <Edit2 size={12} strokeWidth={3} />
-          </button>
-          <button
-            className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-gray-400 dark:text-text-tertiary hover:text-red-500 dark:hover:text-red-400 transition-all cursor-pointer shadow-sm border border-transparent hover:border-red-100 dark:hover:border-red-900/30"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDeleteComment();
-            }}
-            title="삭제"
-          >
-            <Trash2 size={12} strokeWidth={3} />
-          </button>
-        </div>
+        {!isGitHubReviewComment && (
+          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 ml-auto">
+            <button
+              className="p-2 hover:bg-white dark:hover:bg-bg-hover rounded-lg text-gray-400 dark:text-text-tertiary hover:text-brand-500 dark:hover:text-brand-400 transition-all cursor-pointer shadow-sm border border-transparent hover:border-gray-100 dark:hover:border-border-subtle"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsEditing(true);
+                setEditedText(comment.content);
+              }}
+              title="수정"
+            >
+              <Edit2 size={12} strokeWidth={3} />
+            </button>
+            <button
+              className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-gray-400 dark:text-text-tertiary hover:text-red-500 dark:hover:text-red-400 transition-all cursor-pointer shadow-sm border border-transparent hover:border-red-100 dark:hover:border-red-900/30"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteComment();
+              }}
+              title="삭제"
+            >
+              <Trash2 size={12} strokeWidth={3} />
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="pl-12">

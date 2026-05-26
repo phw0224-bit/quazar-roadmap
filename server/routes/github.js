@@ -296,6 +296,45 @@ function mapGitHubStateToRoadmapStatus(state) {
   return state === 'closed' ? 'done' : 'in-progress';
 }
 
+function normalizeOptionalText(value) {
+  const trimmed = `${value || ''}`.trim();
+  return trimmed || null;
+}
+
+function normalizeGitHubReviewState(state) {
+  const normalizedState = `${state || ''}`.trim().toLowerCase();
+  if (normalizedState === 'approved') return 'Approve';
+  if (normalizedState === 'changes_requested') return 'Request changes';
+  if (normalizedState === 'commented') return 'Comment';
+  return normalizedState || 'Review';
+}
+
+function truncateGitHubReviewBody(body, maxLength = 280) {
+  const normalized = `${body || ''}`.replace(/\r\n/g, '\n').trim();
+  if (!normalized) return '';
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
+function buildGitHubReviewCommentContent({ reviewerName, reviewStateLabel, reviewBody, reviewUrl }) {
+  const lines = [
+    '## GitHub PR Review',
+    '',
+    `**${reviewerName || 'GitHub Reviewer'}** · ${reviewStateLabel || 'Review'}`,
+  ];
+
+  const excerpt = truncateGitHubReviewBody(reviewBody);
+  if (excerpt) {
+    lines.push('', excerpt);
+  }
+
+  if (reviewUrl) {
+    lines.push('', `[원문 보기](${reviewUrl})`);
+  }
+
+  return lines.join('\n');
+}
+
 function verifyGitHubWebhookSignature(req) {
   if (!GITHUB_WEBHOOK_SECRET) {
     throw createHttpError(500, 'GITHUB_WEBHOOK_SECRET is not configured.');
@@ -339,7 +378,7 @@ async function findItemRecordById(itemId) {
   for (const table of tables) {
     let query = supabaseAdminClient
       .from(table.name)
-      .select('id, title, content, description, board_type, assignees, tags, status, is_ticket, ticket_key, ticket_number, ticket_created_at')
+      .select('id, title, content, description, board_type, assignees, tags, status, is_ticket, ticket_key, ticket_number, ticket_created_at, created_by')
       .eq('id', itemId);
 
     if (table.mainOnly) {
@@ -359,6 +398,66 @@ async function findItemRecordById(itemId) {
   }
 
   return null;
+}
+
+async function insertGitHubReviewSystemComment({
+  pullRequestRecord,
+  itemRecord,
+  repository,
+  pullRequest,
+  review,
+}) {
+  const sourceEventId = normalizeOptionalText(
+    review?.node_id
+    || review?.id
+    || `${repository?.full_name || ''}:${pullRequest?.number || ''}:${review?.submitted_at || review?.state || ''}`
+  );
+
+  if (!sourceEventId) {
+    throw createHttpError(400, 'Webhook payload is missing review event identity.');
+  }
+
+  const reviewerLogin = normalizeOptionalText(review?.user?.login);
+  const reviewerDisplayName = normalizeOptionalText(review?.user?.name) || reviewerLogin || 'GitHub Reviewer';
+  const reviewUrl = normalizeOptionalText(review?.html_url) || normalizeOptionalText(pullRequest?.html_url);
+  const reviewStateLabel = normalizeGitHubReviewState(review?.state);
+  const reviewBody = normalizeOptionalText(review?.body);
+  const fallbackUserId = pullRequestRecord?.created_by || itemRecord?.item?.created_by || null;
+
+  const { error } = await supabaseAdminClient
+    .from('comments')
+    .upsert([{
+      item_id: pullRequestRecord.item_id,
+      user_id: fallbackUserId,
+      content: buildGitHubReviewCommentContent({
+        reviewerName: reviewerDisplayName,
+        reviewStateLabel,
+        reviewBody,
+        reviewUrl,
+      }),
+      tags: ['github-review'],
+      source: 'github_review',
+      source_event_id: sourceEventId,
+      source_url: reviewUrl,
+      source_metadata: {
+        reviewer_login: reviewerLogin,
+        reviewer_name: reviewerDisplayName,
+        review_state: normalizeOptionalText(review?.state),
+        review_state_label: reviewStateLabel,
+        review_submitted_at: normalizeOptionalText(review?.submitted_at),
+        review_id: review?.id || null,
+        review_body_excerpt: truncateGitHubReviewBody(reviewBody),
+        repo_full_name: normalizeOptionalText(repository?.full_name),
+        pull_number: pullRequest?.number || null,
+        pull_title: normalizeOptionalText(pullRequest?.title),
+        pull_url: normalizeOptionalText(pullRequest?.html_url),
+      },
+    }], {
+      onConflict: 'source,source_event_id',
+      ignoreDuplicates: true,
+    });
+
+  if (error) throw error;
 }
 
 async function allocateTicketNumber() {
@@ -2895,6 +2994,47 @@ router.post('/webhooks', async (req, res) => {
     verifyGitHubWebhookSignature(req);
 
     const event = req.headers['x-github-event'];
+    if (event === 'pull_request_review') {
+      const action = req.body?.action;
+      if (action !== 'submitted') {
+        return res.status(200).json({ handled: false, reason: 'unsupported-action' });
+      }
+
+      const repository = req.body?.repository;
+      const pullRequest = req.body?.pull_request;
+      const review = req.body?.review;
+      const repoFullName = repository?.full_name;
+      const pullNumber = pullRequest?.number;
+      if (!repoFullName || !pullNumber || !review) {
+        return res.status(400).json({ error: 'Webhook payload is missing pull request review information.' });
+      }
+
+      const pullRequestRecord = await getGitHubPullRequestRecord(repoFullName, pullNumber);
+      if (!pullRequestRecord) {
+        return res.status(200).json({ handled: false, reason: 'untracked-pull-request' });
+      }
+
+      const itemRecord = await findItemRecordById(pullRequestRecord.item_id);
+      if (!itemRecord) {
+        return res.status(404).json({ error: 'Linked roadmap item was not found.' });
+      }
+
+      await insertGitHubReviewSystemComment({
+        pullRequestRecord,
+        itemRecord,
+        repository,
+        pullRequest,
+        review,
+      });
+
+      return res.status(200).json({
+        handled: true,
+        itemId: pullRequestRecord.item_id,
+        pullNumber,
+        reviewId: review?.id || null,
+      });
+    }
+
     if (event !== 'issues') {
       return res.status(200).json({ handled: false, reason: 'unsupported-event' });
     }

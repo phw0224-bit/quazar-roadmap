@@ -9,6 +9,49 @@ export const RELEASE_NOTES_STORAGE_KEY = 'kanban-release-notes-last-seen';
 
 export const RELEASE_NOTES = [
   {
+    id: '2026-05-26-github-pr-review-comments',
+    version: 'v0.10.8',
+    title: 'GitHub PR 리뷰 댓글 미러링',
+    description: '연결된 GitHub PR에 리뷰가 제출되면 아이템 댓글 타임라인에 읽기 전용 시스템 댓글로 바로 보이도록 연결했습니다.',
+    sections: [
+      {
+        title: '추가',
+        items: [
+          'GitHub App webhook이 pull_request_review.submitted 이벤트를 받아 연결된 아이템 댓글에 시스템 댓글을 자동 생성',
+          '댓글 타임라인에서 GitHub 리뷰 상태와 짧은 발췌, 원문 링크를 바로 확인 가능',
+        ],
+      },
+      {
+        title: '변경',
+        items: [
+          'GitHub 시스템 댓글은 수정/삭제 버튼 없이 읽기 전용으로 표시',
+          'PR 리뷰 댓글 dedupe 및 메타 저장용 comments.source 계열 스키마 문서 추가',
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026-05-26-browser-notifications',
+    version: 'v0.10.7',
+    title: '브라우저 알림 추가',
+    description: '알림함과 연결된 브라우저 Notification API를 추가해 새 담당자 알림을 앱 밖에서도 더 빨리 확인할 수 있게 했습니다.',
+    sections: [
+      {
+        title: '추가',
+        items: [
+          '알림함에서 브라우저 알림 권한을 바로 켜는 액션 추가',
+          '새 알림 레코드가 들어오면 앱이 백그라운드에 있을 때 브라우저 팝업 알림 표시',
+        ],
+      },
+      {
+        title: '변경',
+        items: [
+          'NotificationsInbox가 Supabase Realtime으로 새 notifications insert를 즉시 다시 불러오도록 개선',
+        ],
+      },
+    ],
+  },
+  {
     id: '2026-05-21-github-pull-request-composer',
     version: 'v0.10.6',
     title: 'GitHub PR 작성 흐름 추가',

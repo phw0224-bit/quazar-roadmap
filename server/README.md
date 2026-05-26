@@ -7,6 +7,7 @@
 - 업로드/삭제 요청 인증 및 개인 메모 소유권 검증
 - 담당자 추가 시 `notifications` 테이블 기록
 - 개발팀 요청 제출 시 Google Chat incoming webhook 알림 전송
+- GitHub App webhook으로 이슈 상태/PR 리뷰를 로드맵 데이터에 반영
 - Ollama AI 요약 프록시 (HTML → Ollama → JSON)
 - 사내 MCP 호출용 프로젝트/아이템 조회 및 아이템 생성·수정 API
 
@@ -26,6 +27,7 @@
 | DELETE | `/uploads/:itemId` | 인증 사용자만 아이템의 모든 파일 삭제. 개인 메모는 소유자만 가능 |
 | POST | `/api/notifications/assignments` | 인증 사용자가 추가한 담당자에게 assignment 알림 레코드 생성 |
 | POST | `/api/notifications/dev-requests` | 개발팀 요청 제출 시 Google Chat incoming webhook 알림 전송 |
+| POST | `/api/github/webhooks` | GitHub App webhook. 이슈 상태 동기화와 PR 리뷰 시스템 댓글 생성 |
 | POST | `/api/summarize` | AI 요약. `{ content: htmlString }` |
 | GET | `/api/mcp/projects` | 사내 MCP 전용 프로젝트 목록 조회. `boardType`, 선택 `query`, 선택 `limit` |
 | POST | `/api/mcp/projects` | 사내 MCP 전용 프로젝트 생성. `title`, 선택 `sectionId`, 선택 `tags` |

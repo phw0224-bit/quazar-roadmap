@@ -37,9 +37,11 @@ GitHub App 페이지에서 아래를 설정합니다.
 4. `Webhook secret`: `GITHUB_WEBHOOK_SECRET`와 동일
 5. Repository permissions:
    - `Issues`: Read and write
+   - `Pull requests`: Read-only
    - `Metadata`: Read-only
 6. Subscribe to events:
    - `Issues`
+   - `Pull request review`
 
 ## 3. 사용자 플로우
 
@@ -54,4 +56,5 @@ GitHub App 페이지에서 아래를 설정합니다.
 - OAuth로 생성한 이슈는 GitHub에서 생성자가 사용자로 기록됩니다.
 - GitHub App 설치 여부와 설치된 repo 목록은 `App ID + private key`로 조회합니다.
 - GitHub App Webhook으로 `issues.closed/reopened` 이벤트를 받아 로드맵 상태를 동기화합니다.
-- DB 스키마 추가 변경은 이번 단계에서 필요하지 않습니다.
+- GitHub App Webhook으로 `pull_request_review.submitted` 이벤트를 받아 연결된 아이템 댓글에 읽기 전용 시스템 댓글을 추가합니다.
+- PR 리뷰 시스템 댓글용 `comments.source*` 컬럼은 `docs/GITHUB_PR_REVIEW_COMMENTS_2026-05-26.sql`로 별도 적용합니다.

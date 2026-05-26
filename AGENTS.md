@@ -108,7 +108,8 @@ item_github_issues, item_github_pull_requests, github_repository_settings -- Git
 - **연관 업무 검색:** 팀 보드 아이템/팀 문서/개인 메모만 신규 연결 후보로 사용하고 전사 로드맵 테이블은 제외
 - **GitHub 이슈 생성:** 상세 제목 아래 보조 액션 → 모달에서 레포 선택 → 이슈 생성, 기존 연결 이슈가 있으면 속성 박스에만 표시
 - **GitHub PR 생성:** 연결 이슈 + linked branch가 있을 때 상세에서 PR 작성 모달을 열고 템플릿/`closes #` 초안을 편집한 뒤 생성, 기존 같은 브랜치 PR이 있으면 중복 생성 대신 기존 PR 표시
-- **Sidebar:** main 보드 제외, parent_item_id/project_id/order_index 함께 갱신
+- **GitHub PR 리뷰 미러링:** 연결된 PR에 `pull_request_review.submitted`가 들어오면 해당 아이템 댓글에 읽기 전용 시스템 댓글로 상태/요약/원문 링크를 남긴다
+- **Sidebar:** main 보드 제외, parent_item_id/project_id/order_index 함께 갱신. 프로젝트 트리의 `+`는 업무(task)와 페이지(page) 중 생성 유형을 선택하고, 일반 문서 영역은 페이지/폴더 계층만 유지
 
 상세 비즈니스 규칙은 이 섹션과 관련 API/컴포넌트 JSDoc을 기준으로 유지한다.
 
@@ -145,6 +146,11 @@ item_github_issues, item_github_pull_requests, github_repository_settings -- Git
 - Express `/api/github/items/:itemId/pull-request/prepare`에서 템플릿 초안/title/base 준비
 - 사용자가 모달에서 제목/본문/draft를 수정한 뒤 `/api/github/items/:itemId/pull-request`로 생성
 - 생성 성공 시 `item_github_pull_requests` 링크 추가, 기존 같은 브랜치 open PR이 있으면 기존 PR을 속성 박스에 표시
+
+**GitHub PR 리뷰 미러링:**
+- GitHub App webhook이 `pull_request_review.submitted` 수신
+- Express가 `item_github_pull_requests`로 대상 item을 찾고 `comments`에 시스템 댓글 insert
+- 프론트 `comments` realtime 구독이 시스템 댓글을 즉시 타임라인에 반영
 
 상세 플로우는 이 섹션과 `src/hooks/useKanbanData.js`, `src/components/KanbanBoard.jsx`를 기준으로 유지한다.
 
