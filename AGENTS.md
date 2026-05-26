@@ -109,6 +109,7 @@ item_github_issues, item_github_pull_requests, github_repository_settings -- Git
 - **GitHub 이슈 생성:** 상세 제목 아래 보조 액션 → 모달에서 레포 선택 → 이슈 생성, 기존 연결 이슈가 있으면 속성 박스에만 표시
 - **GitHub PR 생성:** 연결 이슈 + linked branch가 있을 때 상세에서 PR 작성 모달을 열고 템플릿/`closes #` 초안을 편집한 뒤 생성, 기존 같은 브랜치 PR이 있으면 중복 생성 대신 기존 PR 표시
 - **GitHub PR 리뷰 미러링:** 연결된 PR에 `pull_request_review.submitted`가 들어오면 해당 아이템 댓글에 읽기 전용 시스템 댓글로 상태/요약/원문 링크를 남긴다
+- **GitHub PR 리뷰 알림:** 위 리뷰 미러링 시 item 담당자/작성자에게 `notifications` 레코드를 만들어 브라우저 알림/알림함에도 노출한다
 - **Sidebar:** main 보드 제외, parent_item_id/project_id/order_index 함께 갱신. 프로젝트 트리의 `+`는 업무(task)와 페이지(page) 중 생성 유형을 선택하고, 일반 문서 영역은 페이지/폴더 계층만 유지
 
 상세 비즈니스 규칙은 이 섹션과 관련 API/컴포넌트 JSDoc을 기준으로 유지한다.

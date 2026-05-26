@@ -26,6 +26,7 @@ export const RELEASE_NOTES = [
         items: [
           'GitHub 시스템 댓글은 수정/삭제 버튼 없이 읽기 전용으로 표시',
           'PR 리뷰 댓글 dedupe 및 메타 저장용 comments.source 계열 스키마 문서 추가',
+          'PR 리뷰가 들어오면 연결 아이템 담당자/작성자에게 notifications 기반 브라우저 알림도 함께 전달',
         ],
       },
     ],

@@ -7,7 +7,7 @@
 - 업로드/삭제 요청 인증 및 개인 메모 소유권 검증
 - 담당자 추가 시 `notifications` 테이블 기록
 - 개발팀 요청 제출 시 Google Chat incoming webhook 알림 전송
-- GitHub App webhook으로 이슈 상태/PR 리뷰를 로드맵 데이터에 반영
+- GitHub App webhook으로 이슈 상태/PR 리뷰를 로드맵 데이터와 알림함에 반영
 - Ollama AI 요약 프록시 (HTML → Ollama → JSON)
 - 사내 MCP 호출용 프로젝트/아이템 조회 및 아이템 생성·수정 API
 

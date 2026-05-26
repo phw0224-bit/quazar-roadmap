@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Bell, CheckCheck } from 'lucide-react';
 import API from '../api/kanbanAPI';
+import { supabase } from '../lib/supabase';
+import {
+  getBrowserNotificationPermission,
+  isBrowserNotificationSupported,
+  requestBrowserNotificationPermission,
+  showBrowserNotification,
+} from '../lib/browserNotifications.js';
 
 function formatRelativeTime(value) {
   if (!value) return '';
@@ -35,6 +42,12 @@ function getNotificationMessage(notification) {
     return `${actorName}님이 "${entityTitle}"에 담당자로 지정했습니다.`;
   }
 
+  if (notification.type === 'github_review_submitted') {
+    const reviewerName = notification.payload?.reviewer_name || 'GitHub Reviewer';
+    const reviewStateLabel = notification.payload?.review_state_label || 'Review';
+    return `${reviewerName}님이 "${entityTitle}" PR에 ${reviewStateLabel} 리뷰를 남겼습니다.`;
+  }
+
   return `${actorName}님이 "${entityTitle}"와 관련된 알림을 보냈습니다.`;
 }
 
@@ -44,10 +57,43 @@ export default function NotificationsInbox({ user, userId, onOpenNotification, o
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
+  const [browserPermission, setBrowserPermission] = useState(() => getBrowserNotificationPermission());
   const containerRef = useRef(null);
+  const notifiedIdsRef = useRef(new Set());
+  const hasBootstrappedRef = useRef(false);
 
   const hasUnread = unreadCount > 0;
   const visibleNotifications = useMemo(() => notifications.slice(0, 12), [notifications]);
+  const browserNotificationSupported = isBrowserNotificationSupported();
+
+  const maybeShowBrowserNotifications = useCallback((nextNotifications = [], { allowPopups = true } = {}) => {
+    const knownIds = notifiedIdsRef.current;
+    const shouldShowPopup =
+      allowPopups &&
+      browserPermission === 'granted' &&
+      (document.visibilityState === 'hidden' || !document.hasFocus());
+
+    nextNotifications
+      .slice()
+      .reverse()
+      .forEach((notification) => {
+        if (!notification?.id || knownIds.has(notification.id)) return;
+
+        knownIds.add(notification.id);
+
+        if (!shouldShowPopup || notification.read_at) return;
+
+        showBrowserNotification({
+          title: 'Quazar 알림',
+          body: getNotificationMessage(notification),
+          tag: `quazar-notification-${notification.id}`,
+          onClick: () => {
+            window.focus();
+            void onOpenNotification?.(notification);
+          },
+        });
+      });
+  }, [browserPermission, onOpenNotification]);
 
   const loadNotifications = useCallback(async ({ silent = false } = {}) => {
     const resolvedUserId = userId || user?.id;
@@ -61,8 +107,11 @@ export default function NotificationsInbox({ user, userId, onOpenNotification, o
     if (!silent) setLoading(true);
     try {
       const result = await API.getNotifications(20, resolvedUserId);
-      setNotifications(result.notifications || []);
+      const nextNotifications = result.notifications || [];
+      setNotifications(nextNotifications);
       setUnreadCount(result.unreadCount || 0);
+      maybeShowBrowserNotifications(nextNotifications, { allowPopups: hasBootstrappedRef.current });
+      hasBootstrappedRef.current = true;
     } catch (error) {
       if (!silent) {
         onShowToast?.(`알림을 불러오지 못했습니다: ${error.message}`, 'error');
@@ -70,7 +119,7 @@ export default function NotificationsInbox({ user, userId, onOpenNotification, o
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [onShowToast, user?.id, userId]);
+  }, [maybeShowBrowserNotifications, onShowToast, user?.id, userId]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -98,6 +147,45 @@ export default function NotificationsInbox({ user, userId, onOpenNotification, o
 
     return () => window.clearInterval(intervalId);
   }, [loadNotifications, user?.id]);
+
+  useEffect(() => {
+    const resolvedUserId = userId || user?.id;
+    if (!resolvedUserId) return undefined;
+
+    const channel = supabase.channel(`notifications-${resolvedUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `recipient_user_id=eq.${resolvedUserId}`,
+        },
+        async () => {
+          await loadNotifications({ silent: true });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadNotifications, user?.id, userId]);
+
+  const handleEnableBrowserNotifications = async () => {
+    try {
+      const permission = await requestBrowserNotificationPermission();
+      setBrowserPermission(permission);
+
+      if (permission === 'granted') {
+        onShowToast?.('브라우저 알림이 켜졌습니다.', 'success');
+      } else if (permission === 'denied') {
+        onShowToast?.('브라우저에서 알림 권한이 차단되었습니다.', 'error');
+      }
+    } catch (error) {
+      onShowToast?.(`브라우저 알림 권한 요청 실패: ${error.message}`, 'error');
+    }
+  };
 
   const handleToggleOpen = async () => {
     const nextOpen = !open;
@@ -173,8 +261,29 @@ export default function NotificationsInbox({ user, userId, onOpenNotification, o
             <div>
               <p className="text-sm font-black text-gray-900 dark:text-text-primary">알림</p>
               <p className="text-[11px] text-gray-500 dark:text-text-tertiary">
-                최근 담당자 지정 알림을 확인합니다.
+                최근 담당자/리뷰 알림을 확인합니다.
               </p>
+              {browserNotificationSupported && (
+                <div className="mt-1.5">
+                  {browserPermission === 'granted' ? (
+                    <p className="text-[11px] text-brand-600 dark:text-brand-300">
+                      브라우저 알림이 켜져 있습니다.
+                    </p>
+                  ) : browserPermission === 'denied' ? (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-300">
+                      브라우저에서 알림 권한이 차단되어 있습니다.
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleEnableBrowserNotifications}
+                      className="text-[11px] font-bold text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200 cursor-pointer"
+                    >
+                      브라우저 알림 켜기
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
             <button
               type="button"

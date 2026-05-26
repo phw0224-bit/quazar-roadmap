@@ -378,7 +378,7 @@ async function findItemRecordById(itemId) {
   for (const table of tables) {
     let query = supabaseAdminClient
       .from(table.name)
-      .select('id, title, content, description, board_type, assignees, tags, status, is_ticket, ticket_key, ticket_number, ticket_created_at, created_by')
+      .select('id, title, content, description, board_type, assignees, assignee_user_ids, tags, status, is_ticket, ticket_key, ticket_number, ticket_created_at, created_by')
       .eq('id', itemId);
 
     if (table.mainOnly) {
@@ -400,6 +400,19 @@ async function findItemRecordById(itemId) {
   return null;
 }
 
+function normalizeUuidList(values = []) {
+  const seen = new Set();
+
+  return (Array.isArray(values) ? values : [])
+    .map((value) => `${value || ''}`.trim())
+    .filter(Boolean)
+    .filter((value) => {
+      if (seen.has(value)) return false;
+      seen.add(value);
+      return true;
+    });
+}
+
 async function insertGitHubReviewSystemComment({
   pullRequestRecord,
   itemRecord,
@@ -417,6 +430,23 @@ async function insertGitHubReviewSystemComment({
     throw createHttpError(400, 'Webhook payload is missing review event identity.');
   }
 
+  const { data: existingComment, error: existingCommentError } = await supabaseAdminClient
+    .from('comments')
+    .select('id')
+    .eq('source', 'github_review')
+    .eq('source_event_id', sourceEventId)
+    .maybeSingle();
+
+  if (existingCommentError) throw existingCommentError;
+  if (existingComment?.id) {
+    return {
+      inserted: false,
+      sourceEventId,
+      reviewStateLabel: normalizeGitHubReviewState(review?.state),
+      reviewerDisplayName: normalizeOptionalText(review?.user?.name) || normalizeOptionalText(review?.user?.login) || 'GitHub Reviewer',
+    };
+  }
+
   const reviewerLogin = normalizeOptionalText(review?.user?.login);
   const reviewerDisplayName = normalizeOptionalText(review?.user?.name) || reviewerLogin || 'GitHub Reviewer';
   const reviewUrl = normalizeOptionalText(review?.html_url) || normalizeOptionalText(pullRequest?.html_url);
@@ -426,7 +456,7 @@ async function insertGitHubReviewSystemComment({
 
   const { error } = await supabaseAdminClient
     .from('comments')
-    .upsert([{
+    .insert([{
       item_id: pullRequestRecord.item_id,
       user_id: fallbackUserId,
       content: buildGitHubReviewCommentContent({
@@ -452,12 +482,78 @@ async function insertGitHubReviewSystemComment({
         pull_title: normalizeOptionalText(pullRequest?.title),
         pull_url: normalizeOptionalText(pullRequest?.html_url),
       },
-    }], {
-      onConflict: 'source,source_event_id',
-      ignoreDuplicates: true,
-    });
+    }]);
 
   if (error) throw error;
+  return {
+    inserted: true,
+    sourceEventId,
+    reviewerDisplayName,
+    reviewStateLabel,
+  };
+}
+
+async function insertGitHubReviewNotifications({
+  itemRecord,
+  pullRequestRecord,
+  review,
+  repository,
+  sourceEventId,
+  reviewerDisplayName,
+  reviewStateLabel,
+}) {
+  const item = itemRecord?.item;
+  if (!item?.id) return 0;
+
+  const recipientUserIds = normalizeUuidList([
+    ...(item.assignee_user_ids || []),
+    item.created_by,
+  ]);
+
+  if (recipientUserIds.length === 0) {
+    return 0;
+  }
+
+  const { data: existingNotification, error: existingNotificationError } = await supabaseAdminClient
+    .from('notifications')
+    .select('id')
+    .eq('type', 'github_review_submitted')
+    .eq('entity_table', itemRecord.table)
+    .eq('entity_id', item.id)
+    .contains('payload', { source_event_id: sourceEventId })
+    .limit(1);
+
+  if (existingNotificationError) throw existingNotificationError;
+  if ((existingNotification || []).length > 0) {
+    return 0;
+  }
+
+  const notifications = recipientUserIds.map((recipientUserId) => ({
+    recipient_user_id: recipientUserId,
+    actor_user_id: null,
+    type: 'github_review_submitted',
+    entity_table: itemRecord.table,
+    entity_id: item.id,
+    parent_entity_table: 'items',
+    parent_entity_id: pullRequestRecord.item_id,
+    payload: {
+      entity_title: normalizeOptionalText(item.title),
+      board_type: normalizeOptionalText(item.board_type),
+      reviewer_name: reviewerDisplayName,
+      review_state_label: reviewStateLabel,
+      review_url: normalizeOptionalText(review?.html_url),
+      repo_full_name: normalizeOptionalText(repository?.full_name),
+      pull_number: pullRequestRecord.pull_number || null,
+      source_event_id: sourceEventId,
+    },
+  }));
+
+  const { error } = await supabaseAdminClient
+    .from('notifications')
+    .insert(notifications);
+
+  if (error) throw error;
+  return notifications.length;
 }
 
 async function allocateTicketNumber() {
@@ -3019,7 +3115,7 @@ router.post('/webhooks', async (req, res) => {
         return res.status(404).json({ error: 'Linked roadmap item was not found.' });
       }
 
-      await insertGitHubReviewSystemComment({
+      const commentResult = await insertGitHubReviewSystemComment({
         pullRequestRecord,
         itemRecord,
         repository,
@@ -3027,11 +3123,26 @@ router.post('/webhooks', async (req, res) => {
         review,
       });
 
+      let insertedNotifications = 0;
+      if (commentResult.inserted) {
+        insertedNotifications = await insertGitHubReviewNotifications({
+          itemRecord,
+          pullRequestRecord,
+          review,
+          repository,
+          sourceEventId: commentResult.sourceEventId,
+          reviewerDisplayName: commentResult.reviewerDisplayName,
+          reviewStateLabel: commentResult.reviewStateLabel,
+        });
+      }
+
       return res.status(200).json({
         handled: true,
         itemId: pullRequestRecord.item_id,
         pullNumber,
         reviewId: review?.id || null,
+        insertedComment: commentResult.inserted,
+        insertedNotifications,
       });
     }
 
