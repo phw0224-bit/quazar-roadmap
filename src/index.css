@@ -736,6 +736,14 @@ input:focus, textarea:focus {
   min-height: 1.65em;
 }
 
+.cm-live-preview-shell .cm-line.cm-live-table-adjacent-blank-line {
+  min-height: 0;
+  height: 0;
+  padding: 0;
+  line-height: 0;
+  overflow: hidden;
+}
+
 .cm-live-preview-shell .cm-activeLine,
 .cm-live-active-line {
   background: rgba(96, 165, 250, 0.08) !important;
