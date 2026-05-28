@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { fileURLToPath } from 'url';
@@ -29,6 +30,20 @@ function requireEnv(name) {
     throw new Error(`${name} is required to run the Quazar MCP server.`);
   }
   return value;
+}
+
+function resolveExecutablePath(pathname) {
+  try {
+    return realpathSync(pathname);
+  } catch {
+    return pathname;
+  }
+}
+
+export function isDirectExecution(argv1 = process.argv[1], moduleUrl = import.meta.url) {
+  if (!argv1) return false;
+
+  return resolveExecutablePath(fileURLToPath(moduleUrl)) === resolveExecutablePath(argv1);
 }
 
 export async function runCreateQuazarItemTool(args, { createItem }) {
@@ -724,7 +739,7 @@ export async function main() {
   console.error('Quazar MCP server running on stdio');
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (isDirectExecution()) {
   main().catch((error) => {
     console.error('Quazar MCP server failed:', error);
     process.exit(1);

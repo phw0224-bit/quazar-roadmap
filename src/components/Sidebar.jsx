@@ -55,6 +55,8 @@ export default function Sidebar({
   onNavigate,
   onOpenItem,
   onAddChildPage,
+  onAddProjectItem,
+  onShowChoice,
   onShowPrompt,
   onShowReleaseNotes,
   isReadOnly,
@@ -150,12 +152,50 @@ export default function Sidebar({
     });
   }, []);
 
-  const handleAddChild = useCallback((parentItemId, projectId) => {
-    onShowPrompt?.('하위 페이지 추가', '페이지 제목을 입력하세요', async (title) => {
-      if (!title?.trim()) return;
-      await onAddChildPage?.(projectId, parentItemId, title.trim());
-    });
-  }, [onAddChildPage, onShowPrompt]);
+  const handleAddChild = useCallback((parentItemId, projectId, options = {}) => {
+    const { isProject = false, isGeneralDoc = false } = options;
+
+    if (isGeneralDoc) {
+      onShowPrompt?.('하위 페이지 추가', '페이지 제목을 입력하세요', async (title) => {
+        if (!title?.trim()) return;
+        await onAddChildPage?.(projectId, parentItemId, title.trim());
+      });
+      return;
+    }
+
+    onShowChoice?.(
+      isProject ? '프로젝트에 새 항목 추가' : '하위 항목 추가',
+      isProject
+        ? '이 프로젝트에 업무를 만들지, 문서 페이지를 만들지 선택하세요.'
+        : '이 항목 아래에 업무를 만들지, 문서 페이지를 만들지 선택하세요.',
+      [
+        {
+          id: 'task',
+          label: '업무',
+          badge: 'Task',
+          description: '프로젝트 아이템 목록과 보드에서 보이는 업무 카드를 만듭니다.',
+          onSelect: async () => {
+            onShowPrompt?.('새 업무 추가', '업무 제목을 입력하세요', async (title) => {
+              if (!title?.trim()) return;
+              await onAddProjectItem?.(projectId, title.trim(), isProject ? null : parentItemId);
+            });
+          },
+        },
+        {
+          id: 'page',
+          label: '페이지',
+          badge: 'Page',
+          description: '사이드바 트리에만 보이는 문서 페이지를 만듭니다.',
+          onSelect: async () => {
+            onShowPrompt?.('하위 페이지 추가', '페이지 제목을 입력하세요', async (title) => {
+              if (!title?.trim()) return;
+              await onAddChildPage?.(projectId, parentItemId, title.trim());
+            });
+          },
+        },
+      ],
+    );
+  }, [onAddChildPage, onAddProjectItem, onShowChoice, onShowPrompt]);
 
   const handleSelectBoardType = useCallback((boardType, { syncUrl = true } = {}) => {
     const normalized = normalizeBoardType(boardType);

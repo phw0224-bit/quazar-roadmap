@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 
 import { getMarkdownLivePreviewPlan } from './livePreview.js';
 
+function lineStart(markdown, lineIndex) {
+  return markdown.split('\n')
+    .slice(0, lineIndex)
+    .reduce((start, line) => start + line.length + 1, 0);
+}
+
 test('live preview hides heading markers on inactive lines', () => {
   const plan = getMarkdownLivePreviewPlan('# 제목\n본문', 1);
 
@@ -129,6 +135,7 @@ test('live preview renders inactive markdown tables as block widgets', () => {
   assert.match(plan.blockWidgets[0].html, /data-live-table-root="true"/);
   assert.match(plan.blockWidgets[0].html, /data-live-table-start-line="0"/);
   assert.match(plan.blockWidgets[0].html, /드래그해서 복사 · 더블클릭해서 편집/);
+  assert.ok(!plan.lineClasses.some((item) => item.className === 'cm-live-table-adjacent-blank-line'));
 });
 
 test('live preview keeps active table line rendered when not editing the table', () => {
@@ -148,6 +155,70 @@ test('live preview unwraps active table only for the explicitly edited table', (
 
   assert.equal(plan.blockWidgets.length, 0);
   assert.ok(plan.lineClasses.some((item) => item.className === 'cm-live-active-line'));
+});
+
+test('live preview compacts only the blank line immediately surrounding a rendered table', () => {
+  const markdown = [
+    '앞 문단',
+    '',
+    '',
+    '| 열 1 | 열 2 |',
+    '| --- | --- |',
+    '| 값 | 값 |',
+    '',
+    '',
+    '뒤 문단',
+  ].join('\n');
+  const plan = getMarkdownLivePreviewPlan(markdown, -1);
+  const collapsedLines = plan.lineClasses
+    .filter((item) => item.className === 'cm-live-table-adjacent-blank-line')
+    .map((item) => item.lineStart);
+
+  assert.equal(plan.blockWidgets.length, 1);
+  assert.deepEqual(collapsedLines, [
+    lineStart(markdown, 2),
+    lineStart(markdown, 6),
+  ]);
+});
+
+test('live preview keeps the active blank line beside a rendered table visible for editing', () => {
+  const markdown = [
+    '앞 문단',
+    '',
+    '| 열 1 | 열 2 |',
+    '| --- | --- |',
+    '| 값 | 값 |',
+    '',
+    '뒤 문단',
+  ].join('\n');
+  const plan = getMarkdownLivePreviewPlan(markdown, 1);
+
+  assert.equal(plan.blockWidgets.length, 1);
+  assert.ok(plan.lineClasses.some((item) => item.className === 'cm-live-active-line'));
+  assert.ok(!plan.lineClasses.some((item) => (
+    item.className === 'cm-live-table-adjacent-blank-line'
+    && item.lineStart === lineStart(markdown, 1)
+  )));
+  assert.ok(plan.lineClasses.some((item) => (
+    item.className === 'cm-live-table-adjacent-blank-line'
+    && item.lineStart === lineStart(markdown, 5)
+  )));
+});
+
+test('live preview leaves table-adjacent blank lines unchanged while editing table source', () => {
+  const markdown = [
+    '앞 문단',
+    '',
+    '| 열 1 | 열 2 |',
+    '| --- | --- |',
+    '| 값 | 값 |',
+    '',
+    '뒤 문단',
+  ].join('\n');
+  const plan = getMarkdownLivePreviewPlan(markdown, 3, -1, { editingTableStartLine: 2 });
+
+  assert.equal(plan.blockWidgets.length, 0);
+  assert.ok(!plan.lineClasses.some((item) => item.className === 'cm-live-table-adjacent-blank-line'));
 });
 
 test('live preview renders inactive blockquotes as block widgets', () => {

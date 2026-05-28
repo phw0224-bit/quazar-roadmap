@@ -68,7 +68,7 @@ import {
 } from '../lib/boardNavigation.js';
 import { createDevRequestDescriptionScaffold } from '../lib/devRequestBoard.js';
 
-import { Toast, ConfirmModal, InputModal } from './UI/Feedback';
+import { Toast, ConfirmModal, InputModal, ChoiceModal } from './UI/Feedback';
 
 const DISPLAY_BOARDS = ['main', ...TEAM_BOARD_TYPES];
 const isLegacyRequestDoc = (doc) => doc?.entity_type === 'request' || (Array.isArray(doc?.tags) && doc.tags.includes('request'));
@@ -414,6 +414,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
   const [toast, setToast] = useState(null); // { message, type }
   const [confirm, setConfirm] = useState(null); // { title, message, onConfirm, type }
   const [prompt, setPrompt] = useState(null); // { title, placeholder, onConfirm }
+  const [choice, setChoice] = useState(null); // { title, message, options }
   const [selectFolder, setSelectFolder] = useState(null); // { itemId, itemTitle, folders, onSelect }
 
   const showToast = useCallback((message, type = 'success') => {
@@ -426,6 +427,10 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
 
   const showPrompt = useCallback((title, placeholder, onConfirm) => {
     setPrompt({ title, placeholder, onConfirm });
+  }, []);
+
+  const showChoice = useCallback((title, message, options) => {
+    setChoice({ title, message, options });
   }, []);
 
   const pendingMutationKeysRef = useRef(new Set());
@@ -475,12 +480,12 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
     );
   }, [addProject, runExclusiveMutation]);
 
-  const guardedAddItem = useCallback(async (projectId, title, content = '', createdBy = null) => {
+  const guardedAddItem = useCallback(async (projectId, title, content = '', createdBy = null, parentItemId = null) => {
     const cleanTitle = `${title || ''}`.trim();
     if (!cleanTitle) return null;
     return runExclusiveMutation(
-      `item:create:${projectId}:${cleanTitle.toLowerCase()}`,
-      () => addItem(projectId, cleanTitle, content, createdBy),
+      `item:create:${projectId}:${parentItemId || 'root'}:${cleanTitle.toLowerCase()}`,
+      () => addItem(projectId, cleanTitle, content, createdBy, parentItemId),
       { successMessage: `'${cleanTitle}' 업무가 추가되었습니다.`, errorPrefix: '업무 생성 실패' },
     );
   }, [addItem, runExclusiveMutation]);
@@ -1052,6 +1057,8 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
       onNavigate={(view) => setUrlState({ view, itemId: null, repoFullName: null })}
       onOpenItem={(itemId) => setUrlState({ itemId })}
       onAddChildPage={(projectId, parentItemId, title) => addChildPage(projectId, parentItemId, title, user?.id)}
+      onAddProjectItem={(projectId, title, parentItemId = null) => guardedAddItem(projectId, title, '', user?.id, parentItemId)}
+      onShowChoice={showChoice}
       onShowPrompt={showPrompt}
       onShowReleaseNotes={onShowReleaseNotes}
       onShowConfirm={showConfirm}
@@ -1739,7 +1746,7 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
                   onShowConfirm={showConfirm}
                   onShowToast={showToast}
                   onAddChildPage={(projectId, parentItemId, title) => addChildPage(projectId, parentItemId, title, user?.id)}
-                  onAddProjectItem={(projectId, title) => guardedAddItem(projectId, title, '', user?.id)}
+                  onAddProjectItem={(projectId, title, parentItemId = null) => guardedAddItem(projectId, title, '', user?.id, parentItemId)}
                   onShowPrompt={showPrompt}
                   onManageGitHubSettings={handleOpenProfileModal}
                   isReadOnly={isReadOnly}
@@ -1794,6 +1801,20 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
             placeholder={prompt.placeholder}
             onConfirm={handlePromptConfirm}
             onCancel={() => setPrompt(null)}
+          />
+        )}
+        {choice && (
+          <ChoiceModal
+            title={choice.title}
+            message={choice.message}
+            options={choice.options.map((option) => ({
+              ...option,
+              onSelect: async () => {
+                await option.onSelect?.();
+                setChoice(null);
+              },
+            }))}
+            onCancel={() => setChoice(null)}
           />
         )}
 

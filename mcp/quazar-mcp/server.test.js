@@ -1,9 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   buildSuggestedCheckoutCommands,
   inferRepoFullNameFromGitRemote,
+  isDirectExecution,
   runCreateQuazarItemGitHubBranchTool,
   runCreateQuazarItemGitHubIssueTool,
   runCreateQuazarProjectTool,
@@ -624,6 +629,19 @@ test('inferRepoFullNameFromGitRemote supports GitHub SSH and HTTPS remotes', () 
 
 test('buildSuggestedCheckoutCommands returns null when branchName is missing', () => {
   assert.equal(buildSuggestedCheckoutCommands(''), null);
+});
+
+test('isDirectExecution treats symlinked CLI paths as direct execution', () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'quazar-mcp-'));
+  const symlinkPath = path.join(tempDir, 'quazar-mcp');
+  const serverPath = fileURLToPath(new URL('./server.js', import.meta.url));
+
+  try {
+    fs.symlinkSync(serverPath, symlinkPath);
+    assert.equal(isDirectExecution(symlinkPath, new URL('./server.js', import.meta.url).href), true);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
 });
 
 test('project MCP server schema includes section tools and ok/status envelopes', async () => {

@@ -11,7 +11,7 @@
 
 | 파일 | 역할 |
 |------|------|
-| `Feedback.jsx` | `Toast`, `ConfirmModal`, `InputModal` 세 컴포넌트를 단일 파일에서 export |
+| `Feedback.jsx` | `Toast`, `ConfirmModal`, `InputModal`, `ChoiceModal` 전역 피드백 컴포넌트를 단일 파일에서 export |
 
 ## 패턴 & 규칙
 

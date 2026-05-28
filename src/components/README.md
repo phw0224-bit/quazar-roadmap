@@ -7,7 +7,7 @@
 - 아이템 상세 편집 패널
 - DnD 인터랙션 (KanbanBoard → BoardSection → ProjectColumn → KanbanCard)
 - Sidebar 페이지 트리 렌더링 및 중첩 페이지 이동
-- 전역 피드백 UI (Toast, ConfirmModal, InputModal)
+- 전역 피드백 UI (Toast, ConfirmModal, InputModal, ChoiceModal)
 - 릴리즈 노트, 검색, 상세 패널 같은 전역 오버레이/보조 UI
 
 ## 주요 파일
@@ -18,7 +18,7 @@
 | `AssigneePicker.jsx` | **핵심.** 담당자 추천 선택 + 직접 입력을 공통화하는 편집 UI |
 | `KanbanBoard.jsx` | **최상위 오케스트레이터.** DnD 컨텍스트, 뷰 전환, 전역 모달 관리 |
 | `RepositoriesDashboard.jsx` | GitHub 레포별 PR/이슈/커밋, 티켓 prefix 설정, 로드맵 아이템 연결 대시보드 |
-| `NotificationsInbox.jsx` | 보드 헤더 우측 알림함. 담당자 지정 알림 조회/읽음 처리/대상 이동 |
+| `NotificationsInbox.jsx` | 보드 헤더 우측 알림함. 담당자 지정 알림 조회/읽음 처리/대상 이동 + 브라우저 알림 권한/팝업 처리 |
 | `PresenceAvatars.jsx` | 보드 헤더 우측의 전체 접속자 아바타 표시 |
 | `ItemDetailPanel.jsx` | 우측 슬라이드 패널. 에디터+메타데이터+GitHub 이슈/브랜치/PR 생성·표시+AI요약+댓글. 프로젝트/아이템 공용 shell이지만 엔티티별 저장 경로를 분기 |
 | `ItemViewers.jsx` | 상세 패널 상단에서 같은 아이템을 보는 중/편집 중인 사용자 표시 |
@@ -30,7 +30,7 @@
 | `KanbanCard.jsx` | 카드 (Item). DnD sortable |
 | `TimelineView.jsx` | 간트 스타일 타임라인 뷰 |
 | `PeopleBoard.jsx` | 팀원별 업무 현황 뷰 |
-| `Sidebar.jsx` | 좌측 사이드바 |
+| `Sidebar.jsx` | 좌측 사이드바. 프로젝트 트리의 `+`에서 업무/페이지 생성 유형 선택을 분기 |
 | `SidebarTree.jsx` | 재귀 페이지 트리 (Sidebar 내부에서 사용) |
 | `FilterBar.jsx` | 필터/정렬/그룹 UI |
 | `SearchModal.jsx` | Ctrl+K 전역 검색 모달. 담당자 이름 검색 지원 |
@@ -93,6 +93,13 @@ const stopProp = (e) => e.stopPropagation();
 ```
 
 보드 컬럼은 task/card만 렌더링하고, page 타입은 SidebarTree에서 별도로 사용한다.
+
+**사이드바 `+` 생성 규칙:**
+
+- 프로젝트/프로젝트 소속 항목에서 누르면 `업무` 또는 `페이지`를 선택한다.
+- `업무`는 프로젝트 아이템 목록/보드에 표시된다.
+- `페이지`는 `page_type='page'`로 저장되어 사이드바 트리에만 표시된다.
+- 일반 문서(`project_id=null`) 영역에서는 계속 페이지/폴더 계층만 생성한다.
 
 **연관 업무 검색 범위:**
 

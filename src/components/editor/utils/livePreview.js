@@ -69,6 +69,7 @@ export function getMarkdownLivePreviewPlan(
     );
     if (tableRange) {
       blockWidgets.push(tableRange);
+      collectTableAdjacentBlankLineClasses(lines, lineStarts, tableRange, activeLineIndex, lineClasses);
       lineIndex = tableRange.endLine;
       continue;
     }
@@ -316,8 +317,22 @@ function getMarkdownTableBlock(lines, lineStarts, lineIndex, activeLineIndex, ed
       </div>
     `,
     className: 'cm-live-table-widget',
+    startLine: lineIndex,
     endLine,
   };
+}
+
+function collectTableAdjacentBlankLineClasses(lines, lineStarts, tableRange, activeLineIndex, lineClasses) {
+  const addCollapsedBlankLine = (lineIndex) => {
+    if (lineIndex < 0 || lineIndex >= lines.length || lineIndex === activeLineIndex || !/^\s*$/.test(lines[lineIndex])) return;
+    lineClasses.push({
+      lineStart: lineStarts[lineIndex],
+      className: 'cm-live-table-adjacent-blank-line',
+    });
+  };
+
+  addCollapsedBlankLine(tableRange.startLine - 1);
+  addCollapsedBlankLine(tableRange.endLine + 1);
 }
 
 function getToggleBlock(lines, lineStarts, lineIndex, activeLineIndex) {

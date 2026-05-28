@@ -505,10 +505,10 @@ export const useKanbanData = () => {
     await API.moveProject(projectId, targetIndex, boardType);
   };
 
-  const addItem = async (projectId, title, content, createdBy = null) => {
+  const addItem = async (projectId, title, content, createdBy = null, parentItemId = null) => {
     const project = state.projects.find(p => p.id === projectId);
     const boardType = project?.board_type ?? 'main';
-    const newItem = await API.addItem(projectId, title, content, createdBy, boardType);
+    const newItem = await API.addItem(projectId, title, content, createdBy, boardType, parentItemId);
     dispatch({ type: 'ADD_ITEM', payload: { projectId, item: newItem } });
     return newItem;
   };

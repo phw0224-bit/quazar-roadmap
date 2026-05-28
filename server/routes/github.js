@@ -316,6 +316,53 @@ function truncateGitHubReviewBody(body, maxLength = 280) {
   return `${normalized.slice(0, maxLength - 1).trimEnd()}…`;
 }
 
+function normalizeHttpUrl(value) {
+  const normalized = normalizeOptionalText(value);
+  if (!normalized) return null;
+
+  try {
+    const parsed = new URL(normalized);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function normalizeGitHubPageUrl(value) {
+  const normalized = normalizeHttpUrl(value);
+  if (!normalized) return null;
+
+  try {
+    const parsed = new URL(normalized);
+    return parsed.hostname === 'github.com' ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+export function resolveGitHubReviewUrl({ repository, pullRequest, review }) {
+  const directReviewUrl = normalizeGitHubPageUrl(review?.html_url)
+    || normalizeGitHubPageUrl(review?._links?.html?.href)
+    || normalizeGitHubPageUrl(review?.links?.html?.href);
+  if (directReviewUrl) {
+    return directReviewUrl;
+  }
+
+  const repositoryHtmlUrl = normalizeGitHubPageUrl(repository?.html_url);
+  const repoFullName = normalizeOptionalText(repository?.full_name);
+  const pullNumber = Number.isInteger(pullRequest?.number) ? pullRequest.number : null;
+  const reviewId = Number.isInteger(review?.id) ? review.id : null;
+
+  if (repoFullName && pullNumber && reviewId) {
+    return `https://github.com/${repoFullName}/pull/${pullNumber}#pullrequestreview-${reviewId}`;
+  }
+
+  return normalizeGitHubPageUrl(pullRequest?.html_url) || repositoryHtmlUrl;
+}
+
 function buildGitHubReviewCommentContent({ reviewerName, reviewStateLabel, reviewBody, reviewUrl }) {
   const lines = [
     '## GitHub PR Review',
@@ -449,7 +496,7 @@ async function insertGitHubReviewSystemComment({
 
   const reviewerLogin = normalizeOptionalText(review?.user?.login);
   const reviewerDisplayName = normalizeOptionalText(review?.user?.name) || reviewerLogin || 'GitHub Reviewer';
-  const reviewUrl = normalizeOptionalText(review?.html_url) || normalizeOptionalText(pullRequest?.html_url);
+  const reviewUrl = resolveGitHubReviewUrl({ repository, pullRequest, review });
   const reviewStateLabel = normalizeGitHubReviewState(review?.state);
   const reviewBody = normalizeOptionalText(review?.body);
   const fallbackUserId = pullRequestRecord?.created_by || itemRecord?.item?.created_by || null;
@@ -541,7 +588,7 @@ async function insertGitHubReviewNotifications({
       board_type: normalizeOptionalText(item.board_type),
       reviewer_name: reviewerDisplayName,
       review_state_label: reviewStateLabel,
-      review_url: normalizeOptionalText(review?.html_url),
+      review_url: resolveGitHubReviewUrl({ repository, pullRequest, review }),
       repo_full_name: normalizeOptionalText(repository?.full_name),
       pull_number: pullRequestRecord.pull_number || null,
       source_event_id: sourceEventId,

@@ -1,8 +1,58 @@
 import { useState, useRef, useEffect } from 'react';
-import { Edit2, Trash2, Github } from 'lucide-react';
+import { Edit2, Trash2, Github, ExternalLink } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ProfileAvatar from './ProfileAvatar';
+
+function normalizeHttpUrl(value) {
+  const normalized = `${value || ''}`.trim();
+  if (!normalized) return null;
+
+  try {
+    const parsed = new URL(normalized);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function normalizeGitHubPageUrl(value) {
+  const normalized = normalizeHttpUrl(value);
+  if (!normalized) return null;
+
+  try {
+    const parsed = new URL(normalized);
+    return parsed.hostname === 'github.com' ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveGitHubReviewCommentUrl(comment) {
+  const directUrl = normalizeGitHubPageUrl(comment.source_url)
+    || normalizeGitHubPageUrl(comment.source_metadata?.review_url)
+    || normalizeGitHubPageUrl(comment.source_metadata?.pull_url);
+  if (directUrl) {
+    return directUrl;
+  }
+
+  const repoFullName = `${comment.source_metadata?.repo_full_name || ''}`.trim();
+  const pullNumber = Number.isInteger(comment.source_metadata?.pull_number)
+    ? comment.source_metadata.pull_number
+    : null;
+  const reviewId = Number.isInteger(comment.source_metadata?.review_id)
+    ? comment.source_metadata.review_id
+    : null;
+
+  if (repoFullName && pullNumber && reviewId) {
+    return `https://github.com/${repoFullName}/pull/${pullNumber}#pullrequestreview-${reviewId}`;
+  }
+
+  return directUrl;
+}
 
 export default function Comment({
   comment,
@@ -82,6 +132,7 @@ export default function Comment({
   const userDept = comment.profiles?.department ? ` (${comment.profiles.department})` : '';
   const moodEmoji = comment.profiles?.customization?.moodEmoji || comment.profiles?.customization?.mood_emoji || '';
   const reviewStateLabel = comment.source_metadata?.review_state_label || 'Review';
+  const reviewUrl = isGitHubReviewComment ? resolveGitHubReviewCommentUrl(comment) : null;
 
   return (
     <div className="group flex flex-col gap-2 transition-all duration-300 ease-notion p-4 rounded-2xl hover:bg-gray-50/50 dark:hover:bg-bg-hover/30 border border-transparent hover:border-gray-100 dark:hover:border-border-subtle" onPointerDown={e => e.stopPropagation()}>
@@ -98,10 +149,25 @@ export default function Comment({
             <span className="text-sm font-black text-gray-900 dark:text-text-primary truncate">{userName}</span>
             {!isGitHubReviewComment && moodEmoji && <span className="text-sm leading-none">{moodEmoji}</span>}
             {isGitHubReviewComment ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-gray-900 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-white dark:bg-white dark:text-gray-900">
-                <Github size={10} strokeWidth={3} />
-                {reviewStateLabel}
-              </span>
+              <>
+                <span className="inline-flex items-center gap-1 rounded-full bg-gray-900 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-white dark:bg-white dark:text-gray-900">
+                  <Github size={10} strokeWidth={3} />
+                  {reviewStateLabel}
+                </span>
+                {reviewUrl && (
+                  <a
+                    href={reviewUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    onClick={(event) => event.stopPropagation()}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 hover:text-gray-900 dark:border-border-subtle dark:text-text-tertiary dark:hover:text-text-primary"
+                  >
+                    <ExternalLink size={10} strokeWidth={3} />
+                    원문
+                  </a>
+                )}
+              </>
             ) : (
               <span className="text-[11px] font-black text-gray-400 dark:text-text-tertiary uppercase tracking-widest">{userDept}</span>
             )}

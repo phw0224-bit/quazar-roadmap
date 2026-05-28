@@ -14,6 +14,8 @@ export default function AppLayout({
   onNavigate,
   onOpenItem,
   onAddChildPage,
+  onAddProjectItem,
+  onShowChoice,
   onShowPrompt,
   onShowConfirm,
   onShowReleaseNotes,
@@ -77,7 +79,7 @@ export default function AppLayout({
 
   const sidebarProps = {
     sections, projects, activeView, activeItemId,
-    onNavigate, onOpenItem, onAddChildPage, onShowPrompt, onShowConfirm, onShowReleaseNotes, isReadOnly,
+    onNavigate, onOpenItem, onAddChildPage, onAddProjectItem, onShowChoice, onShowPrompt, onShowConfirm, onShowReleaseNotes, isReadOnly,
     user, theme, mounted, onToggleTheme, onLogout,
     onToggleSidebar: toggleSidebar,
     onSetBoardType,

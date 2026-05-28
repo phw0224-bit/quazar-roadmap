@@ -53,7 +53,11 @@ const SortableTreeItem = memo(function SortableTreeItem({
 
   const handleAddChild = (e) => {
     e.stopPropagation();
-    onAddChild?.(isProject ? null : node.id, isProject ? node.id : node.project_id ?? null);
+    onAddChild?.(
+      isProject ? null : node.id,
+      isProject ? node.id : node.project_id ?? null,
+      { isProject, isGeneralDoc: !isProject && !node.project_id }
+    );
   };
 
   const label = node.title || node.content || '제목 없음';

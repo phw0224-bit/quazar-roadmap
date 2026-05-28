@@ -696,14 +696,26 @@ const supabaseAPI = {
     if (errors.length > 0) throw errors[0].error;
   },
 
-  addItem: async (projectId, title, content = '', createdBy = null, boardType = 'main') => {
-    const { data: existingItems } = await supabase.from(itemsTable(boardType)).select('order_index').eq('project_id', projectId).order('order_index', { ascending: false }).limit(1);
+  addItem: async (projectId, title, content = '', createdBy = null, boardType = 'main', parentItemId = null) => {
+    let query = supabase
+      .from(itemsTable(boardType))
+      .select('order_index')
+      .eq('project_id', projectId)
+      .order('order_index', { ascending: false })
+      .limit(1);
+
+    query = parentItemId
+      ? query.eq('parent_item_id', parentItemId)
+      : query.is('parent_item_id', null);
+
+    const { data: existingItems } = await query;
     const nextOrder = existingItems?.[0] ? existingItems[0].order_index + 1 : 0;
 
     const { data, error } = await supabase
       .from(itemsTable(boardType))
       .insert([{
         project_id: projectId,
+        parent_item_id: parentItemId,
         title,
         content,
         order_index: nextOrder,

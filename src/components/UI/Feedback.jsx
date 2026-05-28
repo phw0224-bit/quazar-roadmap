@@ -75,6 +75,83 @@ export function ConfirmModal({ title, message, confirmText = '확인', cancelTex
 }
 
 /**
+ * Choice Modal
+ */
+export function ChoiceModal({ title, message, options = [], cancelText = '취소', onCancel }) {
+  const [submittingId, setSubmittingId] = useState(null);
+
+  const handleOptionClick = async (option) => {
+    if (!option?.id || typeof option?.onSelect !== 'function' || submittingId) return;
+    setSubmittingId(option.id);
+    try {
+      await option.onSelect();
+    } finally {
+      setSubmittingId(null);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-6">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={onCancel} />
+      <div className="relative w-full max-w-[440px] rounded-2xl border border-gray-200 bg-white p-7 shadow-none animate-scale-in dark:border-border-subtle dark:bg-bg-elevated transition-colors duration-200">
+        <div className="flex items-center gap-3">
+          <div className="h-2.5 w-2.5 rounded-full bg-gray-900 dark:bg-white" />
+          <span className="text-[11px] font-black uppercase tracking-[0.24em] text-gray-400 dark:text-text-tertiary">
+            생성 유형 선택
+          </span>
+        </div>
+
+        <h3 className="mt-4 text-2xl font-black tracking-tight text-gray-900 dark:text-text-primary">
+          {title}
+        </h3>
+        <p className="mt-2 text-sm leading-6 text-gray-500 dark:text-text-secondary">
+          {message}
+        </p>
+
+        <div className="mt-6 grid gap-3">
+          {options.map((option) => {
+            const isSubmitting = submittingId === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                disabled={Boolean(submittingId)}
+                onClick={() => handleOptionClick(option)}
+                className="rounded-xl border border-gray-200 bg-white px-4 py-4 text-left transition-colors hover:border-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-border-subtle dark:bg-bg-base dark:hover:bg-bg-hover cursor-pointer"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-black text-gray-900 dark:text-text-primary">
+                    {option.label}
+                  </span>
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-gray-400 dark:text-text-tertiary">
+                    {isSubmitting ? '처리 중' : option.badge || '선택'}
+                  </span>
+                </div>
+                {option.description && (
+                  <p className="mt-1 text-xs font-semibold leading-5 text-gray-500 dark:text-text-secondary">
+                    {option.description}
+                  </p>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-8 flex items-center justify-end gap-2 border-t border-gray-100 pt-4 dark:border-border-subtle">
+          <button
+            disabled={Boolean(submittingId)}
+            onClick={onCancel}
+            className="rounded-lg px-3.5 py-2 text-sm font-bold text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-text-tertiary dark:hover:bg-bg-hover dark:hover:text-text-primary cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {cancelText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Input Modal (Replaces window.prompt)
  */
 export function InputModal({ title, placeholder, defaultValue = '', confirmText = '완료', cancelText = '취소', onConfirm, onCancel }) {
