@@ -157,7 +157,7 @@ test('live preview unwraps active table only for the explicitly edited table', (
   assert.ok(plan.lineClasses.some((item) => item.className === 'cm-live-active-line'));
 });
 
-test('live preview compacts only the blank line immediately surrounding a rendered table', () => {
+test('live preview absorbs only the blank line immediately surrounding a rendered table', () => {
   const markdown = [
     '앞 문단',
     '',
@@ -170,15 +170,11 @@ test('live preview compacts only the blank line immediately surrounding a render
     '뒤 문단',
   ].join('\n');
   const plan = getMarkdownLivePreviewPlan(markdown, -1);
-  const collapsedLines = plan.lineClasses
-    .filter((item) => item.className === 'cm-live-table-adjacent-blank-line')
-    .map((item) => item.lineStart);
 
   assert.equal(plan.blockWidgets.length, 1);
-  assert.deepEqual(collapsedLines, [
-    lineStart(markdown, 2),
-    lineStart(markdown, 6),
-  ]);
+  assert.equal(plan.blockWidgets[0].from, lineStart(markdown, 2));
+  assert.equal(plan.blockWidgets[0].to, lineStart(markdown, 7));
+  assert.ok(!plan.lineClasses.some((item) => item.className === 'cm-live-table-adjacent-blank-line'));
 });
 
 test('live preview keeps the active blank line beside a rendered table visible for editing', () => {
@@ -195,14 +191,8 @@ test('live preview keeps the active blank line beside a rendered table visible f
 
   assert.equal(plan.blockWidgets.length, 1);
   assert.ok(plan.lineClasses.some((item) => item.className === 'cm-live-active-line'));
-  assert.ok(!plan.lineClasses.some((item) => (
-    item.className === 'cm-live-table-adjacent-blank-line'
-    && item.lineStart === lineStart(markdown, 1)
-  )));
-  assert.ok(plan.lineClasses.some((item) => (
-    item.className === 'cm-live-table-adjacent-blank-line'
-    && item.lineStart === lineStart(markdown, 5)
-  )));
+  assert.equal(plan.blockWidgets[0].from, lineStart(markdown, 2));
+  assert.equal(plan.blockWidgets[0].to, lineStart(markdown, 6));
 });
 
 test('live preview leaves table-adjacent blank lines unchanged while editing table source', () => {

@@ -69,7 +69,6 @@ export function getMarkdownLivePreviewPlan(
     );
     if (tableRange) {
       blockWidgets.push(tableRange);
-      collectTableAdjacentBlankLineClasses(lines, lineStarts, tableRange, activeLineIndex, lineClasses);
       lineIndex = tableRange.endLine;
       continue;
     }
@@ -304,12 +303,18 @@ function getMarkdownTableBlock(lines, lineStarts, lineIndex, activeLineIndex, ed
 
   const from = lineStarts[lineIndex];
   const to = getBlockRangeEnd(lines, lineStarts, endLine);
+  const range = extendTableWidgetRangeAcrossAdjacentBlankLines(
+    lines,
+    lineStarts,
+    { from, to, startLine: lineIndex, endLine },
+    activeLineIndex,
+  );
   const markdown = lines.slice(lineIndex, endLine + 1).join('\n');
   const renderedTable = renderMarkdownPreviewHTML(markdown);
 
   return {
-    from,
-    to,
+    from: range.from,
+    to: range.to,
     html: `
       <div class="cm-live-table-wrap" data-live-table-root="true" data-live-table-start-line="${lineIndex}">
         ${renderedTable}
@@ -322,17 +327,31 @@ function getMarkdownTableBlock(lines, lineStarts, lineIndex, activeLineIndex, ed
   };
 }
 
-function collectTableAdjacentBlankLineClasses(lines, lineStarts, tableRange, activeLineIndex, lineClasses) {
-  const addCollapsedBlankLine = (lineIndex) => {
-    if (lineIndex < 0 || lineIndex >= lines.length || lineIndex === activeLineIndex || !/^\s*$/.test(lines[lineIndex])) return;
-    lineClasses.push({
-      lineStart: lineStarts[lineIndex],
-      className: 'cm-live-table-adjacent-blank-line',
-    });
-  };
+function extendTableWidgetRangeAcrossAdjacentBlankLines(lines, lineStarts, tableRange, activeLineIndex) {
+  const previousLine = tableRange.startLine - 1;
+  const nextLine = tableRange.endLine + 1;
+  let from = tableRange.from;
+  let to = tableRange.to;
 
-  addCollapsedBlankLine(tableRange.startLine - 1);
-  addCollapsedBlankLine(tableRange.endLine + 1);
+  if (
+    previousLine >= 0
+    && previousLine !== activeLineIndex
+    && /^\s*$/.test(lines[previousLine])
+  ) {
+    from = lineStarts[previousLine];
+  }
+
+  if (
+    nextLine < lines.length
+    && nextLine !== activeLineIndex
+    && /^\s*$/.test(lines[nextLine])
+  ) {
+    to = nextLine + 1 < lines.length
+      ? lineStarts[nextLine + 1]
+      : getBlockRangeEnd(lines, lineStarts, nextLine);
+  }
+
+  return { from, to };
 }
 
 function getToggleBlock(lines, lineStarts, lineIndex, activeLineIndex) {

@@ -736,12 +736,6 @@ input:focus, textarea:focus {
   min-height: 1.65em;
 }
 
-.cm-live-preview-shell .cm-line.cm-live-table-adjacent-blank-line {
-  min-height: 0.35rem;
-  padding: 0;
-  line-height: 0.35rem;
-}
-
 .cm-live-preview-shell .cm-activeLine,
 .cm-live-active-line {
   background: rgba(96, 165, 250, 0.08) !important;
@@ -1158,7 +1152,7 @@ input:focus, textarea:focus {
 }
 
 .cm-live-table-widget {
-  margin: 0.7rem 0;
+  margin: 0.18rem 0;
 }
 
 .cm-live-table-wrap {
