@@ -1161,6 +1161,7 @@ input:focus, textarea:focus {
 
 .cm-live-table-widget {
   margin: 0.18rem 0;
+  white-space: normal;
 }
 
 .cm-live-table-wrap {
