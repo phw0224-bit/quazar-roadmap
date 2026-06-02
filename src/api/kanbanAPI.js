@@ -549,12 +549,35 @@ const supabaseAPI = {
   },
 
   addProject: async (title, boardType = 'main', sectionId = null) => {
-    const { data: existingProjects } = await supabase.from(projectsTable(boardType)).select('order_index').order('order_index', { ascending: false }).limit(1);
-    const nextOrder = existingProjects?.[0] ? existingProjects[0].order_index + 1 : 0;
+    let siblingsQuery = supabase
+      .from(projectsTable(boardType))
+      .select('id, order_index')
+      .eq('board_type', boardType)
+      .order('order_index', { ascending: true });
+
+    siblingsQuery = sectionId
+      ? siblingsQuery.eq('section_id', sectionId)
+      : siblingsQuery.is('section_id', null);
+
+    const { data: siblingProjects, error: siblingError } = await siblingsQuery;
+    if (siblingError) throw siblingError;
+
+    if ((siblingProjects || []).length > 0) {
+      const shiftResults = await Promise.all(
+        siblingProjects.map((project) =>
+          supabase
+            .from(projectsTable(boardType))
+            .update({ order_index: (project.order_index ?? 0) + 1 })
+            .eq('id', project.id)
+        )
+      );
+      const shiftError = shiftResults.find((result) => result.error)?.error;
+      if (shiftError) throw shiftError;
+    }
 
     const { data, error } = await supabase
       .from(projectsTable(boardType))
-      .insert([{ title, order_index: nextOrder, board_type: boardType, assignees: [], assignee_user_ids: [], tags: [], section_id: sectionId }])
+      .insert([{ title, order_index: 0, board_type: boardType, assignees: [], assignee_user_ids: [], tags: [], section_id: sectionId }])
       .select();
 
     if (error) throw error;

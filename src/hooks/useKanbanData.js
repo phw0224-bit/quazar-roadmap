@@ -91,8 +91,20 @@ const kanbanReducer = (state, action) => {
     }
     case 'SET_ERROR':
       return { ...state, error: action.payload, loading: false };
-    case 'ADD_PROJECT':
-      return { ...state, projects: [...state.projects, { ...action.payload, items: [] }] };
+    case 'ADD_PROJECT': {
+      const newProject = { ...action.payload, items: [] };
+      return {
+        ...state,
+        projects: state.projects
+          .map((project) => {
+            const isSameBoard = (project.board_type || 'main') === (newProject.board_type || 'main');
+            const isSameSection = (project.section_id || null) === (newProject.section_id || null);
+            if (!isSameBoard || !isSameSection) return project;
+            return { ...project, order_index: (project.order_index ?? 0) + 1 };
+          })
+          .concat(newProject),
+      };
+    }
     case 'UPDATE_PROJECT':
       return {
         ...state,
@@ -459,7 +471,7 @@ export const useKanbanData = () => {
   }, [fetchCommentWithProfile, handleEntryRealtimeChange, scheduleFetchData, state.loading]);
 
   /**
-   * @description 새 칸반 컬럼(프로젝트)을 추가. order_index는 현재 최대값+1 자동 계산.
+   * @description 새 칸반 컬럼(프로젝트)을 추가. 기본 생성 위치는 같은 보드/섹션의 가장 왼쪽(order_index 0)이다.
    * @param {string} title - 컬럼 제목
    * @param {string} [boardType='main'] - 'main'|'개발팀'|'AI팀'|'지원팀'
    * @param {string|null} [sectionId=null] - 속할 섹션 ID. null이면 섹션 없는 컬럼

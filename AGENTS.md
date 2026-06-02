@@ -103,6 +103,7 @@ item_github_issues, item_github_pull_requests, github_repository_settings -- Git
 - **board_type:** 'main'(전사) / '개발팀'|'AI팀'|'지원팀' → KanbanBoard view prop 필터
 - **page_type:** null/'task' = 보드 렌더, 'page' = 사이드바만 표시
 - **order_index:** 이동 시 배열 전체 재계산 (0부터 연속)
+- **새 프로젝트 기본 위치:** 같은 보드/섹션에서 새 프로젝트는 가장 왼쪽(order_index 0)에 생성되고, 기존 프로젝트는 오른쪽으로 한 칸씩 밀림
 - **완료 프로젝트:** pre_completion_section_id/order_index에 복귀 위치 저장
 - **related_items:** 양방향 목표 (현재 단방향 + 하위 페이지 생성 시만 양방향)
 - **연관 업무 검색:** 팀 보드 아이템/팀 문서/개인 메모만 신규 연결 후보로 사용하고 전사 로드맵 테이블은 제외

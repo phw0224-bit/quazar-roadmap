@@ -598,13 +598,15 @@ export default function KanbanBoard({ onShowReleaseNotes }) {
 
   // 필터/정렬 적용된 projects 파생
   const filteredProjects = useMemo(() => {
-    return projects.map(project => ({
-      ...project,
-      items: applyFilterSort(
-        (project.items || []).filter(item => !item.page_type || item.page_type === 'task'),
-        filters, sort
-      ),
-    }));
+    return [...projects]
+      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+      .map(project => ({
+        ...project,
+        items: applyFilterSort(
+          (project.items || []).filter(item => !item.page_type || item.page_type === 'task'),
+          filters, sort
+        ),
+      }));
   }, [projects, filters, sort]);
 
   const projectItems = useMemo(
