@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { resolveGitHubReviewUrl } from './github.js';
+import {
+  buildGitHubReviewNotificationPayload,
+  resolveGitHubReviewUrl,
+} from './github.js';
 
 test('resolveGitHubReviewUrl prefers direct review html_url', () => {
   const url = resolveGitHubReviewUrl({
@@ -48,4 +51,28 @@ test('resolveGitHubReviewUrl ignores api urls and falls back to browser-safe pul
   });
 
   assert.equal(url, 'https://github.com/acme/roadmap/pull/12#pullrequestreview-345');
+});
+
+test('buildGitHubReviewNotificationPayload includes browser-safe review url for webhook notifications', () => {
+  const payload = buildGitHubReviewNotificationPayload({
+    item: { title: '리뷰 대상', board_type: '개발팀' },
+    repository: { full_name: 'acme/roadmap' },
+    pullRequest: { number: 12, html_url: 'https://github.com/acme/roadmap/pull/12' },
+    pullRequestRecord: { pull_number: 12 },
+    review: { id: 345 },
+    sourceEventId: 'evt-123',
+    reviewerDisplayName: 'octocat',
+    reviewStateLabel: 'Approved',
+  });
+
+  assert.deepEqual(payload, {
+    entity_title: '리뷰 대상',
+    board_type: '개발팀',
+    reviewer_name: 'octocat',
+    review_state_label: 'Approved',
+    review_url: 'https://github.com/acme/roadmap/pull/12#pullrequestreview-345',
+    repo_full_name: 'acme/roadmap',
+    pull_number: 12,
+    source_event_id: 'evt-123',
+  });
 });

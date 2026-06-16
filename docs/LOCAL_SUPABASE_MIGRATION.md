@@ -12,7 +12,7 @@
 - `scripts/setup-supabase-selfhost.ps1`: self-host `.env` 생성 및 JWT/비밀값 생성
 - `scripts/export-supabase-cloud.ps1`: Cloud DB에서 roles/schema/data 덤프
 - `scripts/restore-local-supabase.ps1`: self-host Postgres에 덤프 복원
-- `.env.local.example`: 앱이 self-host Supabase를 바라보는 예시
+- 루트 `.env` / `.env.local`: 앱이 self-host Supabase를 바라보는 환경변수 파일 (`.env.local`은 setup 스크립트가 생성)
 
 ## 현재 상태
 
@@ -36,7 +36,7 @@ $env:SUPABASE_CLOUD_DB_URL = "postgresql://postgres.ealbfnlqmvitflctlats:<DB_PAS
 yarn supabase:selfhost:setup
 ```
 
-출력되는 값을 `.env.local`에 반영한다.
+이 스크립트는 `infra/supabase-selfhost/.env`와 앱 루트 `.env.local`을 함께 생성한다. 앱 서버는 `.env`를 먼저 읽고 `.env.local`이 있으면 그 값으로 덮어쓴다.
 
 예시:
 

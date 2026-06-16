@@ -30,7 +30,7 @@
 yarn install
 ```
 
-### 2. 환경변수 (.env)
+### 2. 환경변수 (`.env` / `.env.local`)
 
 ```env
 VITE_SUPABASE_URL=http://localhost:8000
@@ -40,6 +40,8 @@ SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
 APP_BASE_URL=http://localhost:5173
 ```
+
+앱 서버는 루트의 `.env`를 먼저 읽고, `.env.local`이 있으면 그 값으로 덮어쓴다. `yarn supabase:selfhost:setup`은 self-host 스택용 `infra/supabase-selfhost/.env`와 앱용 `.env.local`을 함께 생성한다.
 
 **옵션 (Google Chat Bot, google-chat-bot/.env):**
 ```env

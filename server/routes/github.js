@@ -363,6 +363,28 @@ export function resolveGitHubReviewUrl({ repository, pullRequest, review }) {
   return normalizeGitHubPageUrl(pullRequest?.html_url) || repositoryHtmlUrl;
 }
 
+export function buildGitHubReviewNotificationPayload({
+  item,
+  repository,
+  pullRequest,
+  pullRequestRecord,
+  review,
+  sourceEventId,
+  reviewerDisplayName,
+  reviewStateLabel,
+}) {
+  return {
+    entity_title: normalizeOptionalText(item?.title),
+    board_type: normalizeOptionalText(item?.board_type),
+    reviewer_name: reviewerDisplayName,
+    review_state_label: reviewStateLabel,
+    review_url: resolveGitHubReviewUrl({ repository, pullRequest, review }),
+    repo_full_name: normalizeOptionalText(repository?.full_name),
+    pull_number: pullRequestRecord?.pull_number || null,
+    source_event_id: sourceEventId,
+  };
+}
+
 function buildGitHubReviewCommentContent({ reviewerName, reviewStateLabel, reviewBody, reviewUrl }) {
   const lines = [
     '## GitHub PR Review',
@@ -543,6 +565,7 @@ async function insertGitHubReviewSystemComment({
 async function insertGitHubReviewNotifications({
   itemRecord,
   pullRequestRecord,
+  pullRequest,
   review,
   repository,
   sourceEventId,
@@ -583,16 +606,16 @@ async function insertGitHubReviewNotifications({
     entity_id: item.id,
     parent_entity_table: 'items',
     parent_entity_id: pullRequestRecord.item_id,
-    payload: {
-      entity_title: normalizeOptionalText(item.title),
-      board_type: normalizeOptionalText(item.board_type),
-      reviewer_name: reviewerDisplayName,
-      review_state_label: reviewStateLabel,
-      review_url: resolveGitHubReviewUrl({ repository, pullRequest, review }),
-      repo_full_name: normalizeOptionalText(repository?.full_name),
-      pull_number: pullRequestRecord.pull_number || null,
-      source_event_id: sourceEventId,
-    },
+    payload: buildGitHubReviewNotificationPayload({
+      item,
+      repository,
+      pullRequest,
+      pullRequestRecord,
+      review,
+      sourceEventId,
+      reviewerDisplayName,
+      reviewStateLabel,
+    }),
   }));
 
   const { error } = await supabaseAdminClient
@@ -3175,6 +3198,7 @@ router.post('/webhooks', async (req, res) => {
         insertedNotifications = await insertGitHubReviewNotifications({
           itemRecord,
           pullRequestRecord,
+          pullRequest,
           review,
           repository,
           sourceEventId: commentResult.sourceEventId,

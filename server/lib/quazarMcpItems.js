@@ -936,8 +936,9 @@ export function createQuazarItemService(supabase) {
               assignee_user_ids: [],
               section_id: sectionId,
               is_completed: false,
+              tags,
             }])
-            .select('id, title, is_completed, section_id, order_index, created_at, board_type')
+            .select('id, title, tags, is_completed, section_id, order_index, created_at, board_type')
             .single();
 
           if (error) {
@@ -969,13 +970,16 @@ export function createQuazarItemService(supabase) {
           if (Object.prototype.hasOwnProperty.call(patch, 'isCompleted')) {
             updates.is_completed = patch.isCompleted;
           }
+          if (Object.prototype.hasOwnProperty.call(patch, 'tags')) {
+            updates.tags = patch.tags;
+          }
 
           const { data, error } = await supabase
             .from(getProjectsTable(boardType))
             .update(updates)
             .eq('board_type', boardType)
             .eq('id', projectId)
-            .select('id, title, is_completed, section_id, order_index, created_at, board_type')
+            .select('id, title, tags, is_completed, section_id, order_index, created_at, board_type')
             .maybeSingle();
 
           if (error) {

@@ -32,6 +32,7 @@ import {
   validateSearchQuazarItemsInput,
   validateUpdateQuazarItemInput,
   validateUpdateQuazarProjectInput,
+  createQuazarItemService,
 } from './quazarMcpItems.js';
 
 test('normalizeProjectName collapses whitespace and lowercases values', () => {
@@ -920,4 +921,186 @@ test('createQuazarProjectUpdate returns normalized updated project detail', asyn
     createdAt: '2026-05-20T00:00:00.000Z',
     updatedAt: '2026-05-22T00:00:00.000Z',
   });
+});
+
+test('createQuazarItemService createProject persists tags in insert payload', async () => {
+  let insertedPayload = null;
+
+  const supabase = {
+    from(table) {
+      assert.equal(table, 'projects');
+
+      return {
+        select(fields) {
+          if (fields === 'id, title, board_type, order_index') {
+            return Promise.resolve({ data: [], error: null });
+          }
+
+          if (fields === 'order_index') {
+            return {
+              eq(column, value) {
+                assert.equal(column, 'board_type');
+                assert.equal(value, '개발팀');
+                return {
+                  order(orderColumn, options) {
+                    assert.equal(orderColumn, 'order_index');
+                    assert.deepEqual(options, { ascending: false });
+                    return {
+                      limit(limitValue) {
+                        assert.equal(limitValue, 1);
+                        return Promise.resolve({ data: [], error: null });
+                      },
+                    };
+                  },
+                };
+              },
+            };
+          }
+
+          throw new Error(`unexpected select fields: ${fields}`);
+        },
+        insert(rows) {
+          insertedPayload = rows;
+          return {
+            select(fields) {
+              assert.equal(fields, 'id, title, tags, is_completed, section_id, order_index, created_at, board_type');
+              return {
+                single() {
+                  return Promise.resolve({
+                    data: {
+                      id: 'project-a',
+                      title: '신규 온보딩 프로젝트',
+                      tags: ['docs'],
+                      is_completed: false,
+                      section_id: 'section-a',
+                      order_index: 0,
+                      created_at: '2026-05-22T00:00:00.000Z',
+                      board_type: '개발팀',
+                    },
+                    error: null,
+                  });
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+
+  const service = createQuazarItemService(supabase);
+  const result = await service.createProject({
+    boardType: '개발팀',
+    title: '신규 온보딩 프로젝트',
+    sectionId: 'section-a',
+    tags: ['docs'],
+  });
+
+  assert.deepEqual(insertedPayload, [{
+    title: '신규 온보딩 프로젝트',
+    order_index: 0,
+    board_type: '개발팀',
+    assignees: [],
+    assignee_user_ids: [],
+    section_id: 'section-a',
+    is_completed: false,
+    tags: ['docs'],
+  }]);
+  assert.deepEqual(result.tags, ['docs']);
+});
+
+test('createQuazarItemService updateProject persists tags in update payload', async () => {
+  let updatedPayload = null;
+
+  const supabase = {
+    from(table) {
+      assert.equal(table, 'projects');
+
+      return {
+        select(fields) {
+          assert.equal(fields, 'id, title, is_completed, section_id, order_index, created_at, board_type');
+          return {
+            eq(column, value) {
+              assert.equal(column, 'board_type');
+              assert.equal(value, '지원팀');
+              return {
+                eq(nextColumn, nextValue) {
+                  assert.equal(nextColumn, 'id');
+                  assert.equal(nextValue, 'project-z');
+                  return {
+                    maybeSingle() {
+                      return Promise.resolve({
+                        data: {
+                          id: 'project-z',
+                          title: '기존 프로젝트',
+                          is_completed: false,
+                          section_id: 'section-z',
+                          order_index: 4,
+                          created_at: '2026-05-20T00:00:00.000Z',
+                          board_type: '지원팀',
+                        },
+                        error: null,
+                      });
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+        update(payload) {
+          updatedPayload = payload;
+          return {
+            eq(column, value) {
+              assert.equal(column, 'board_type');
+              assert.equal(value, '지원팀');
+              return {
+                eq(nextColumn, nextValue) {
+                  assert.equal(nextColumn, 'id');
+                  assert.equal(nextValue, 'project-z');
+                  return {
+                    select(fields) {
+                      assert.equal(fields, 'id, title, tags, is_completed, section_id, order_index, created_at, board_type');
+                      return {
+                        maybeSingle() {
+                          return Promise.resolve({
+                            data: {
+                              id: 'project-z',
+                              title: 'CS 운영 개선',
+                              tags: ['ops'],
+                              is_completed: false,
+                              section_id: 'section-z',
+                              order_index: 4,
+                              created_at: '2026-05-20T00:00:00.000Z',
+                              updated_at: '2026-05-22T00:00:00.000Z',
+                              board_type: '지원팀',
+                            },
+                            error: null,
+                          });
+                        },
+                      };
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+
+  const service = createQuazarItemService(supabase);
+  const result = await service.updateProject({
+    boardType: '지원팀',
+    projectId: 'project-z',
+    title: 'CS 운영 개선',
+    tags: ['ops'],
+  });
+
+  assert.deepEqual(updatedPayload, {
+    title: 'CS 운영 개선',
+    tags: ['ops'],
+  });
+  assert.deepEqual(result.tags, ['ops']);
 });
