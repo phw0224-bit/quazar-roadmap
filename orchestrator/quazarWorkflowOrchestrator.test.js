@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   buildCommentDraft,
   buildDevelopmentItemDraft,
+  buildItemUpdateDraft,
   createWorkflowDryRun,
   executeWorkflowPlan,
   parseWorkflowRequest,
@@ -31,6 +32,12 @@ test('parseWorkflowRequest treats review phrasing as a read-only summary intent'
   assert.equal(parsed.intent, 'summarize-project');
 });
 
+test('parseWorkflowRequest treats item body updates as update-item intent', () => {
+  const parsed = parseWorkflowRequest('item-123 본문을 "새 본문"으로 바꿔줘');
+
+  assert.equal(parsed.intent, 'update-item');
+});
+
 test('buildDevelopmentItemDraft creates development-tag scaffold with request text embedded', () => {
   const draft = buildDevelopmentItemDraft('Pinata를 사용해서 JSON 데이터를 임시로 IPFS에 업로드하고 CID 응답을 받는다.');
 
@@ -47,6 +54,16 @@ test('buildCommentDraft creates daily comment scaffold when the request looks li
   assert.equal(draft.templateType, 'daily');
   assert.match(draft.content, /## 일일업무/);
   assert.match(draft.content, /원문 요청/);
+});
+
+test('buildItemUpdateDraft extracts status, tags, and description patches', () => {
+  const draft = buildItemUpdateDraft('item-123 본문을 "새 본문"으로 바꿔줘');
+  const statusDraft = buildItemUpdateDraft('item-123 상태를 done으로 바꿔줘');
+  const tagsDraft = buildItemUpdateDraft('item-123 태그를 ops, faq로 덮어써줘');
+
+  assert.equal(draft.patch.description, '새 본문');
+  assert.equal(statusDraft.patch.status, 'done');
+  assert.deepEqual(tagsDraft.patch.tags, ['ops', 'faq']);
 });
 
 test('createWorkflowDryRun resolves resources and produces an execution plan without mutating calls', async () => {
@@ -212,6 +229,31 @@ test('createWorkflowDryRun builds a comment-append plan when the request targets
   ]);
 });
 
+test('createWorkflowDryRun builds an update-item plan when the request targets an item body update', async () => {
+  const plan = await createWorkflowDryRun({
+    requestText: 'item-123 본문을 "새 본문"으로 바꿔줘',
+    boardType: '개발팀',
+  }, {
+    listProjects: async () => ({ projects: [] }),
+    getItem: async ({ itemId }) => ({
+      itemId,
+      id: itemId,
+      title: '기존 업무',
+    }),
+  });
+
+  assert.equal(plan.intent, 'update-item');
+  assert.equal(plan.targetItem.itemId, 'item-123');
+  assert.equal(plan.itemUpdateDraft.patch.description, '새 본문');
+  assert.equal(plan.canExecute, true);
+  assert.equal(plan.requiresConfirmation, false);
+  assert.match(plan.reviewPrompt, /아이템 수정 초안/);
+  assert.deepEqual(plan.steps.map((step) => step.type), [
+    'use-item',
+    'update-item',
+  ]);
+});
+
 test('executeWorkflowPlan executes item, issue, and branch steps in order and returns checkout prompt', async () => {
   const calls = [];
   const result = await executeWorkflowPlan({
@@ -339,6 +381,39 @@ test('executeWorkflowPlan executes a real dry-run comment plan without requiring
 
   assert.equal(result.status, 'EXECUTED');
   assert.equal(result.comment.commentId, 'comment-2');
+});
+
+test('executeWorkflowPlan executes item update plans via updateItem', async () => {
+  const calls = [];
+  const result = await executeWorkflowPlan({
+    ok: true,
+    status: 'PLANNED',
+    intent: 'update-item',
+    boardType: '개발팀',
+    targetItem: { itemId: 'item-123', title: '기존 업무' },
+    itemUpdateDraft: {
+      patch: {
+        description: '새 본문',
+      },
+    },
+    canExecute: true,
+    itemDraftApproved: true,
+  }, {
+    updateItem: async (payload) => {
+      calls.push(payload);
+      return {
+        ok: true,
+        status: 'UPDATED',
+        itemId: payload.itemId,
+        description: payload.description,
+      };
+    },
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].itemId, 'item-123');
+  assert.equal(calls[0].description, '새 본문');
+  assert.equal(result.item.description, '새 본문');
 });
 
 test('executeWorkflowPlan returns read-only summaries without mutation for summary plans', async () => {

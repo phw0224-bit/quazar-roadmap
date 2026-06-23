@@ -1,6 +1,6 @@
 ---
 name: quazar-workflow
-description: Use when working in the Quazar roadmap workspace and the user asks for a natural-language work-management flow such as finding or creating a section/project, drafting a development item, appending a work-log comment, reviewing a member project, creating a linked GitHub issue or branch, or asking whether to check out the branch after the workflow completes.
+description: Use when working in the Quazar roadmap workspace and the user asks for a natural-language work-management flow such as finding or creating a section/project, drafting a development item, updating an existing item body or safe-core fields, appending a work-log comment, reviewing a member project, creating a linked GitHub issue or branch, or asking whether to check out the branch after the workflow completes.
 ---
 
 # Quazar Workflow
@@ -37,6 +37,7 @@ Use this skill when the request looks like:
 - "이 작업을 Quazar 아이템으로 만들고 GitHub issue랑 branch도 연결해줘"
 - "박형우 프로젝트에서 이번 주 한 작업 정리해줘"
 - "item-123 댓글에 오늘 진행 내용 남겨줘"
+- "item-123 본문을 최신 내용으로 바꿔줘"
 
 Do not use this skill for:
 - Single atomic MCP actions the user already specified precisely
@@ -70,8 +71,9 @@ Before mutating anything, produce a dry-run plan.
 The dry-run should:
 - resolve section candidates
 - resolve project candidates
-- choose between item creation, comment append, or read-only summary
+- choose between item creation, item update, comment append, or read-only summary
 - build an item draft using the `개발` template when a new item is the right target
+- build an item update draft when an existing item body or safe-core field is the right target
 - build a comment draft using the repo comment template when a comment append is the right target
 - mark the draft as review-required before any mutating call
 - identify whether GitHub issue creation and branch creation are intended
@@ -94,7 +96,7 @@ Use MCP as an atomic toolbox in this order:
 3. `list_quazar_projects`
 4. `create_quazar_project` only if needed and confirmed
 5. `get_quazar_project_activity` when the request is review/report oriented
-6. `create_quazar_item`
+6. `create_quazar_item` or `update_quazar_item`
 7. `create_quazar_item_comment`
 8. `create_quazar_item_github_issue`
 9. `create_quazar_item_github_branch`

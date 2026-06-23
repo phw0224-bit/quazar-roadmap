@@ -21,6 +21,22 @@ function detectMutationIntent(normalizedText) {
   return /(?:만들어줘|생성|추가|등록|작성|남겨줘|달아줘)/i.test(normalizedText);
 }
 
+function detectUpdateVerbIntent(normalizedText) {
+  return /(?:바꿔줘|수정해줘|업데이트해줘|변경해줘|교체해줘|덮어써줘)/i.test(normalizedText);
+}
+
+function detectItemUpdateIntent(normalizedText, itemId) {
+  if (!itemId || detectCommentIntent(normalizedText)) {
+    return false;
+  }
+
+  if (!detectUpdateVerbIntent(normalizedText)) {
+    return false;
+  }
+
+  return /(?:상태|우선순위|priority|본문|내용|설명|description|태그|tags?)/i.test(normalizedText);
+}
+
 function detectSummaryIntent(normalizedText) {
   if (detectMutationIntent(normalizedText)) {
     return false;
@@ -77,11 +93,14 @@ export function parseWorkflowRequest(requestText) {
     ? summaryTokens.join(' ')
     : normalizedText.slice(0, 60);
   const isCommentIntent = detectCommentIntent(normalizedText);
+  const isItemUpdateIntent = detectItemUpdateIntent(normalizedText, itemIdMatch?.[1]);
   const isSummaryIntent = detectSummaryIntent(normalizedText);
 
   let intent = 'create-item';
   if (isCommentIntent && itemIdMatch?.[1]) {
     intent = 'append-comment';
+  } else if (isItemUpdateIntent) {
+    intent = 'update-item';
   } else if (isSummaryIntent) {
     intent = 'summarize-project';
   }
@@ -108,6 +127,43 @@ function buildSummaryTitle(parsed) {
     return token;
   });
   return normalizeWhitespace(`${restoredTokens.join(' ')} 작업`.replace(/\s+작업$/, ' 구현'));
+}
+
+function extractDelimitedValue(text) {
+  const quoteMatch = text.match(/["'“”‘’](.+?)["'“”‘’]/);
+  return quoteMatch?.[1]?.trim() || '';
+}
+
+function extractItemUpdatePatch(normalizedText) {
+  const patch = {};
+
+  const statusMatch = normalizedText.match(/(?:상태|status)(?:를|을)?\s+([A-Za-z0-9_-]+)\s*(?:으로|로)?\s*(?:바꿔줘|수정해줘|업데이트해줘|변경해줘|덮어써줘)/i);
+  if (statusMatch?.[1]) {
+    patch.status = statusMatch[1];
+  }
+
+  const priorityMatch = normalizedText.match(/(?:우선순위|priority)(?:를|을)?\s+([A-Za-z0-9_-]+)\s*(?:으로|로)?\s*(?:바꿔줘|수정해줘|업데이트해줘|변경해줘|덮어써줘)/i);
+  if (priorityMatch?.[1]) {
+    patch.priority = priorityMatch[1];
+  }
+
+  const tagsMatch = normalizedText.match(/(?:태그|tags?)(?:를|을)?\s+([A-Za-z0-9_, -]+)\s*(?:으로|로)?\s*(?:바꿔줘|수정해줘|업데이트해줘|변경해줘|덮어써줘)/i);
+  if (tagsMatch?.[1]) {
+    patch.tags = tagsMatch[1]
+      .split(',')
+      .map((tag) => normalizeWhitespace(tag))
+      .filter(Boolean);
+  }
+
+  const descriptionDelimited = extractDelimitedValue(normalizedText);
+  const descriptionMatch = normalizedText.match(/(?:본문|내용|설명|description)(?:을|를)?\s+(.+?)\s*(?:으로|로)?\s*(?:바꿔줘|수정해줘|업데이트해줘|변경해줘|교체해줘)/i);
+  if (descriptionDelimited) {
+    patch.description = descriptionDelimited;
+  } else if (descriptionMatch?.[1]) {
+    patch.description = normalizeWhitespace(descriptionMatch[1]);
+  }
+
+  return patch;
 }
 
 export function buildDevelopmentItemDraft(requestText) {
@@ -144,6 +200,22 @@ export function buildCommentDraft(requestText) {
 ## [원문 요청]
 - ${parsed.requestText}
 `,
+  };
+}
+
+export function buildItemUpdateDraft(requestText) {
+  const parsed = typeof requestText === 'string' ? parseWorkflowRequest(requestText) : requestText;
+  const patch = extractItemUpdatePatch(parsed.requestText);
+  const summaryParts = [];
+
+  if (patch.status) summaryParts.push(`status -> ${patch.status}`);
+  if (patch.priority) summaryParts.push(`priority -> ${patch.priority}`);
+  if (patch.tags) summaryParts.push(`tags -> ${patch.tags.join(', ')}`);
+  if (patch.description) summaryParts.push(`description -> ${patch.description}`);
+
+  return {
+    patch,
+    summary: summaryParts.join('\n'),
   };
 }
 
@@ -202,6 +274,7 @@ export async function createWorkflowDryRun(input, deps) {
 
   const itemDraft = buildDevelopmentItemDraft(parsed);
   const commentDraft = buildCommentDraft(parsed);
+  const itemUpdateDraft = buildItemUpdateDraft(parsed);
   const steps = [];
 
   if (parsed.sectionName) {
@@ -245,6 +318,26 @@ export async function createWorkflowDryRun(input, deps) {
         : `${parsed.itemId || 'itemId'} 아이템 확인 필요`,
     });
     canExecute = Boolean(targetItem);
+  } else if (parsed.intent === 'update-item') {
+    planType = 'update-item';
+    if (parsed.itemId && typeof deps.getItem === 'function') {
+      targetItem = await deps.getItem({
+        boardType: parsed.boardType,
+        itemId: parsed.itemId,
+      });
+    }
+
+    steps.push({
+      type: 'use-item',
+      label: targetItem
+        ? `${parsed.itemId} 아이템 본문/속성 수정`
+        : `${parsed.itemId || 'itemId'} 아이템 확인 필요`,
+    });
+    steps.push({
+      type: 'update-item',
+      label: '아이템 본문/속성 수정',
+    });
+    canExecute = Boolean(targetItem) && Object.keys(itemUpdateDraft.patch).length > 0;
   } else if (parsed.intent === 'summarize-project') {
     planType = 'summarize-project';
     requiresDraftReview = false;
@@ -269,6 +362,8 @@ export async function createWorkflowDryRun(input, deps) {
 
   const requiresConfirmation = parsed.intent === 'append-comment'
     ? !targetItem
+    : parsed.intent === 'update-item'
+      ? !targetItem
     : sectionResolution.requiresConfirmation || projectResolution.requiresConfirmation;
 
   return {
@@ -283,11 +378,14 @@ export async function createWorkflowDryRun(input, deps) {
     projectResolution,
     itemDraft,
     commentDraft,
+    itemUpdateDraft,
     targetItem,
     requiresDraftReview,
     itemDraftApproved: false,
     reviewPrompt: planType === 'append-comment'
       ? '댓글 초안입니다. 내용과 템플릿 방향이 괜찮은지 의견을 주세요. 승인 전에는 생성하지 않습니다.'
+      : planType === 'update-item'
+        ? '아이템 수정 초안입니다. 본문/속성 변경 방향이 괜찮은지 의견을 주세요. 승인 전에는 수정하지 않습니다.'
       : planType === 'summarize-project'
         ? '읽기 전용 요약 계획입니다. 원본 데이터 확인 후 요약만 수행합니다.'
         : '아이템 초안입니다. 제목, 태그, 본문 방향이 괜찮은지 의견을 주세요. 승인 전에는 생성하지 않습니다.',
@@ -347,6 +445,41 @@ export async function executeWorkflowPlan(plan, deps) {
       ok: true,
       status: 'EXECUTED',
       comment: commentResult,
+      shouldAskForCheckout: false,
+      checkoutPrompt: null,
+      suggestedCheckoutCommand: null,
+    };
+  }
+
+  if (plan?.intent === 'update-item') {
+    if (!plan?.targetItem?.itemId && !plan?.targetItem?.id) {
+      const error = new Error('Workflow item update plan is not ready to execute.');
+      error.code = 'INVALID_WORKFLOW_PLAN';
+      throw error;
+    }
+
+    if (plan?.canExecute === false || !plan?.itemUpdateDraft || Object.keys(plan.itemUpdateDraft.patch || {}).length === 0) {
+      const error = new Error('Workflow item update plan is not ready to execute.');
+      error.code = 'INVALID_WORKFLOW_PLAN';
+      throw error;
+    }
+
+    if (plan?.itemDraftApproved !== true) {
+      const error = new Error('Item draft review is required before execution.');
+      error.code = 'ITEM_DRAFT_REVIEW_REQUIRED';
+      throw error;
+    }
+
+    const itemResult = await deps.updateItem({
+      boardType: plan.boardType,
+      itemId: plan.targetItem.itemId || plan.targetItem.id,
+      ...plan.itemUpdateDraft.patch,
+    });
+
+    return {
+      ok: true,
+      status: 'EXECUTED',
+      item: itemResult,
       shouldAskForCheckout: false,
       checkoutPrompt: null,
       suggestedCheckoutCommand: null,
