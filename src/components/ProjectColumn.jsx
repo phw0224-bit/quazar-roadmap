@@ -27,33 +27,6 @@ import {
   PROJECT_MENU_SURFACE_CLASS,
 } from './projectColumnMenu';
 
-const COMPLETED_GROUPING_STORAGE_KEY = 'project-column-completed-grouping';
-
-function readCompletedGroupingPreference(projectId) {
-  if (typeof window === 'undefined' || !projectId) return true;
-
-  try {
-    const raw = window.localStorage.getItem(COMPLETED_GROUPING_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-    return parsed[projectId] ?? true;
-  } catch {
-    return true;
-  }
-}
-
-function writeCompletedGroupingPreference(projectId, groupCompletedAtBottom) {
-  if (typeof window === 'undefined' || !projectId) return;
-
-  try {
-    const raw = window.localStorage.getItem(COMPLETED_GROUPING_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-    parsed[projectId] = groupCompletedAtBottom;
-    window.localStorage.setItem(COMPLETED_GROUPING_STORAGE_KEY, JSON.stringify(parsed));
-  } catch {
-    // Ignore storage failures and keep runtime state only.
-  }
-}
-
 function getProjectTint(projectId, projectIndex) {
   if (Number.isInteger(projectIndex)) {
     return PROJECT_TINTS[Math.abs(projectIndex) % PROJECT_TINTS.length];
@@ -85,8 +58,7 @@ export default function ProjectColumn({
   const COLLAPSED_COUNT = 6;
   const [isExpanded, setIsExpanded] = useState(false);
   const [hideCompleted, setHideCompleted] = useState(false);
-  const [groupCompletedAtBottom, setGroupCompletedAtBottom] = useState(() => readCompletedGroupingPreference(project.id));
-  const orderedItems = sortProjectItemsByCompletion(project.items, { groupCompletedAtBottom });
+  const orderedItems = sortProjectItemsByCompletion(project.items);
   const completedCount = orderedItems.filter(item => item.status === 'done').length;
   const displayItems = hideCompleted
     ? orderedItems.filter(item => item.status !== 'done')
@@ -130,12 +102,7 @@ export default function ProjectColumn({
   useEffect(() => {
     setIsEditingAssignees(false);
     setShowMenu(false);
-    setGroupCompletedAtBottom(readCompletedGroupingPreference(project.id));
   }, [project.id, project.title, project.assignees]);
-
-  useEffect(() => {
-    writeCompletedGroupingPreference(project.id, groupCompletedAtBottom);
-  }, [groupCompletedAtBottom, project.id]);
 
   useEffect(() => {
     if (!showMenu) return undefined;
@@ -276,17 +243,6 @@ export default function ProjectColumn({
                   >
                     <CheckCircle2 size={14} strokeWidth={2.2} />
                     {project.is_completed ? '프로젝트 완료 해제' : '프로젝트 완료 처리'}
-                  </button>
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:text-text-secondary dark:hover:bg-bg-hover"
-                    onClick={() => {
-                      setGroupCompletedAtBottom(prev => !prev);
-                      setShowMenu(false);
-                    }}
-                  >
-                    <CheckCircle2 size={14} strokeWidth={2.2} />
-                    {groupCompletedAtBottom ? '완료 항목 아래로 정렬 끄기' : '완료 항목 아래로 정렬 켜기'}
                   </button>
                   {completedCount > 0 && (
                     <button

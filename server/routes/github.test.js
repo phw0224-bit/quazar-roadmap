@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   buildGitHubReviewNotificationPayload,
   resolveGitHubReviewUrl,
+  resolveMcpGitHubActorUserIdFromItemRecord,
 } from './github.js';
 
 test('resolveGitHubReviewUrl prefers direct review html_url', () => {
@@ -75,4 +76,37 @@ test('buildGitHubReviewNotificationPayload includes browser-safe review url for 
     pull_number: 12,
     source_event_id: 'evt-123',
   });
+});
+
+test('resolveMcpGitHubActorUserIdFromItemRecord prefers created_by', () => {
+  const userId = resolveMcpGitHubActorUserIdFromItemRecord({
+    item: {
+      created_by: 'user-created',
+      assignee_user_ids: ['user-assignee-1', 'user-assignee-2'],
+    },
+  });
+
+  assert.equal(userId, 'user-created');
+});
+
+test('resolveMcpGitHubActorUserIdFromItemRecord falls back to first assignee user id', () => {
+  const userId = resolveMcpGitHubActorUserIdFromItemRecord({
+    item: {
+      created_by: null,
+      assignee_user_ids: ['', 'user-assignee-2', 'user-assignee-3'],
+    },
+  });
+
+  assert.equal(userId, 'user-assignee-2');
+});
+
+test('resolveMcpGitHubActorUserIdFromItemRecord returns null without actor candidates', () => {
+  const userId = resolveMcpGitHubActorUserIdFromItemRecord({
+    item: {
+      created_by: null,
+      assignee_user_ids: [],
+    },
+  });
+
+  assert.equal(userId, null);
 });

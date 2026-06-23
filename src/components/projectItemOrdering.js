@@ -1,5 +1,5 @@
 export function sortProjectItemsByCompletion(items = [], options = {}) {
-  const { groupCompletedAtBottom = true } = options;
+  const { groupCompletedAtBottom = false } = options;
 
   return [...items].sort((left, right) => {
     const leftDone = left?.status === 'done';
