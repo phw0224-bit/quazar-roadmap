@@ -46,13 +46,20 @@ function wrapSelection(textarea, selection, before, after, cursorOffset = 0) {
   textarea.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
+function replaceSelection(textarea, nextText, nextSelectionStart, nextSelectionEnd = nextSelectionStart) {
+  textarea.value = nextText;
+  textarea.selectionStart = nextSelectionStart;
+  textarea.selectionEnd = nextSelectionEnd;
+  textarea.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
 /**
  * 글머리 목록 삽입 (`- 항목`)
  * @param {HTMLTextAreaElement} textarea
  */
 export function insertBulletList(textarea) {
   const selection = getSelection(textarea);
-  const { text, start, end } = selection;
+  const { text, start } = selection;
   
   if (text) {
     // 선택된 텍스트가 여러 줄인 경우 각 줄에 - 추가
@@ -71,6 +78,29 @@ export function insertBulletList(textarea) {
     // 커서 위치에 새로운 글머리 항목 추가
     wrapSelection(textarea, selection, '- ', '', 0);
   }
+}
+
+export function insertOrderedList(textarea) {
+  const selection = getSelection(textarea);
+  const { text } = selection;
+
+  if (text) {
+    const wrapped = text
+      .split('\n')
+      .map((line, index) => `${index + 1}. ${line.replace(/^\d+\.\s+/, '')}`)
+      .join('\n');
+    const beforeText = textarea.value.substring(0, selection.start);
+    const afterText = textarea.value.substring(selection.end);
+    replaceSelection(
+      textarea,
+      beforeText + wrapped + afterText,
+      selection.start,
+      selection.start + wrapped.length,
+    );
+    return;
+  }
+
+  wrapSelection(textarea, selection, '1. ', '', 0);
 }
 
 /**
@@ -114,4 +144,41 @@ export function insertTable(textarea) {
 export function insertCheckbox(textarea) {
   const selection = getSelection(textarea);
   wrapSelection(textarea, selection, '- [ ] ', '', 0);
+}
+
+export function wrapBold(textarea) {
+  const selection = getSelection(textarea);
+  wrapSelection(textarea, selection, '**', '**', 0);
+}
+
+export function insertHeading(textarea, level = 1) {
+  const selection = getSelection(textarea);
+  const prefix = `${'#'.repeat(Math.min(Math.max(level, 1), 6))} `;
+  const beforeText = textarea.value.substring(0, selection.start);
+  const afterText = textarea.value.substring(selection.end);
+  const selectedText = selection.text || '제목';
+  const linePrefix = selection.start > 0 && !beforeText.endsWith('\n') ? '\n' : '';
+  const nextText = `${beforeText}${linePrefix}${prefix}${selectedText}${afterText}`;
+  const selectionStart = beforeText.length + linePrefix.length + prefix.length;
+  replaceSelection(textarea, nextText, selectionStart, selectionStart + selectedText.length);
+}
+
+export function insertBlockquote(textarea) {
+  const selection = getSelection(textarea);
+  const sourceText = selection.text || '인용문';
+  const quoted = sourceText.split('\n').map((line) => `> ${line}`).join('\n');
+  const beforeText = textarea.value.substring(0, selection.start);
+  const afterText = textarea.value.substring(selection.end);
+  replaceSelection(textarea, `${beforeText}${quoted}${afterText}`, selection.start, selection.start + quoted.length);
+}
+
+export function insertCodeBlock(textarea) {
+  const selection = getSelection(textarea);
+  const selectedText = selection.text || '\n';
+  const snippet = `\`\`\`\n${selectedText}\n\`\`\``;
+  const beforeText = textarea.value.substring(0, selection.start);
+  const afterText = textarea.value.substring(selection.end);
+  const nextText = `${beforeText}${snippet}${afterText}`;
+  const cursor = beforeText.length + 4;
+  replaceSelection(textarea, nextText, cursor, cursor + selectedText.length);
 }

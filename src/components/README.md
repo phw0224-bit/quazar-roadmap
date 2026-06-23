@@ -20,7 +20,7 @@
 | `RepositoriesDashboard.jsx` | GitHub 레포별 PR/이슈/커밋, 티켓 prefix 설정, 로드맵 아이템 연결 대시보드 |
 | `NotificationsInbox.jsx` | 보드 헤더 우측 알림함. 담당자 지정 알림 조회/읽음 처리/대상 이동 + 브라우저 알림 권한/팝업 처리 |
 | `PresenceAvatars.jsx` | 보드 헤더 우측의 전체 접속자 아바타 표시 |
-| `ItemDetailPanel.jsx` | 우측 슬라이드 패널. 에디터+메타데이터+GitHub 이슈/브랜치/PR 생성·표시+AI요약+댓글. 프로젝트/아이템 공용 shell이지만 엔티티별 저장 경로를 분기 |
+| `ItemDetailPanel.jsx` | 우측 슬라이드 패널. 에디터+메타데이터+GitHub 이슈/브랜치/PR 생성·표시+AI요약+댓글+문서 레일(목차/백링크/언급). 프로젝트/아이템 공용 shell이지만 엔티티별 저장 경로를 분기 |
 | `ItemViewers.jsx` | 상세 패널 상단에서 같은 아이템을 보는 중/편집 중인 사용자 표시 |
 | `ItemDescriptionSection.jsx` | ItemDetailPanel 내부의 Markdown live/source/view editor, AI 요약, 링크 모달 전담 섹션. 프로젝트 상세에서는 slash 명령을 새 업무 생성으로 연결 |
 | `itemDescriptionMode.js` | 상세 설명 섹션이 본문 유무와 읽기 전용 여부에 따라 기본 모드를 정하는 규칙 |

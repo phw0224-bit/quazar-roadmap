@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, MessageSquarePlus, X, Loader2 } from 'lucide-react';
+import { Eye, PenSquare, Send, MessageSquarePlus, X, Loader2 } from 'lucide-react';
 import Comment from './Comment';
 import CommentMarkdownToolbar from './CommentMarkdownToolbar';
+import MarkdownPreview from './editor/MarkdownPreview';
 import { COMMENT_TEMPLATES } from '../lib/itemTemplates';
 import { getCommentScaffold } from '../lib/itemTemplates';
 
@@ -19,6 +20,7 @@ export default function CommentSection({
   const [newCommentText, setNewCommentText] = useState('');
   const [selectedTag, setSelectedTag] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [composerMode, setComposerMode] = useState('write');
   const textareaRef = useRef(null);
 
   const adjustTextareaHeight = () => {
@@ -43,6 +45,7 @@ export default function CommentSection({
       setNewCommentText('');
       setSelectedTag(null);
       setShowAddComment(false);
+      setComposerMode('write');
       onShowToast?.('댓글이 작성되었습니다.');
     } catch {
       onShowToast?.('댓글 작성에 실패했습니다.');
@@ -72,9 +75,9 @@ export default function CommentSection({
               itemId={itemId}
               onUpdateComment={onUpdateComment}
               onDeleteComment={onDeleteComment}
-              onShowConfirm={onShowConfirm}
-              onShowToast={onShowToast}
-            />
+                  onShowConfirm={onShowConfirm}
+                  onShowToast={onShowToast}
+                />
           ))
         ) : (
           <div className="flex flex-col items-center justify-center py-12 bg-gray-50/50 dark:bg-bg-hover/20 rounded-3xl border border-dashed border-gray-200 dark:border-border-subtle">
@@ -134,28 +137,70 @@ export default function CommentSection({
               </div>
 
               <CommentMarkdownToolbar textareaRef={textareaRef} />
+
+              <div className="flex items-center gap-1 self-start rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-border-subtle dark:bg-bg-hover/40">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setComposerMode('write');
+                    textareaRef.current?.focus();
+                  }}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-black uppercase tracking-widest ${
+                    composerMode === 'write'
+                      ? 'bg-white text-gray-900 shadow-sm dark:bg-bg-base dark:text-text-primary'
+                      : 'text-gray-500 dark:text-text-secondary'
+                  }`}
+                >
+                  <PenSquare size={12} />
+                  작성
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setComposerMode('preview');
+                  }}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-black uppercase tracking-widest ${
+                    composerMode === 'preview'
+                      ? 'bg-white text-gray-900 shadow-sm dark:bg-bg-base dark:text-text-primary'
+                      : 'text-gray-500 dark:text-text-secondary'
+                  }`}
+                >
+                  <Eye size={12} />
+                  미리보기
+                </button>
+              </div>
               
-              <textarea
-                ref={textareaRef}
-                className="w-full p-0 border-none rounded-lg text-sm font-bold resize-none min-h-[140px] focus:ring-0 bg-transparent text-gray-900 dark:text-text-primary placeholder:text-gray-300 dark:placeholder:text-text-tertiary overflow-hidden"
-                placeholder="팀원들과 공유할 의견을 남겨주세요..."
-                value={newCommentText}
-                onChange={(e) => {
-                  setNewCommentText(e.target.value);
-                  adjustTextareaHeight();
-                }}
-                onKeyDown={e => e.stopPropagation()}
-                autoFocus
-              />
+              {composerMode === 'write' ? (
+                <textarea
+                  ref={textareaRef}
+                  className="w-full p-0 border-none rounded-lg text-sm font-bold resize-none min-h-[140px] focus:ring-0 bg-transparent text-gray-900 dark:text-text-primary placeholder:text-gray-300 dark:placeholder:text-text-tertiary overflow-hidden"
+                  placeholder="팀원들과 공유할 의견을 남겨주세요..."
+                  value={newCommentText}
+                  onChange={(e) => {
+                    setNewCommentText(e.target.value);
+                    adjustTextareaHeight();
+                  }}
+                  onKeyDown={e => e.stopPropagation()}
+                  autoFocus
+                />
+              ) : (
+                <MarkdownPreview
+                  content={newCommentText || '_미리볼 내용이 없습니다._'}
+                  className="min-h-[140px] rounded-2xl border-dashed bg-gray-50/70 text-sm shadow-none dark:bg-bg-base"
+                />
+              )}
             </div>
             <div className="flex justify-end gap-2 pt-3 border-t border-gray-50 dark:border-border-subtle">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowAddComment(false);
-                  setNewCommentText('');
-                  setSelectedTag(null);
-                }}
+                      setShowAddComment(false);
+                      setNewCommentText('');
+                      setSelectedTag(null);
+                      setComposerMode('write');
+                    }}
                 disabled={isSubmitting}
                 className="px-5 py-2 text-[13px] font-bold text-gray-400 hover:text-gray-900 dark:hover:text-text-primary transition-colors cursor-pointer uppercase tracking-widest disabled:cursor-not-allowed disabled:opacity-50"
               >

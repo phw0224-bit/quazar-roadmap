@@ -4,12 +4,27 @@
  * 필수 기능: 글머리, 오늘 날짜, 표, 체크박스
  */
 
-import { List, Calendar, Table2, CheckSquare } from 'lucide-react';
+import {
+  Bold,
+  Calendar,
+  CheckSquare,
+  Code,
+  Heading1,
+  List,
+  ListOrdered,
+  Quote,
+  Table2,
+} from 'lucide-react';
 import { 
+  insertBlockquote,
   insertBulletList, 
+  insertCodeBlock,
+  insertHeading,
+  insertOrderedList,
   insertToday, 
   insertTable, 
-  insertCheckbox 
+  insertCheckbox,
+  wrapBold,
 } from '../lib/markdownHelpers';
 
 function ToolbarButton({ title, onClick, children, disabled = false }) {
@@ -31,49 +46,36 @@ function ToolbarButton({ title, onClick, children, disabled = false }) {
  * @param {Object} props
  * @param {React.RefObject<HTMLTextAreaElement>} props.textareaRef - textarea ref
  */
+const TOOLBAR_ACTIONS = [
+  { key: 'bold', label: '굵게', Icon: Bold, run: wrapBold },
+  { key: 'heading', label: '제목', Icon: Heading1, run: (textarea) => insertHeading(textarea, 1) },
+  { key: 'bullet', label: '목록', Icon: List, run: insertBulletList },
+  { key: 'ordered', label: '번호', Icon: ListOrdered, run: insertOrderedList },
+  { key: 'checkbox', label: '체크', Icon: CheckSquare, run: insertCheckbox },
+  { key: 'quote', label: '인용', Icon: Quote, run: insertBlockquote },
+  { key: 'code', label: '코드', Icon: Code, run: insertCodeBlock },
+  { key: 'table', label: '표', Icon: Table2, run: insertTable },
+  { key: 'today', label: '날짜', Icon: Calendar, run: insertToday },
+];
+
 export default function CommentMarkdownToolbar({ textareaRef }) {
-  const handleBulletList = () => {
+  const runAction = (action) => {
     if (textareaRef.current) {
-      insertBulletList(textareaRef.current);
-      textareaRef.current.focus();
-    }
-  };
-
-  const handleToday = () => {
-    if (textareaRef.current) {
-      insertToday(textareaRef.current);
-      textareaRef.current.focus();
-    }
-  };
-
-  const handleTable = () => {
-    if (textareaRef.current) {
-      insertTable(textareaRef.current);
-      textareaRef.current.focus();
-    }
-  };
-
-  const handleCheckbox = () => {
-    if (textareaRef.current) {
-      insertCheckbox(textareaRef.current);
+      action.run(textareaRef.current);
       textareaRef.current.focus();
     }
   };
 
   return (
-    <div className="mb-2 flex gap-2">
-      <ToolbarButton title="글머리 목록" onClick={handleBulletList}>
-        <List size={15} />
-      </ToolbarButton>
-      <ToolbarButton title="오늘 날짜" onClick={handleToday}>
-        <Calendar size={15} />
-      </ToolbarButton>
-      <ToolbarButton title="표" onClick={handleTable}>
-        <Table2 size={15} />
-      </ToolbarButton>
-      <ToolbarButton title="체크박스" onClick={handleCheckbox}>
-        <CheckSquare size={15} />
-      </ToolbarButton>
+    <div className="mb-2 flex flex-wrap gap-2">
+      {TOOLBAR_ACTIONS.map((action) => (
+        <ToolbarButton key={action.key} title={action.label} onClick={() => runAction(action)}>
+          <span className="inline-flex items-center gap-1.5">
+            <action.Icon size={15} />
+            <span className="text-[11px] font-bold">{action.label}</span>
+          </span>
+        </ToolbarButton>
+      ))}
     </div>
   );
 }

@@ -1355,8 +1355,8 @@ export async function getBacklinks(itemId) {
     { data: directMatchesMain, error: directErrorMain },
     { data: directMatchesMemos, error: directErrorMemos },
   ] = await Promise.all([
-    supabase.from('items').select('id, title, content, page_type, project_id').ilike('description', `%|${itemId}]]%`),
-    supabase.from('roadmap_items').select('id, title, content, page_type, project_id').ilike('description', `%|${itemId}]]%`),
+    supabase.from('items').select('id, title, content, description, page_type, project_id').ilike('description', `%|${itemId}]]%`),
+    supabase.from('roadmap_items').select('id, title, content, description, page_type, project_id').ilike('description', `%|${itemId}]]%`),
     supabase.from(personalMemosTable).select('id, title, content, description').ilike('description', `%|${itemId}]]%`),
   ]);
   if (directError) throw directError;
@@ -1393,8 +1393,8 @@ export async function getBacklinks(itemId) {
       { data: titleMatchesMain, error: titleErrorMain },
       { data: titleMatchesMemos, error: titleErrorMemos },
     ] = await Promise.all([
-      supabase.from('items').select('id, title, content, page_type, project_id').ilike('description', `%[[${title}]]%`),
-      supabase.from('roadmap_items').select('id, title, content, page_type, project_id').ilike('description', `%[[${title}]]%`),
+      supabase.from('items').select('id, title, content, description, page_type, project_id').ilike('description', `%[[${title}]]%`),
+      supabase.from('roadmap_items').select('id, title, content, description, page_type, project_id').ilike('description', `%[[${title}]]%`),
       supabase.from(personalMemosTable).select('id, title, content, description').ilike('description', `%[[${title}]]%`),
     ]);
     if (titleError) throw titleError;

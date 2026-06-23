@@ -5,14 +5,30 @@
  * ItemDescriptionSection이 아이템 전환 시 일관된 첫 화면을 보여주도록 돕는다.
  */
 
+const DESCRIPTION_MODE_STORAGE_KEY = 'item-description-mode';
+const VALID_DESCRIPTION_MODES = new Set(['live', 'source', 'preview']);
+
 /**
  * @description 상세 설명의 초기 보기 모드를 결정한다.
- * @param {Object} options - `{ isReadOnly, description }`
+ * @param {Object} options - `{ isReadOnly }`
  * @returns {string} `'preview'|'live'`
  */
-export function getInitialDescriptionMode({ isReadOnly, description }) {
+export function getInitialDescriptionMode({ isReadOnly }) {
   if (isReadOnly) return 'preview';
+
+  if (typeof window !== 'undefined') {
+    const savedMode = window.localStorage.getItem(DESCRIPTION_MODE_STORAGE_KEY);
+    if (VALID_DESCRIPTION_MODES.has(savedMode)) {
+      return savedMode;
+    }
+  }
 
   // 기본값을 항상 live로 설정
   return 'live';
+}
+
+export function persistDescriptionMode(mode) {
+  if (typeof window === 'undefined') return;
+  if (!VALID_DESCRIPTION_MODES.has(mode)) return;
+  window.localStorage.setItem(DESCRIPTION_MODE_STORAGE_KEY, mode);
 }

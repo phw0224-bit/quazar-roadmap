@@ -18,24 +18,6 @@ import {
   Calendar,
 } from 'lucide-react';
 
-const TOOLBAR_COMMAND_IDS = [
-  'h1',
-  'h2',
-  'h3',
-  'bullet',
-  'numbered',
-  'todo',
-  'quote',
-  'code',
-  'table',
-  'divider',
-  'toggle',
-  'toggle-note',
-  'link-page',
-  'page',
-  'image',
-];
-
 const TOOLBAR_ICONS = {
   h1: Heading1,
   h2: Heading2,
@@ -54,16 +36,33 @@ const TOOLBAR_ICONS = {
   image: ImagePlus,
 };
 
-function ToolbarButton({ title, onClick, children, disabled = false }) {
+const TOOLBAR_GROUPS = [
+  {
+    title: '텍스트',
+    items: ['h1', 'h2', 'h3', 'bullet', 'numbered', 'todo', 'bold'],
+  },
+  {
+    title: '구조',
+    items: ['quote', 'code', 'table', 'divider', 'toggle', 'toggle-note'],
+  },
+  {
+    title: '삽입',
+    items: ['link-page', 'page', 'image', 'date'],
+  },
+];
+
+function ToolbarButton({ title, label, onClick, children, disabled = false }) {
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border-subtle dark:bg-bg-base dark:text-text-secondary dark:hover:bg-bg-hover dark:hover:text-text-primary"
+      aria-label={title}
+      className="inline-flex min-w-[72px] items-center gap-2 rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-left text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border-subtle dark:bg-bg-base dark:text-text-secondary dark:hover:bg-bg-hover dark:hover:text-text-primary"
     >
       {children}
+      <span className="text-[11px] font-bold tracking-tight">{label}</span>
     </button>
   );
 }
@@ -89,33 +88,54 @@ function EditorToolbar({
 
   return (
     <div className="relative rounded-2xl border border-gray-200 bg-gray-50 px-2 py-2 dark:border-border-subtle dark:bg-bg-elevated">
-      <div className="flex flex-wrap items-center gap-1">
-        {TOOLBAR_COMMAND_IDS.map((commandId) => {
-          const command = commandMap[commandId];
-          const Icon = TOOLBAR_ICONS[commandId];
-          const isDisabled = (commandId === 'link-page' && !onLinkExistingPage)
-            || (commandId === 'page' && !onAddChildPage)
-            || (commandId === 'image' && !itemId);
+      <div className="flex flex-col gap-2">
+        {TOOLBAR_GROUPS.map((group) => (
+          <div key={group.title} className="flex flex-col gap-1">
+            <span className="px-1 text-[10px] font-black uppercase tracking-[0.18em] text-gray-400 dark:text-text-tertiary">
+              {group.title}
+            </span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {group.items.map((item) => {
+                if (item === 'bold') {
+                  return (
+                    <ToolbarButton key={item} title="굵게" label="굵게" onClick={insertBold}>
+                      <Bold size={15} />
+                    </ToolbarButton>
+                  );
+                }
 
-          return (
-            <ToolbarButton
-              key={commandId}
-              title={command.label}
-              onClick={() => runCommandById(commandId)}
-              disabled={isDisabled}
-            >
-              <Icon size={15} />
-            </ToolbarButton>
-          );
-        })}
-        <ToolbarButton title="굵게" onClick={insertBold}>
-          <Bold size={15} />
-        </ToolbarButton>
-        {onInsertDate && (
-          <ToolbarButton title="오늘 날짜 삽입" onClick={onInsertDate}>
-            <Calendar size={15} />
-          </ToolbarButton>
-        )}
+                if (item === 'date') {
+                  if (!onInsertDate) return null;
+                  return (
+                    <ToolbarButton key={item} title="오늘 날짜 삽입" label="날짜" onClick={onInsertDate}>
+                      <Calendar size={15} />
+                    </ToolbarButton>
+                  );
+                }
+
+                const command = commandMap[item];
+                if (!command) return null;
+
+                const Icon = TOOLBAR_ICONS[item];
+                const isDisabled = (item === 'link-page' && !onLinkExistingPage)
+                  || (item === 'page' && !onAddChildPage)
+                  || (item === 'image' && !itemId);
+
+                return (
+                  <ToolbarButton
+                    key={item}
+                    title={command.label}
+                    label={command.label}
+                    onClick={() => runCommandById(item)}
+                    disabled={isDisabled}
+                  >
+                    <Icon size={15} />
+                  </ToolbarButton>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
       <input

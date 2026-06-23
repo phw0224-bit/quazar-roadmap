@@ -430,12 +430,79 @@ input:focus, textarea:focus {
   letter-spacing: -0.01em;
 }
 
+.markdown-preview .markdown-preview-heading {
+  position: relative;
+  scroll-margin-top: 7rem;
+}
+
+.markdown-preview .markdown-preview-heading-anchor {
+  margin-left: 0.5rem;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.85em;
+  font-weight: 800;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.markdown-preview .markdown-preview-heading:hover .markdown-preview-heading-anchor {
+  opacity: 1;
+}
+
+.markdown-preview .markdown-preview-heading-anchor:hover {
+  color: var(--color-brand-500);
+}
+
+.markdown-preview .markdown-preview-heading-target {
+  animation: highlight-pulse 1.8s ease-out forwards;
+}
+
 .markdown-preview h1 { font-size: 1.5rem; }
 .markdown-preview h2 { font-size: 1.3rem; }
 .markdown-preview h3 { font-size: 1.15rem; }
 
 .markdown-preview :where(p, ul, ol, blockquote, table, pre, hr) {
   margin: 0.7rem 0;
+}
+
+.markdown-preview .markdown-preview-checklist-progress {
+  margin: 0 0 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.9));
+}
+
+.markdown-preview .markdown-preview-checklist-progress-copy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+  color: #475569;
+}
+
+.markdown-preview .markdown-preview-checklist-progress-copy strong {
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.markdown-preview .markdown-preview-checklist-progress-bar {
+  margin-top: 0.7rem;
+  height: 0.45rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(203, 213, 225, 0.6);
+}
+
+.markdown-preview .markdown-preview-checklist-progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4f6b88, #8ab1c8);
 }
 
 .markdown-preview .markdown-preview-table-wrap {
@@ -1309,6 +1376,63 @@ input:focus, textarea:focus {
   font-size: 0.88rem;
   line-height: 1.6;
   color: #e5e7eb;
+}
+
+.markdown-preview .markdown-preview-codeblock-shell {
+  margin: 0.9rem 0;
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 1rem;
+  background: #141922;
+}
+
+.markdown-preview .markdown-preview-codeblock-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.95rem 0;
+}
+
+.markdown-preview .markdown-preview-codeblock-language {
+  color: rgba(226, 232, 240, 0.82);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.markdown-preview .markdown-preview-codeblock-copy {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.3);
+  color: rgba(226, 232, 240, 0.88);
+  padding: 0.28rem 0.7rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.markdown-preview .markdown-preview-codeblock-copy:hover {
+  border-color: rgba(138, 177, 200, 0.5);
+  color: white;
+}
+
+.markdown-preview .markdown-preview-codeblock-shell pre {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+}
+
+.dark .markdown-preview .markdown-preview-checklist-progress {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.02));
+}
+
+.dark .markdown-preview .markdown-preview-checklist-progress-copy {
+  color: #cbd5e1;
 }
 
 .markdown-preview .markdown-preview-task-checkbox {

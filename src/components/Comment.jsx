@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { Edit2, Trash2, Github, ExternalLink } from 'lucide-react';
+import { Edit2, Trash2, Github, ExternalLink, Eye, PenSquare } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ProfileAvatar from './ProfileAvatar';
+import CommentMarkdownToolbar from './CommentMarkdownToolbar';
+import MarkdownPreview from './editor/MarkdownPreview';
 
 function normalizeHttpUrl(value) {
   const normalized = `${value || ''}`.trim();
@@ -65,6 +67,7 @@ export default function Comment({
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(comment.content);
+  const [editMode, setEditMode] = useState('write');
   const editTextareaRef = useRef(null);
   const isGitHubReviewComment = comment.source === 'github_review';
 
@@ -86,7 +89,7 @@ export default function Comment({
     if (isEditing) {
       adjustEditTextareaHeight();
     }
-  }, [editedText]);
+  }, [editedText, isEditing]);
 
   const handleUpdateComment = async () => {
     if (!editedText.trim() || editedText === comment.content) {
@@ -187,6 +190,7 @@ export default function Comment({
                 e.stopPropagation();
                 setIsEditing(true);
                 setEditedText(comment.content);
+                setEditMode('write');
               }}
               title="수정"
             >
@@ -210,7 +214,7 @@ export default function Comment({
         {!isEditing ? (
           <div className="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-text-secondary break-words leading-relaxed [&>*]:my-0 [&>p]:text-sm [&>p]:font-medium [&>p]:whitespace-pre-wrap [&>ul]:my-1 [&>ol]:my-1 [&>li]:text-sm [&>li]:font-medium [&>code]:bg-gray-100 [&>code]:dark:bg-bg-hover [&>code]:px-1 [&>code]:py-0.5 [&>code]:rounded [&>pre]:bg-gray-100 [&>pre]:dark:bg-bg-hover [&>pre]:p-2 [&>pre]:rounded [&>pre]:overflow-x-auto [&_code]:text-xs [&_strong]:font-bold [&_em]:italic">
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
-              a: ({ node, ...props }) => (
+              a: ({ ...props }) => (
                 <a
                   {...props}
                   target="_blank"
@@ -220,34 +224,75 @@ export default function Comment({
                   className="cursor-pointer text-brand-500 dark:text-brand-400 hover:underline"
                 />
               ),
-              code: ({ node, inline, ...props }) => {
+              code: ({ inline, ...props }) => {
                 if (inline) {
                   return <code {...props} className="bg-gray-100 dark:bg-bg-hover px-1 py-0.5 rounded text-xs" />;
                 }
                 return <code {...props} />;
               },
-              blockquote: ({ node, ...props }) => <blockquote {...props} className="border-l-2 border-gray-300 dark:border-border-subtle pl-3 italic text-gray-600 dark:text-text-tertiary my-1" />,
-              hr: ({ node, ...props }) => <hr {...props} className="my-2 border-gray-200 dark:border-border-subtle" />,
-              table: ({ node, ...props }) => <table {...props} className="w-full border-collapse border border-gray-200 dark:border-border-subtle text-xs" />,
-              th: ({ node, ...props }) => <th {...props} className="border border-gray-200 dark:border-border-subtle bg-gray-100 dark:bg-bg-hover p-1" />,
-              td: ({ node, ...props }) => <td {...props} className="border border-gray-200 dark:border-border-subtle p-1" />,
+              blockquote: ({ ...props }) => <blockquote {...props} className="border-l-2 border-gray-300 dark:border-border-subtle pl-3 italic text-gray-600 dark:text-text-tertiary my-1" />,
+              hr: ({ ...props }) => <hr {...props} className="my-2 border-gray-200 dark:border-border-subtle" />,
+              table: ({ ...props }) => <table {...props} className="w-full border-collapse border border-gray-200 dark:border-border-subtle text-xs" />,
+              th: ({ ...props }) => <th {...props} className="border border-gray-200 dark:border-border-subtle bg-gray-100 dark:bg-bg-hover p-1" />,
+              td: ({ ...props }) => <td {...props} className="border border-gray-200 dark:border-border-subtle p-1" />,
             }}>
               {comment.content}
             </ReactMarkdown>
           </div>
         ) : (
           <div className="flex flex-col gap-3 bg-white dark:bg-bg-base border border-gray-200 dark:border-border-subtle rounded-2xl p-4 shadow-xl animate-in zoom-in-95 duration-200">
-            <textarea
-              ref={editTextareaRef}
-              className="w-full p-0 border-none rounded-lg text-sm font-bold resize-none min-h-[120px] focus:ring-0 bg-transparent text-gray-900 dark:text-text-primary overflow-hidden"
-              value={editedText}
-              onChange={(e) => {
-                setEditedText(e.target.value);
-                adjustEditTextareaHeight();
-              }}
-              onKeyDown={e => e.stopPropagation()}
-              autoFocus
-            />
+            <CommentMarkdownToolbar textareaRef={editTextareaRef} />
+            <div className="flex items-center gap-1 self-start rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-border-subtle dark:bg-bg-hover/40">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditMode('write');
+                  editTextareaRef.current?.focus();
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-black uppercase tracking-widest ${
+                  editMode === 'write'
+                    ? 'bg-white text-gray-900 shadow-sm dark:bg-bg-elevated dark:text-text-primary'
+                    : 'text-gray-500 dark:text-text-secondary'
+                }`}
+              >
+                <PenSquare size={12} />
+                작성
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditMode('preview');
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-black uppercase tracking-widest ${
+                  editMode === 'preview'
+                    ? 'bg-white text-gray-900 shadow-sm dark:bg-bg-elevated dark:text-text-primary'
+                    : 'text-gray-500 dark:text-text-secondary'
+                }`}
+              >
+                <Eye size={12} />
+                미리보기
+              </button>
+            </div>
+            {editMode === 'write' ? (
+              <textarea
+                ref={editTextareaRef}
+                className="w-full p-0 border-none rounded-lg text-sm font-bold resize-none min-h-[120px] focus:ring-0 bg-transparent text-gray-900 dark:text-text-primary overflow-hidden"
+                value={editedText}
+                onChange={(e) => {
+                  setEditedText(e.target.value);
+                  adjustEditTextareaHeight();
+                }}
+                onKeyDown={e => e.stopPropagation()}
+                autoFocus
+              />
+            ) : (
+              <MarkdownPreview
+                content={editedText || '_미리볼 내용이 없습니다._'}
+                className="min-h-[120px] rounded-2xl border-dashed bg-gray-50/70 text-sm shadow-none dark:bg-bg-hover/10"
+              />
+            )}
             <div className="flex justify-end gap-2 pt-2 border-t border-gray-50 dark:border-border-subtle">
               <button
                 onClick={(e) => {

@@ -9,6 +9,27 @@ import { useEffect, useState } from 'react';
 import { Link2, FileText, CheckSquare } from 'lucide-react';
 import { getBacklinks } from '../api/kanbanAPI';
 
+function buildSnippet(description = '', itemTitle = '') {
+  const plain = `${description || ''}`
+    .replace(/\[\[([^\]]+)\]\]/g, '$1')
+    .replace(/[#>*`-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!plain) return '';
+  const query = `${itemTitle || ''}`.trim();
+  if (!query) return plain.slice(0, 120);
+
+  const index = plain.toLowerCase().indexOf(query.toLowerCase());
+  if (index < 0) return plain.slice(0, 120);
+
+  const start = Math.max(0, index - 28);
+  const end = Math.min(plain.length, index + query.length + 56);
+  const prefix = start > 0 ? '…' : '';
+  const suffix = end < plain.length ? '…' : '';
+  return `${prefix}${plain.slice(start, end)}${suffix}`;
+}
+
 export default function BacklinksPanel({ itemId, onOpenDetail, allItems }) {
   const [backlinks, setBacklinks] = useState([]);
   const [loadedItemId, setLoadedItemId] = useState(null);
@@ -63,28 +84,36 @@ export default function BacklinksPanel({ itemId, onOpenDetail, allItems }) {
         {backlinks.map((bl) => {
           const Icon = bl.page_type === 'page' ? FileText : CheckSquare;
           const title = bl.title || bl.content || '제목 없음';
-          // allItems에서 전체 데이터 찾기 (onOpenDetail에 전달하기 위해)
           const fullItem = allItems?.find((i) => i.id === bl.id) || bl;
+          const snippet = buildSnippet(fullItem?.description || bl.description || '', title);
           return (
             <button
               key={bl.id}
               type="button"
-              onClick={() => onOpenDetail?.(fullItem)}
-              className="w-full text-left flex items-center gap-2 py-1.5 px-2 rounded-lg text-sm
-                hover:bg-gray-100 dark:hover:bg-bg-hover text-gray-700 dark:text-text-secondary
-                transition-colors group"
+              onClick={() => onOpenDetail?.(fullItem.id)}
+              className="w-full rounded-xl px-3 py-2 text-left transition-colors group hover:bg-gray-100 dark:hover:bg-bg-hover"
             >
-              <Icon
-                size={13}
-                className="flex-shrink-0 text-gray-400 dark:text-text-tertiary
-                  group-hover:text-brand-400 transition-colors"
-              />
-              <span className="flex-1 truncate group-hover:text-gray-900 dark:group-hover:text-text-primary">
-                {title}
-              </span>
-              <span className="text-[10px] text-gray-300 dark:text-text-tertiary flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                열기
-              </span>
+              <div className="flex items-start gap-2">
+                <Icon
+                  size={13}
+                  className="mt-0.5 flex-shrink-0 text-gray-400 transition-colors group-hover:text-brand-400 dark:text-text-tertiary"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm font-semibold text-gray-700 transition-colors group-hover:text-gray-900 dark:text-text-secondary dark:group-hover:text-text-primary">
+                      {title}
+                    </span>
+                    <span className="flex-shrink-0 text-[10px] font-black uppercase tracking-[0.18em] text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 dark:text-text-tertiary">
+                      열기
+                    </span>
+                  </div>
+                  {snippet && (
+                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-gray-400 dark:text-text-tertiary">
+                      {snippet}
+                    </p>
+                  )}
+                </div>
+              </div>
             </button>
           );
         })}

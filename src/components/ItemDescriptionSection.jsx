@@ -17,7 +17,8 @@ import MarkdownEditor from './editor/Editor';
 import MarkdownPreview from './editor/MarkdownPreview';
 import SearchModal from './SearchModal';
 import { summarizeContent } from '../api/summarizeAPI';
-import { getInitialDescriptionMode } from './itemDescriptionMode';
+import { getInitialDescriptionMode, persistDescriptionMode } from './itemDescriptionMode';
+import { extractHeadings } from './editor/utils/headingExtractor';
 import { toggleMarkdownTaskItem } from './editor/utils/markdownPreview';
 import {
   convertMarkdownToEditorHTML,
@@ -70,6 +71,11 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
   const isProject = entityContext?.type === ENTITY_TYPES.PROJECT;
   const isEditorMode = descriptionMode === 'live' || descriptionMode === 'source';
 
+  const handleDescriptionModeChange = useCallback((nextMode) => {
+    setDescriptionMode(nextMode);
+    persistDescriptionMode(nextMode);
+  }, []);
+
   useEffect(() => {
     setDescriptionMode(getInitialDescriptionMode({
       isReadOnly,
@@ -108,6 +114,14 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
 
   useEffect(() => {
     if (!descriptionRef.current) return;
+    const headings = extractHeadings(description);
+    const headingElements = descriptionRef.current.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    headingElements.forEach((heading, index) => {
+      const offset = headings[index]?.offset;
+      if (typeof offset === 'number') {
+        heading.dataset.headingOffset = String(offset);
+      }
+    });
     const blocks = descriptionMode === 'preview'
       ? descriptionRef.current.querySelectorAll('h1, h2, h3, h4, p, li')
       : descriptionRef.current.querySelectorAll('.cm-line');
@@ -236,6 +250,21 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
       dirtyDescriptionRef.current = true;
       return saveDescription(description);
     },
+    scrollToHeading: (offset) => {
+      const root = descriptionRef.current;
+      if (!root) return false;
+      const target = root.querySelector(`[data-heading-offset="${offset}"]`);
+      if (!target) return false;
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      target.classList.remove('markdown-preview-heading-target');
+      window.requestAnimationFrame(() => {
+        target.classList.add('markdown-preview-heading-target');
+      });
+      window.setTimeout(() => {
+        target.classList.remove('markdown-preview-heading-target');
+      }, 1800);
+      return true;
+    },
   }), [description, isReadOnly, item?.description, saveDescription]);
 
   const handleLinkExistingPage = useCallback((callback) => {
@@ -321,6 +350,14 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
     onShowToast?.(`연결된 페이지를 찾지 못했습니다: ${target}`);
   }, [allItems, onOpenDetail, onShowToast]);
 
+  const resolveLinkPreview = useCallback((target) => {
+    return allItems.find((candidate) =>
+      candidate.id === target
+      || candidate.title === target
+      || candidate.content === target
+    ) || null;
+  }, [allItems]);
+
   const handleToggleTaskItem = useCallback((taskIndex, checked) => {
     if (isReadOnly) return;
     setDescription((prev) => {
@@ -328,13 +365,10 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
       if (next !== prev) {
         dirtyDescriptionRef.current = true;
         setHasPendingAutosave(true);
-        onUpdateItem(projectId, item.id, { description: next }).catch((error) => {
-          onShowToast?.(`본문 업데이트 실패: ${error.message}`, 'error');
-        });
       }
       return next;
     });
-  }, [isReadOnly, item.id, onShowToast, onUpdateItem, projectId]);
+  }, [isReadOnly]);
 
   const linkModalPhases = useMemo(
     () => [{ title: '전체 아이템', items: allItems }],
@@ -410,7 +444,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
               <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-border-subtle dark:bg-bg-elevated">
                 <button
                   type="button"
-                  onClick={() => setDescriptionMode('live')}
+                  onClick={() => handleDescriptionModeChange('live')}
                   className={`rounded-lg px-2.5 py-1.5 text-[11px] font-black uppercase tracking-widest transition-colors ${
                     descriptionMode === 'live'
                       ? 'bg-white text-gray-900 shadow-sm dark:bg-bg-base dark:text-text-primary'
@@ -421,7 +455,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setDescriptionMode('source')}
+                  onClick={() => handleDescriptionModeChange('source')}
                   className={`rounded-lg px-2.5 py-1.5 text-[11px] font-black uppercase tracking-widest transition-colors ${
                     descriptionMode === 'source'
                       ? 'bg-white text-gray-900 shadow-sm dark:bg-bg-base dark:text-text-primary'
@@ -432,7 +466,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setDescriptionMode('preview')}
+                  onClick={() => handleDescriptionModeChange('preview')}
                   className={`rounded-lg px-2.5 py-1.5 text-[11px] font-black uppercase tracking-widest transition-colors ${
                     descriptionMode === 'preview'
                       ? 'bg-white text-gray-900 shadow-sm dark:bg-bg-base dark:text-text-primary'
@@ -553,6 +587,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
               containerRef={descriptionRef}
               onOpenLink={handleOpenLink}
               onToggleTaskItem={handleToggleTaskItem}
+              resolveLinkPreview={resolveLinkPreview}
             />
           )}
         </div>

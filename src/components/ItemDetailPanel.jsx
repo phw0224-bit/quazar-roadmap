@@ -45,6 +45,29 @@ import {
   prepareGitHubItemPullRequest,
 } from '../api/githubAPI';
 
+function normalizeDocSearchText(value) {
+  return `${value || ''}`.trim().toLowerCase();
+}
+
+function buildMentionSnippet(description = '', query = '') {
+  const plain = `${description || ''}`
+    .replace(/\[\[([^\]]+)\]\]/g, '$1')
+    .replace(/[#>*`-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!plain) return '';
+  const normalizedQuery = normalizeDocSearchText(query);
+  if (!normalizedQuery) return plain.slice(0, 140);
+
+  const index = plain.toLowerCase().indexOf(normalizedQuery);
+  if (index < 0) return plain.slice(0, 140);
+
+  const start = Math.max(0, index - 36);
+  const end = Math.min(plain.length, index + normalizedQuery.length + 72);
+  return `${start > 0 ? '…' : ''}${plain.slice(start, end)}${end < plain.length ? '…' : ''}`;
+}
+
 function ItemDetailPanel({
   item, project = null, phase = project, entityContext = null, allItems = [], onClose, onUpdateItem, onUpdateProject, onUpdatePhase = onUpdateProject, isReadOnly,
   relationItems = allItems,
@@ -74,8 +97,8 @@ function ItemDetailPanel({
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [titleInput, setTitleInput] = useState(item?.title || item?.content || '');
   const [isWideView, setIsWideView] = useState(false);
-  const [showOutline, setShowOutline] = useState(false);
-  const [showBacklinks, setShowBacklinks] = useState(false);
+  const [isDocRailOpen, setIsDocRailOpen] = useState(true);
+  const [docRailTab, setDocRailTab] = useState('outline');
   const [currentEditorOffset, setCurrentEditorOffset] = useState(0);
   const [githubStatus, setGitHubStatus] = useState({ connected: false });
   const [githubRepos, setGitHubRepos] = useState([]);
@@ -162,6 +185,36 @@ function ItemDetailPanel({
   };
   const isRequestNotified = Boolean(item.notified_at);
   const isRequestSubmittedWithoutNotification = Boolean(item.submitted_at) && !item.notified_at;
+  const hasDescription = Boolean(`${item?.description || ''}`.trim());
+  const queryCandidates = [item?.title, item?.content]
+    .map((value) => `${value || ''}`.trim())
+    .filter((value, index, array) => value && array.indexOf(value) === index);
+  const mentionCandidates = queryCandidates.length === 0
+    ? []
+    : allItems
+      .filter((candidate) => candidate.id !== item?.id)
+      .map((candidate) => {
+        const description = `${candidate.description || ''}`;
+        if (!description.trim()) return null;
+
+        const matchedQuery = queryCandidates.find((query) => {
+          const linkedWithId = description.includes(`|${item?.id}]]`);
+          const linkedByTitle = description.includes(`[[${query}]]`);
+          if (linkedWithId || linkedByTitle) return false;
+          return description.toLowerCase().includes(query.toLowerCase());
+        });
+
+        if (!matchedQuery) return null;
+
+        return {
+          id: candidate.id,
+          title: candidate.title || candidate.content || '제목 없음',
+          pageType: candidate.page_type === 'page' ? '문서' : '업무',
+          snippet: buildMentionSnippet(description, matchedQuery),
+        };
+      })
+      .filter(Boolean)
+      .slice(0, 12);
 
   useEffect(() => {
     setTitleInput(item?.title || item?.content || '');
@@ -193,6 +246,7 @@ function ItemDetailPanel({
       key: item?.ticket_key || '',
       number: item?.ticket_number ?? null,
     });
+    setDocRailTab('outline');
   }, [item]);
 
   const handleRetryGitHubSync = useCallback(() => {
@@ -493,6 +547,11 @@ function ItemDetailPanel({
   };
 
   const handleHeadingClick = (offset) => {
+    if (descriptionSectionRef.current?.scrollToHeading?.(offset)) {
+      setCurrentEditorOffset((current) => (current === offset ? current : offset));
+      return;
+    }
+
     // CodeMirror editorView로 스크롤
     if (editorViewRef.current) {
       const view = editorViewRef.current;
@@ -513,6 +572,11 @@ function ItemDetailPanel({
       setCurrentEditorOffset((current) => (current === offset ? current : offset));
     }
   };
+
+  const handleDocRailTabClick = useCallback((nextTab) => {
+    setDocRailTab(nextTab);
+    setIsDocRailOpen(true);
+  }, []);
 
   const handleSaveTitle = async () => {
     const nextTitle = titleInput.trim();
@@ -1237,18 +1301,43 @@ function ItemDetailPanel({
               {isWideView ? <AlignCenter size={17} strokeWidth={2.4} /> : <AlignJustify size={17} strokeWidth={2.4} />}
             </button>
             <button
-              onClick={() => setShowOutline(v => !v)}
-              className={`${headerToggleButtonClass} ${showOutline ? 'bg-brand-50 dark:bg-brand-800/20 text-brand-500 dark:text-brand-400' : 'text-gray-400 dark:text-text-tertiary hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
-              title={showOutline ? '목차 숨기기' : '목차 표시'}
+              onClick={() => {
+                if (isDocRailOpen && docRailTab === 'outline') {
+                  setIsDocRailOpen(false);
+                  return;
+                }
+                handleDocRailTabClick('outline');
+              }}
+              className={`${headerToggleButtonClass} ${isDocRailOpen && docRailTab === 'outline' ? 'bg-brand-50 dark:bg-brand-800/20 text-brand-500 dark:text-brand-400' : 'text-gray-400 dark:text-text-tertiary hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
+              title={isDocRailOpen && docRailTab === 'outline' ? '문서 레일 숨기기' : '목차 표시'}
             >
               <List size={17} strokeWidth={2.4} />
             </button>
             <button
-              onClick={() => setShowBacklinks(v => !v)}
-              className={`${headerToggleButtonClass} ${showBacklinks ? 'bg-brand-50 dark:bg-brand-800/20 text-brand-500 dark:text-brand-400' : 'text-gray-400 dark:text-text-tertiary hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
-              title={showBacklinks ? '백링크 숨기기' : '백링크 표시'}
+              onClick={() => {
+                if (isDocRailOpen && docRailTab === 'backlinks') {
+                  setIsDocRailOpen(false);
+                  return;
+                }
+                handleDocRailTabClick('backlinks');
+              }}
+              className={`${headerToggleButtonClass} ${isDocRailOpen && docRailTab === 'backlinks' ? 'bg-brand-50 dark:bg-brand-800/20 text-brand-500 dark:text-brand-400' : 'text-gray-400 dark:text-text-tertiary hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
+              title={isDocRailOpen && docRailTab === 'backlinks' ? '문서 레일 숨기기' : '백링크 표시'}
             >
               <Link2 size={17} strokeWidth={2.4} />
+            </button>
+            <button
+              onClick={() => {
+                if (isDocRailOpen && docRailTab === 'mentions') {
+                  setIsDocRailOpen(false);
+                  return;
+                }
+                handleDocRailTabClick('mentions');
+              }}
+              className={`${headerToggleButtonClass} ${isDocRailOpen && docRailTab === 'mentions' ? 'bg-brand-50 dark:bg-brand-800/20 text-brand-500 dark:text-brand-400' : 'text-gray-400 dark:text-text-tertiary hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
+              title={isDocRailOpen && docRailTab === 'mentions' ? '문서 레일 숨기기' : '언급 보기'}
+            >
+              <ClipboardList size={17} strokeWidth={2.4} />
             </button>
             {!isReadOnly && (
               <button
@@ -1327,28 +1416,6 @@ function ItemDetailPanel({
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* TOC 패널 (좌측) */}
-        {showOutline && item.description && (
-          <div className="w-64 border-r border-gray-200 dark:border-border-subtle bg-white dark:bg-bg-base flex-shrink-0 overflow-y-auto">
-            <DocumentOutline
-              markdown={item.description || ''}
-              onHeadingClick={handleHeadingClick}
-              currentOffset={currentEditorOffset}
-            />
-          </div>
-        )}
-
-        {/* 백링크 패널 (좌측, TOC와 함께 표시 가능) */}
-        {showBacklinks && (
-          <div className="w-64 border-r border-gray-200 dark:border-border-subtle bg-white dark:bg-bg-base flex-shrink-0 overflow-y-auto">
-            <BacklinksPanel
-              itemId={item.id}
-              allItems={allItems}
-              onOpenDetail={onOpenDetail}
-            />
-          </div>
-        )}
-
         {/* 메인 스크롤 영역 */}
         <div className="flex-1 overflow-y-auto custom-scrollbar bg-white dark:bg-bg-base transition-colors duration-200">
         <div className={`${isWideView ? 'px-24' : 'max-w-4xl mx-auto px-12'} py-16 flex flex-col gap-16 transition-all duration-300`}>
@@ -1466,7 +1533,6 @@ function ItemDetailPanel({
                 </div>
               </div>
             </div>
-
             {/* Assignees */}
             {!isRequest && (
               <div className="flex items-center min-h-[48px] group">
@@ -2129,6 +2195,120 @@ function ItemDetailPanel({
           )}
         </div>
       </div>
+      {isDocRailOpen && (
+        <aside className="hidden w-80 flex-shrink-0 border-l border-gray-200 bg-gray-50/70 dark:border-border-subtle dark:bg-bg-elevated/40 xl:flex xl:flex-col">
+          <div className="border-b border-gray-200 px-3 py-3 dark:border-border-subtle">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-400 dark:text-text-tertiary">
+                  Document Rail
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-700 dark:text-text-secondary">
+                  문서 탐색 보조 패널
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDocRailOpen(false)}
+                className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-white hover:text-gray-900 dark:text-text-tertiary dark:hover:bg-bg-hover dark:hover:text-text-primary"
+                title="문서 레일 닫기"
+              >
+                <X size={15} />
+              </button>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-1 rounded-2xl border border-gray-200 bg-white p-1 dark:border-border-subtle dark:bg-bg-base">
+              {[
+                { id: 'outline', label: '목차', icon: List },
+                { id: 'backlinks', label: '백링크', icon: Link2 },
+                { id: 'mentions', label: '언급', icon: ClipboardList },
+              ].map((tab) => {
+                const Icon = tab.icon;
+                const isActive = docRailTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setDocRailTab(tab.id)}
+                    className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[11px] font-black uppercase tracking-[0.14em] transition-colors ${
+                      isActive
+                        ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                        : 'text-gray-500 hover:bg-gray-50 dark:text-text-secondary dark:hover:bg-bg-hover'
+                    }`}
+                  >
+                    <Icon size={12} />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {docRailTab === 'outline' && (
+              hasDescription ? (
+                <DocumentOutline
+                  markdown={item.description || ''}
+                  onHeadingClick={handleHeadingClick}
+                  currentOffset={currentEditorOffset}
+                />
+              ) : (
+                <div className="p-4 text-center text-sm text-gray-400 dark:text-text-tertiary">
+                  본문이 없어 목차를 만들 수 없습니다.
+                </div>
+              )
+            )}
+            {docRailTab === 'backlinks' && (
+              <BacklinksPanel
+                itemId={item.id}
+                allItems={allItems}
+                onOpenDetail={onOpenDetail}
+              />
+            )}
+            {docRailTab === 'mentions' && (
+              <div className="p-3">
+                <div className="mb-3 px-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-text-tertiary">
+                    링크되지 않은 언급
+                  </h3>
+                  <p className="mt-1 text-xs leading-5 text-gray-400 dark:text-text-tertiary">
+                    현재 문서 제목이 본문에 등장하지만 아직 위키링크로 연결되지 않은 항목입니다.
+                  </p>
+                </div>
+                {mentionCandidates.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-gray-200 bg-white/70 px-4 py-5 text-center text-sm text-gray-400 dark:border-border-subtle dark:bg-bg-base dark:text-text-tertiary">
+                    새로 연결할 만한 언급이 없습니다.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {mentionCandidates.map((candidate) => (
+                      <button
+                        key={candidate.id}
+                        type="button"
+                        onClick={() => onOpenDetail?.(candidate.id)}
+                        className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-left transition-colors hover:border-brand-200 hover:bg-brand-50/40 dark:border-border-subtle dark:bg-bg-base dark:hover:border-brand-700/50 dark:hover:bg-brand-900/10"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate text-sm font-semibold text-gray-800 dark:text-text-primary">
+                            {candidate.title}
+                          </span>
+                          <span className="flex-shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.16em] text-gray-500 dark:bg-bg-hover dark:text-text-tertiary">
+                            {candidate.pageType}
+                          </span>
+                        </div>
+                        {candidate.snippet && (
+                          <p className="mt-2 line-clamp-3 text-xs leading-5 text-gray-400 dark:text-text-tertiary">
+                            {candidate.snippet}
+                          </p>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </aside>
+      )}
+      </div>
       {shareLinkModal}
       {showGitHubIssueCreator && !isMemo && (
         <div
@@ -2475,7 +2655,6 @@ function ItemDetailPanel({
         </div>
       )}
     </div>
-  </div>
   );
 }
 
