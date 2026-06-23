@@ -7,6 +7,17 @@ export function sortProjectItemsByCompletion(items = []) {
       return leftDone ? 1 : -1;
     }
 
-    return (left?.order_index ?? 0) - (right?.order_index ?? 0);
+    const leftCreatedAt = left?.created_at ? new Date(left.created_at).getTime() : null;
+    const rightCreatedAt = right?.created_at ? new Date(right.created_at).getTime() : null;
+
+    if (leftCreatedAt !== null && rightCreatedAt !== null && leftCreatedAt !== rightCreatedAt) {
+      return rightCreatedAt - leftCreatedAt;
+    }
+
+    if (leftCreatedAt !== null || rightCreatedAt !== null) {
+      return rightCreatedAt === null ? 1 : -1;
+    }
+
+    return (right?.order_index ?? 0) - (left?.order_index ?? 0);
   });
 }
