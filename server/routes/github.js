@@ -485,7 +485,7 @@ export function resolveMcpGitHubActorUserIdFromItemRecord(itemRecord) {
 }
 
 function isMcpGitHubRequest(req) {
-  const token = getBearerToken(req.headers || {});
+  const token = getBearerToken(req);
   return Boolean(MCP_SHARED_TOKEN) && token === MCP_SHARED_TOKEN;
 }
 
