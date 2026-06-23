@@ -8,6 +8,7 @@ import {
   createQuazarItemCommentViaApi,
   createQuazarItemGitHubBranchViaApi,
   createQuazarItemGitHubIssueViaApi,
+  createQuazarItemGitHubPullRequestViaApi,
   deleteQuazarItemCommentViaApi,
   getQuazarProjectActivityViaApi,
   getQuazarProjectViaApi,
@@ -865,4 +866,113 @@ test('getQuazarItemGitHubBranchViaApi requests the item branch endpoint', async 
   assert.equal(result.branch.branchName, 'QZR-77');
   assert.equal(calls[0].url, 'http://localhost:3001/api/github/items/item-77/branch');
   assert.equal(calls[0].init.method, 'GET');
+});
+
+test('createQuazarItemGitHubPullRequestViaApi uses roadmap draft defaults and creates a PR', async () => {
+  const calls = [];
+  const result = await createQuazarItemGitHubPullRequestViaApi({
+    baseUrl: 'http://localhost:3001',
+    token: 'shared-secret',
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      if (url.endsWith('/pull-request/prepare')) {
+        return new Response(JSON.stringify({
+          repoFullName: 'phw0224-bit/quazar-roadmap',
+          issue: {
+            issueNumber: 77,
+            issueUrl: 'https://github.com/phw0224-bit/quazar-roadmap/issues/77',
+          },
+          ticket: {
+            ticket_key: 'QZR-77',
+            ticket_number: 77,
+          },
+          branch: {
+            branchName: 'QZR-77',
+            branchUrl: 'https://github.com/phw0224-bit/quazar-roadmap/tree/QZR-77',
+          },
+          baseBranch: 'main',
+          defaultTitle: '[QZR-77] 작업 제목',
+          defaultBody: 'PR 본문 초안',
+          draft: true,
+          existingPullRequest: null,
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      return new Response(JSON.stringify({
+        itemId: 'item-77',
+        repoFullName: 'phw0224-bit/quazar-roadmap',
+        issue: {
+          issueNumber: 77,
+          issueUrl: 'https://github.com/phw0224-bit/quazar-roadmap/issues/77',
+        },
+        branch: {
+          branchName: 'QZR-77',
+          branchUrl: 'https://github.com/phw0224-bit/quazar-roadmap/tree/QZR-77',
+        },
+        pullRequest: {
+          pull_number: 15,
+          pull_url: 'https://github.com/phw0224-bit/quazar-roadmap/pull/15',
+          pull_state_snapshot: 'open',
+        },
+        body: 'PR 본문 초안',
+        created: true,
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+  }, {
+    itemId: 'item-77',
+  });
+
+  assert.equal(calls[0].url, 'http://localhost:3001/api/github/items/item-77/pull-request/prepare');
+  assert.equal(calls[0].init.method, 'POST');
+  assert.equal(calls[1].url, 'http://localhost:3001/api/github/items/item-77/pull-request');
+  assert.deepEqual(JSON.parse(calls[1].init.body), {
+    title: '[QZR-77] 작업 제목',
+    body: 'PR 본문 초안',
+    base: 'main',
+    draft: true,
+  });
+  assert.equal(result.pullRequest.pull_number, 15);
+});
+
+test('createQuazarItemGitHubPullRequestViaApi returns ALREADY_EXISTS when prepare finds an existing PR', async () => {
+  const result = await createQuazarItemGitHubPullRequestViaApi({
+    baseUrl: 'http://localhost:3001',
+    token: 'shared-secret',
+    fetchImpl: async () => new Response(JSON.stringify({
+      repoFullName: 'phw0224-bit/quazar-roadmap',
+      issue: {
+        issueNumber: 77,
+        issueUrl: 'https://github.com/phw0224-bit/quazar-roadmap/issues/77',
+      },
+      ticket: {
+        ticket_key: 'QZR-77',
+        ticket_number: 77,
+      },
+      branch: {
+        branchName: 'QZR-77',
+        branchUrl: 'https://github.com/phw0224-bit/quazar-roadmap/tree/QZR-77',
+      },
+      existingPullRequest: {
+        pull_number: 15,
+        pull_url: 'https://github.com/phw0224-bit/quazar-roadmap/pull/15',
+        pull_state_snapshot: 'open',
+      },
+      defaultBody: 'PR 본문 초안',
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+  }, {
+    itemId: 'item-77',
+  });
+
+  assert.equal(result.status, 'ALREADY_EXISTS');
+  assert.equal(result.created, false);
+  assert.equal(result.pullRequest.pull_number, 15);
 });

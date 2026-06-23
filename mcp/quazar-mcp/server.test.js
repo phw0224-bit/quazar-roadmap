@@ -12,6 +12,7 @@ import {
   runCreateQuazarItemCommentTool,
   runCreateQuazarItemGitHubBranchTool,
   runCreateQuazarItemGitHubIssueTool,
+  runCreateQuazarItemGitHubPullRequestTool,
   runCreateQuazarProjectTool,
   runDeleteQuazarItemCommentTool,
   runGetQuazarProjectActivityTool,
@@ -761,6 +762,49 @@ test('runGetQuazarItemGitHubBranchTool flattens branch payload and adds checkout
     'git fetch origin QZR-88',
     'git switch QZR-88 || git switch --track -c QZR-88 origin/QZR-88',
   ]);
+});
+
+test('runCreateQuazarItemGitHubPullRequestTool surfaces ticket-aware PR details', async () => {
+  const result = await runCreateQuazarItemGitHubPullRequestTool({
+    itemId: 'item-99',
+  }, {
+    createGitHubPullRequest: async (payload) => {
+      assert.deepEqual(payload, {
+        itemId: 'item-99',
+      });
+
+      return {
+        ok: true,
+        status: 'CREATED',
+        itemId: 'item-99',
+        repoFullName: 'phw0224-bit/quazar-roadmap',
+        issue: {
+          issueNumber: 99,
+          issueUrl: 'https://github.com/phw0224-bit/quazar-roadmap/issues/99',
+        },
+        ticket: {
+          ticket_key: 'QZR-99',
+          ticket_number: 99,
+        },
+        branch: {
+          branchName: 'QZR-99',
+          branchUrl: 'https://github.com/phw0224-bit/quazar-roadmap/tree/QZR-99',
+        },
+        pullRequest: {
+          pull_number: 41,
+          pull_url: 'https://github.com/phw0224-bit/quazar-roadmap/pull/41',
+          pull_state_snapshot: 'open',
+        },
+        body: 'PR 본문 초안',
+        created: true,
+      };
+    },
+  });
+
+  assert.equal(result.structuredContent.ticketKey, 'QZR-99');
+  assert.equal(result.structuredContent.pullNumber, 41);
+  assert.equal(result.structuredContent.status, 'CREATED');
+  assert.match(result.content[0].text, /QZR-99/);
 });
 
 test('inferRepoFullNameFromGitRemote supports GitHub SSH and HTTPS remotes', () => {

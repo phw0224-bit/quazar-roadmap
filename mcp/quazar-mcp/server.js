@@ -11,6 +11,7 @@ import {
   createQuazarSectionViaApi,
   createQuazarItemGitHubBranchViaApi,
   createQuazarItemGitHubIssueViaApi,
+  createQuazarItemGitHubPullRequestViaApi,
   createQuazarItemCommentViaApi,
   createQuazarProjectViaApi,
   createQuazarItemViaApi,
@@ -398,6 +399,40 @@ export async function runGetQuazarItemGitHubBranchTool(args, { getGitHubBranch }
   };
 }
 
+export async function runCreateQuazarItemGitHubPullRequestTool(args, { createGitHubPullRequest }) {
+  const result = await createGitHubPullRequest(args);
+  const pullRequest = result?.pullRequest || {};
+  const issue = result?.issue || {};
+  const branch = result?.branch || {};
+  const structuredContent = {
+    ok: Boolean(result?.ok),
+    status: result?.status || 'CREATED',
+    itemId: result?.itemId || args.itemId,
+    repoFullName: result?.repoFullName || null,
+    issueNumber: issue.issueNumber || null,
+    issueUrl: issue.issueUrl || null,
+    ticketKey: result?.ticket?.ticket_key || result?.ticket?.ticketKey || null,
+    ticketNumber: result?.ticket?.ticket_number || result?.ticket?.ticketNumber || null,
+    branchName: branch.branchName || null,
+    branchUrl: branch.branchUrl || null,
+    pullNumber: pullRequest.pull_number || null,
+    pullUrl: pullRequest.pull_url || null,
+    pullState: pullRequest.pull_state_snapshot || null,
+    created: Boolean(result?.created),
+    body: result?.body || null,
+  };
+
+  return {
+    content: [{
+      type: 'text',
+      text: structuredContent.status === 'ALREADY_EXISTS'
+        ? `Reused existing GitHub PR ${structuredContent.pullNumber || 'unknown'} for Quazar item ${structuredContent.itemId} in ${structuredContent.repoFullName}.`
+        : `Created GitHub PR ${structuredContent.pullNumber || 'unknown'} for Quazar item ${structuredContent.itemId} in ${structuredContent.repoFullName} (${structuredContent.ticketKey || 'no-ticket'}).`,
+    }],
+    structuredContent,
+  };
+}
+
 export function createQuazarMcpServer({
   createSection,
   resolveSection,
@@ -418,6 +453,7 @@ export function createQuazarMcpServer({
   updateItem,
   createGitHubIssue,
   createGitHubBranch,
+  createGitHubPullRequest,
   getGitHubBranch,
   getSuggestedRepoFullName = getSuggestedRepoFullNameFromWorkspace,
 }) {
@@ -999,6 +1035,35 @@ export function createQuazarMcpServer({
     },
   }, async (args) => runGetQuazarItemGitHubBranchTool(args, { getGitHubBranch }));
 
+  server.registerTool('create_quazar_item_github_pull_request', {
+    title: 'Create Quazar Item GitHub Pull Request',
+    description: 'Create a GitHub pull request for one Quazar item using the same ticket-based draft flow as the Quazar roadmap UI.',
+    inputSchema: {
+      itemId: z.string().min(1).describe('Quazar item id'),
+      title: z.string().optional().describe('Optional PR title override. Defaults to the roadmap draft title.'),
+      body: z.string().optional().describe('Optional PR body override. Defaults to the roadmap draft body.'),
+      base: z.string().optional().describe('Optional base branch override. Defaults to the repository default branch.'),
+      draft: z.boolean().optional().describe('Whether to create the PR as draft. Defaults to the roadmap draft setting.'),
+    },
+    outputSchema: {
+      ok: z.boolean(),
+      status: z.string(),
+      itemId: z.string().nullable(),
+      repoFullName: z.string().nullable(),
+      issueNumber: z.number().int().nullable(),
+      issueUrl: z.string().nullable(),
+      ticketKey: z.string().nullable(),
+      ticketNumber: z.number().int().nullable(),
+      branchName: z.string().nullable(),
+      branchUrl: z.string().nullable(),
+      pullNumber: z.number().int().nullable(),
+      pullUrl: z.string().nullable(),
+      pullState: z.string().nullable(),
+      created: z.boolean(),
+      body: z.string().nullable(),
+    },
+  }, async (args) => runCreateQuazarItemGitHubPullRequestTool(args, { createGitHubPullRequest }));
+
   return server;
 }
 
@@ -1025,6 +1090,7 @@ export async function main() {
     updateItem: (payload) => updateQuazarItemViaApi({ baseUrl, token }, payload),
     createGitHubIssue: (payload) => createQuazarItemGitHubIssueViaApi({ baseUrl, token }, payload),
     createGitHubBranch: (payload) => createQuazarItemGitHubBranchViaApi({ baseUrl, token }, payload),
+    createGitHubPullRequest: (payload) => createQuazarItemGitHubPullRequestViaApi({ baseUrl, token }, payload),
     getGitHubBranch: (payload) => getQuazarItemGitHubBranchViaApi({ baseUrl, token }, payload),
   });
 

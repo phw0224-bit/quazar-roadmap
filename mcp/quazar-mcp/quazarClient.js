@@ -489,3 +489,71 @@ export async function getQuazarItemGitHubBranchViaApi(
     ...result,
   };
 }
+
+export async function createQuazarItemGitHubPullRequestViaApi(
+  { baseUrl, token, fetchImpl = fetch },
+  payload,
+) {
+  const prepared = await requestJson(
+    { baseUrl, token, fetchImpl },
+    `/api/github/items/${encodeURIComponent(payload.itemId)}/pull-request/prepare`,
+    {
+      method: 'POST',
+    }
+  );
+
+  if (prepared?.existingPullRequest) {
+    return {
+      ok: true,
+      status: 'ALREADY_EXISTS',
+      itemId: payload.itemId,
+      repoFullName: prepared.repoFullName || null,
+      issue: prepared.issue || null,
+      branch: prepared.branch || null,
+      pullRequest: prepared.existingPullRequest,
+      body: prepared.defaultBody || null,
+      created: false,
+      ticket: prepared.ticket || null,
+    };
+  }
+
+  const requestBody = {
+    title: typeof payload.title === 'string' && payload.title.trim()
+      ? payload.title.trim()
+      : prepared.defaultTitle || '',
+    body: typeof payload.body === 'string' && payload.body.trim()
+      ? payload.body
+      : prepared.defaultBody || '',
+    base: typeof payload.base === 'string' && payload.base.trim()
+      ? payload.base.trim()
+      : prepared.baseBranch || 'main',
+    draft: payload.draft === undefined ? prepared.draft !== false : Boolean(payload.draft),
+  };
+
+  return requestJsonAllowAlreadyExists(
+    { baseUrl, token, fetchImpl },
+    `/api/github/items/${encodeURIComponent(payload.itemId)}/pull-request`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    },
+    (error) => {
+      if (!error?.pullRequest) return null;
+      return {
+        ok: true,
+        status: 'ALREADY_EXISTS',
+        itemId: payload.itemId,
+        repoFullName: prepared.repoFullName || null,
+        issue: prepared.issue || null,
+        branch: prepared.branch || null,
+        pullRequest: error.pullRequest,
+        body: requestBody.body,
+        created: false,
+        ticket: prepared.ticket || null,
+      };
+    }
+  );
+}

@@ -2880,13 +2880,14 @@ router.get('/items/:itemId/pull-requests', async (req, res) => {
   try {
     if (!requireServerConfig(res)) return;
 
-    const user = await requireAuthenticatedUser(req, res);
-    if (!user) return;
-
     const itemId = String(req.params.itemId || '').trim();
     if (!itemId) {
       return res.status(400).json({ error: 'itemId가 필요합니다.' });
     }
+
+    const actor = await resolveGitHubActorForItemRequest(req, res, itemId);
+    if (!actor) return;
+    const { user } = actor;
 
     await requireGitHubRepoConnection(user.id);
     const pullRequests = await getExistingGitHubPullRequestsForItem(itemId);
@@ -2901,20 +2902,21 @@ router.post('/items/:itemId/pull-request/prepare', async (req, res) => {
   try {
     if (!requireServerConfig(res)) return;
 
-    const user = await requireAuthenticatedUser(req, res);
-    if (!user) return;
-
     const itemId = String(req.params.itemId || '').trim();
     if (!itemId) {
       return res.status(400).json({ error: 'itemId가 필요합니다.' });
     }
+
+    const actor = await resolveGitHubActorForItemRequest(req, res, itemId);
+    if (!actor) return;
+    const { user } = actor;
 
     const issueRecord = await getExistingGitHubIssueForItem(itemId);
     if (!issueRecord) {
       return res.status(404).json({ error: '이 아이템에 연결된 GitHub 이슈를 찾을 수 없습니다.' });
     }
 
-    const itemRecord = await findItemRecordById(itemId);
+    const itemRecord = actor.itemRecord || await findItemRecordById(itemId);
     if (!itemRecord) {
       return res.status(404).json({ error: '아이템을 찾을 수 없습니다.' });
     }
@@ -3004,20 +3006,21 @@ router.post('/items/:itemId/pull-request', async (req, res) => {
   try {
     if (!requireServerConfig(res)) return;
 
-    const user = await requireAuthenticatedUser(req, res);
-    if (!user) return;
-
     const itemId = String(req.params.itemId || '').trim();
     if (!itemId) {
       return res.status(400).json({ error: 'itemId가 필요합니다.' });
     }
+
+    const actor = await resolveGitHubActorForItemRequest(req, res, itemId);
+    if (!actor) return;
+    const { user } = actor;
 
     const issueRecord = await getExistingGitHubIssueForItem(itemId);
     if (!issueRecord) {
       return res.status(404).json({ error: '이 아이템에 연결된 GitHub 이슈를 찾을 수 없습니다.' });
     }
 
-    const itemRecord = await findItemRecordById(itemId);
+    const itemRecord = actor.itemRecord || await findItemRecordById(itemId);
     if (!itemRecord) {
       return res.status(404).json({ error: '아이템을 찾을 수 없습니다.' });
     }

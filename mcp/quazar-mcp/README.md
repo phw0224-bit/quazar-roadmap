@@ -23,6 +23,7 @@
 - MCP 툴 `create_quazar_item_github_issue` 노출
 - MCP 툴 `create_quazar_item_github_branch` 노출
 - MCP 툴 `get_quazar_item_github_branch` 노출
+- MCP 툴 `create_quazar_item_github_pull_request` 노출
 - Quazar 내부 API `POST /api/mcp/projects` 호출
 - Quazar 내부 API `GET /api/mcp/sections` 호출
 - Quazar 내부 API `GET /api/mcp/sections/resolve` 호출
@@ -143,11 +144,15 @@ MCP_SHARED_TOKEN=shared-secret QUAZAR_API_BASE_URL=http://localhost:3001 npm sta
   - `item-123으로 linked branch 만들어줘`
 - 아이템 GitHub 브랜치 조회:
   - `item-123 브랜치 정보랑 suggestedCheckoutCommand 보여줘`
+- 아이템 GitHub PR 생성:
+  - `item-123으로 GitHub PR 만들어줘. 로드맵 UI처럼 기본 제목/본문 초안을 쓰고 draft로 열어줘`
 
 ## GitHub 연동 규칙
 
 - `create_quazar_item_github_issue`의 `repoFullName`은 선택 입력이다.
 - `repoFullName`을 생략하면 MCP 서버가 현재 실행 중인 워크스페이스의 `origin` remote를 읽어 GitHub `owner/repo` 형식으로 추천한다.
+- `create_quazar_item_github_pull_request`는 로드맵 UI와 같은 `/pull-request/prepare -> /pull-request` 흐름을 사용한다.
+- 따라서 PR 제목/본문 초안과 티켓 키(`QZR-*`) 사용 방식은 UI와 MCP가 동일하다.
 - 원격 이슈/브랜치 생성은 MCP가 처리하지만, 로컬 git checkout은 수행하지 않는다.
 - 대신 브랜치 생성/조회 응답에 `suggestedCheckoutCommand`가 들어가며, 현재 프로젝트 폴더에서 그 명령으로 이어서 작업하면 된다.
 - 같은 `itemId`에 이미 연결된 이슈나 브랜치가 있으면 실패 대신 `ok: true`, `status: "ALREADY_EXISTS"`로 기존 연결 정보를 반환한다.
