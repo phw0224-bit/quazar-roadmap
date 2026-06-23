@@ -1,9 +1,11 @@
-export function sortProjectItemsByCompletion(items = []) {
+export function sortProjectItemsByCompletion(items = [], options = {}) {
+  const { groupCompletedAtBottom = true } = options;
+
   return [...items].sort((left, right) => {
     const leftDone = left?.status === 'done';
     const rightDone = right?.status === 'done';
 
-    if (leftDone !== rightDone) {
+    if (groupCompletedAtBottom && leftDone !== rightDone) {
       return leftDone ? 1 : -1;
     }
 

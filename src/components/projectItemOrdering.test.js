@@ -34,3 +34,14 @@ test('sortProjectItemsByCompletion falls back to descending order_index when cre
 
   assert.deepEqual(sorted.map((item) => item.id), ['todo-3', 'todo-2', 'todo-1']);
 });
+
+test('sortProjectItemsByCompletion can disable completed grouping', () => {
+  const sorted = sortProjectItemsByCompletion([
+    { id: 'done-new', status: 'done', created_at: '2026-06-22T10:00:00.000Z' },
+    { id: 'todo-old', status: 'todo', created_at: '2026-06-20T10:00:00.000Z' },
+    { id: 'done-old', status: 'done', created_at: '2026-06-19T10:00:00.000Z' },
+    { id: 'todo-new', status: 'todo', created_at: '2026-06-21T10:00:00.000Z' },
+  ], { groupCompletedAtBottom: false });
+
+  assert.deepEqual(sorted.map((item) => item.id), ['done-new', 'todo-new', 'todo-old', 'done-old']);
+});
