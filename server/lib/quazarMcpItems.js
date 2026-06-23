@@ -145,6 +145,63 @@ export function validateGetQuazarItemInput(payload = {}) {
   };
 }
 
+export function validateListQuazarItemCommentsInput(payload = {}) {
+  return {
+    boardType: requireBoardType(payload.boardType),
+    itemId: requireNonEmptyString(payload.itemId, 'itemId'),
+  };
+}
+
+export function validateCreateQuazarCommentInput(payload = {}) {
+  const boardType = requireBoardType(payload.boardType);
+  const itemId = requireNonEmptyString(payload.itemId, 'itemId');
+  const content = requireNonEmptyString(payload.content, 'content');
+  const tags = payload.tags === undefined ? [] : normalizeTags(requireStringArray(payload.tags, 'tags'));
+  const authorName = normalizeOptionalString(payload.authorName) || 'Quazar MCP';
+
+  return {
+    boardType,
+    itemId,
+    content,
+    tags,
+    authorName,
+  };
+}
+
+export function validateUpdateQuazarCommentInput(payload = {}) {
+  const boardType = requireBoardType(payload.boardType);
+  const itemId = requireNonEmptyString(payload.itemId, 'itemId');
+  const commentId = requireNonEmptyString(payload.commentId, 'commentId');
+  const patch = {};
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'content')) {
+    patch.content = requireNonEmptyString(payload.content, 'content');
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'tags')) {
+    patch.tags = normalizeTags(requireStringArray(payload.tags, 'tags'));
+  }
+
+  if (Object.keys(patch).length === 0) {
+    throw createError('INVALID_INPUT', 400, 'At least one updatable field is required.');
+  }
+
+  return {
+    boardType,
+    itemId,
+    commentId,
+    patch,
+  };
+}
+
+export function validateDeleteQuazarCommentInput(payload = {}) {
+  return {
+    boardType: requireBoardType(payload.boardType),
+    itemId: requireNonEmptyString(payload.itemId, 'itemId'),
+    commentId: requireNonEmptyString(payload.commentId, 'commentId'),
+  };
+}
+
 export function validateUpdateQuazarItemInput(payload = {}) {
   const boardType = requireBoardType(payload.boardType);
   const itemId = requireNonEmptyString(payload.itemId, 'itemId');
@@ -196,6 +253,13 @@ export function validateCreateQuazarProjectInput(payload = {}) {
 }
 
 export function validateGetQuazarProjectInput(payload = {}) {
+  return {
+    boardType: requireBoardType(payload.boardType),
+    projectId: requireNonEmptyString(payload.projectId, 'projectId'),
+  };
+}
+
+export function validateGetQuazarProjectActivityInput(payload = {}) {
   return {
     boardType: requireBoardType(payload.boardType),
     projectId: requireNonEmptyString(payload.projectId, 'projectId'),
@@ -311,11 +375,59 @@ export function formatQuazarItemDetail(item, boardType) {
     itemStatus: item.status || '',
     priority: item.priority || '',
     tags: Array.isArray(item.tags) ? item.tags : [],
+    assignees: Array.isArray(item.assignees) ? item.assignees : [],
+    assigneeUserIds: Array.isArray(item.assignee_user_ids) ? item.assignee_user_ids : [],
     projectId: item.project_id || null,
     projectTitle: item.project_title || '',
+    pageType: item.page_type || null,
+    startDate: item.start_date || null,
+    endDate: item.end_date || null,
+    isTicket: Boolean(item.is_ticket || item.ticket_key),
+    ticketKey: item.ticket_key || null,
+    ticketNumber: item.ticket_number ?? null,
+    hasLinkedIssue: Boolean(item.has_linked_issue || item.ticket_key),
+    linkedIssueCount: Number.isInteger(item.linked_issue_count) ? item.linked_issue_count : 0,
+    linkedIssueRepoFullName: item.linked_issue_repo_full_name || null,
+    linkedIssueUrl: item.linked_issue_url || null,
+    hasLinkedBranch: Boolean(item.github_linked_branch_name),
+    linkedBranchName: item.github_linked_branch_name || null,
+    linkedBranchUrl: item.github_linked_branch_url || null,
+    linkedBranchSource: item.github_branch_source || null,
+    commentCount: Number.isInteger(item.comment_count) ? item.comment_count : 0,
+    latestCommentAt: item.latest_comment_at || null,
     boardType,
     createdAt: item.created_at || null,
     updatedAt: item.updated_at || null,
+  };
+}
+
+function resolveCommentAuthorName(comment) {
+  if (comment?.source === 'github_review') {
+    return comment?.source_metadata?.reviewer_name
+      || comment?.source_metadata?.reviewer_login
+      || 'GitHub Reviewer';
+  }
+
+  return comment?.source_metadata?.author_name
+    || comment?.profiles?.name
+    || '익명 사용자';
+}
+
+export function formatQuazarCommentDetail(comment, boardType) {
+  return {
+    commentId: comment.id,
+    itemId: comment.item_id,
+    boardType,
+    content: comment.content || '',
+    tags: Array.isArray(comment.tags) ? comment.tags : [],
+    source: comment.source || '',
+    sourceUrl: comment.source_url || null,
+    sourceMetadata: comment.source_metadata || null,
+    authorUserId: comment.user_id || null,
+    authorName: resolveCommentAuthorName(comment),
+    authorDepartment: comment.profiles?.department || '',
+    createdAt: comment.created_at || null,
+    updatedAt: comment.updated_at || null,
   };
 }
 
@@ -350,10 +462,79 @@ function formatQuazarItemSummary(item) {
     itemStatus: item.status || '',
     priority: item.priority || '',
     tags: Array.isArray(item.tags) ? item.tags : [],
+    assignees: Array.isArray(item.assignees) ? item.assignees : [],
     projectId: item.project_id || null,
     projectTitle: item.project_title || '',
+    pageType: item.page_type || null,
+    startDate: item.start_date || null,
+    endDate: item.end_date || null,
+    ticketKey: item.ticket_key || null,
+    ticketNumber: item.ticket_number ?? null,
+    hasLinkedIssue: Boolean(item.has_linked_issue || item.ticket_key),
+    linkedIssueCount: Number.isInteger(item.linked_issue_count) ? item.linked_issue_count : 0,
+    hasLinkedBranch: Boolean(item.github_linked_branch_name),
+    linkedBranchName: item.github_linked_branch_name || null,
+    commentCount: Number.isInteger(item.comment_count) ? item.comment_count : 0,
+    latestCommentAt: item.latest_comment_at || null,
     updatedAt: item.updated_at || null,
   };
+}
+
+function buildCommentMetricsMap(comments = []) {
+  const metricsByItemId = new Map();
+
+  for (const comment of comments) {
+    const itemId = comment?.item_id || null;
+    if (!itemId) continue;
+    const existing = metricsByItemId.get(itemId) || {
+      comment_count: 0,
+      latest_comment_at: null,
+    };
+    existing.comment_count += 1;
+    const createdAt = comment?.created_at || null;
+    if (createdAt && (!existing.latest_comment_at || createdAt > existing.latest_comment_at)) {
+      existing.latest_comment_at = createdAt;
+    }
+    metricsByItemId.set(itemId, existing);
+  }
+
+  return metricsByItemId;
+}
+
+function buildIssueMetricsMap(issueLinks = []) {
+  const metricsByItemId = new Map();
+
+  for (const issue of issueLinks) {
+    const itemId = issue?.item_id || null;
+    if (!itemId) continue;
+    const existing = metricsByItemId.get(itemId) || {
+      linked_issue_count: 0,
+      linked_issue_repo_full_name: null,
+      linked_issue_url: null,
+      has_linked_issue: false,
+    };
+    existing.linked_issue_count += 1;
+    existing.has_linked_issue = true;
+
+    if (!existing.linked_issue_url && issue?.issue_url) {
+      existing.linked_issue_url = issue.issue_url;
+    }
+    if (!existing.linked_issue_repo_full_name && issue?.repo_full_name) {
+      existing.linked_issue_repo_full_name = issue.repo_full_name;
+    }
+
+    metricsByItemId.set(itemId, existing);
+  }
+
+  return metricsByItemId;
+}
+
+function enrichItemsWithActivity(items = [], { commentMetricsByItemId = new Map(), issueMetricsByItemId = new Map() } = {}) {
+  return items.map((item) => ({
+    ...item,
+    ...(commentMetricsByItemId.get(item.id) || {}),
+    ...(issueMetricsByItemId.get(item.id) || {}),
+  }));
 }
 
 function matchesSearchQuery(item, query) {
@@ -573,6 +754,89 @@ export async function createQuazarItemUpdate({ payload, getItem, updateItem }) {
   return formatQuazarItemDetail(updatedItem, validated.boardType);
 }
 
+export async function createQuazarItemCommentLookup({ payload, getItem, listComments }) {
+  const validated = validateListQuazarItemCommentsInput(payload);
+  const item = await getItem(validated);
+
+  if (!item) {
+    throw createError('ITEM_NOT_FOUND', 404, 'Item was not found.');
+  }
+
+  const comments = await listComments(validated);
+  return {
+    boardType: validated.boardType,
+    itemId: validated.itemId,
+    count: comments.length,
+    comments: comments.map((comment) => formatQuazarCommentDetail(comment, validated.boardType)),
+  };
+}
+
+export async function createQuazarComment({ payload, getItem, insertComment }) {
+  const validated = validateCreateQuazarCommentInput(payload);
+  const item = await getItem({
+    boardType: validated.boardType,
+    itemId: validated.itemId,
+  });
+
+  if (!item) {
+    throw createError('ITEM_NOT_FOUND', 404, 'Item was not found.');
+  }
+
+  const comment = await insertComment(validated);
+  return formatQuazarCommentDetail(comment, validated.boardType);
+}
+
+function assertCommentWritable(comment) {
+  if (!comment) {
+    throw createError('COMMENT_NOT_FOUND', 404, 'Comment was not found.');
+  }
+
+  if (comment.source === 'github_review') {
+    throw createError('COMMENT_READ_ONLY', 409, 'GitHub review comments are read-only.');
+  }
+}
+
+export async function createQuazarCommentUpdate({ payload, getItem, getComment, updateComment }) {
+  const validated = validateUpdateQuazarCommentInput(payload);
+  const item = await getItem({
+    boardType: validated.boardType,
+    itemId: validated.itemId,
+  });
+
+  if (!item) {
+    throw createError('ITEM_NOT_FOUND', 404, 'Item was not found.');
+  }
+
+  const existingComment = await getComment(validated);
+  assertCommentWritable(existingComment);
+
+  const comment = await updateComment(validated);
+  return formatQuazarCommentDetail(comment, validated.boardType);
+}
+
+export async function deleteQuazarComment({ payload, getItem, getComment, deleteComment }) {
+  const validated = validateDeleteQuazarCommentInput(payload);
+  const item = await getItem({
+    boardType: validated.boardType,
+    itemId: validated.itemId,
+  });
+
+  if (!item) {
+    throw createError('ITEM_NOT_FOUND', 404, 'Item was not found.');
+  }
+
+  const existingComment = await getComment(validated);
+  assertCommentWritable(existingComment);
+
+  await deleteComment(validated);
+  return {
+    boardType: validated.boardType,
+    itemId: validated.itemId,
+    commentId: validated.commentId,
+    deleted: true,
+  };
+}
+
 export async function createQuazarSection({ payload, insertSection }) {
   const validated = validateCreateQuazarSectionInput(payload);
   const section = await insertSection(validated);
@@ -606,6 +870,34 @@ export async function getQuazarProjectDetail({ payload, getProject }) {
   }
 
   return formatQuazarProjectDetail(project, validated.boardType);
+}
+
+export async function getQuazarProjectActivity({ payload, getProject, listItems, listCommentMetrics, listIssueMetrics }) {
+  const validated = validateGetQuazarProjectActivityInput(payload);
+  const project = await getProject(validated);
+
+  if (!project) {
+    throw createError('PROJECT_NOT_FOUND', 404, 'Project was not found.');
+  }
+
+  const items = (await listItems(validated)).map((item) => ({
+    ...item,
+    project_title: item.project_title || project.title || '',
+  }));
+  const itemIds = items.map((item) => item.id).filter(Boolean);
+  const commentMetricsByItemId = await listCommentMetrics(itemIds);
+  const issueMetricsByItemId = await listIssueMetrics(itemIds);
+  const enrichedItems = enrichItemsWithActivity(items, {
+    commentMetricsByItemId,
+    issueMetricsByItemId,
+  });
+
+  return {
+    project: formatQuazarProjectDetail(project, validated.boardType),
+    boardType: validated.boardType,
+    count: enrichedItems.length,
+    items: enrichedItems.map(formatQuazarItemSummary),
+  };
 }
 
 export async function createQuazarProjectUpdate({ payload, getProject, updateProject }) {
@@ -671,7 +963,7 @@ async function selectSectionsForBoard(supabase, boardType) {
 async function getProjectById(supabase, boardType, projectId) {
   const { data, error } = await supabase
     .from(getProjectsTable(boardType))
-    .select('id, title, is_completed, section_id, order_index, created_at, board_type')
+    .select('id, title, tags, assignees, assignee_user_ids, is_completed, section_id, order_index, created_at, updated_at, board_type')
     .eq('board_type', boardType)
     .eq('id', projectId)
     .maybeSingle();
@@ -686,7 +978,7 @@ async function getProjectById(supabase, boardType, projectId) {
 async function selectItemsForBoard(supabase, boardType, projectId = null) {
   let query = supabase
     .from(getItemsTable(boardType))
-    .select('id, title, description, status, priority, tags, project_id, created_at, board_type')
+    .select('id, title, description, status, priority, tags, assignees, assignee_user_ids, project_id, page_type, start_date, end_date, is_ticket, ticket_key, ticket_number, github_linked_branch_name, github_linked_branch_url, github_branch_source, created_at, updated_at, board_type')
     .eq('board_type', boardType)
     .order('created_at', { ascending: false, nullsFirst: false });
 
@@ -705,7 +997,7 @@ async function selectItemsForBoard(supabase, boardType, projectId = null) {
 async function getItemById(supabase, boardType, itemId) {
   const { data, error } = await supabase
     .from(getItemsTable(boardType))
-    .select('id, title, description, status, priority, tags, project_id, created_at, board_type')
+    .select('id, title, description, status, priority, tags, assignees, assignee_user_ids, project_id, page_type, start_date, end_date, is_ticket, ticket_key, ticket_number, github_linked_branch_name, github_linked_branch_url, github_branch_source, created_at, updated_at, board_type')
     .eq('board_type', boardType)
     .eq('id', itemId)
     .maybeSingle();
@@ -715,6 +1007,65 @@ async function getItemById(supabase, boardType, itemId) {
   }
 
   return data || null;
+}
+
+async function selectCommentsForItem(supabase, itemId) {
+  const { data, error } = await supabase
+    .from('comments')
+    .select('id, item_id, user_id, content, tags, source, source_url, source_metadata, created_at, updated_at, profiles (name, department)')
+    .eq('item_id', itemId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    throw createError('INTERNAL_ERROR', 500, error.message);
+  }
+
+  return data || [];
+}
+
+async function selectCommentMetricsForItems(supabase, itemIds = []) {
+  if (itemIds.length === 0) return new Map();
+
+  const { data, error } = await supabase
+    .from('comments')
+    .select('item_id, created_at')
+    .in('item_id', itemIds);
+
+  if (error) {
+    throw createError('INTERNAL_ERROR', 500, error.message);
+  }
+
+  return buildCommentMetricsMap(data || []);
+}
+
+async function getCommentById(supabase, itemId, commentId) {
+  const { data, error } = await supabase
+    .from('comments')
+    .select('id, item_id, user_id, content, tags, source, source_url, source_metadata, created_at, updated_at, profiles (name, department)')
+    .eq('item_id', itemId)
+    .eq('id', commentId)
+    .maybeSingle();
+
+  if (error) {
+    throw createError('INTERNAL_ERROR', 500, error.message);
+  }
+
+  return data || null;
+}
+
+async function selectIssueLinksForItems(supabase, itemIds = []) {
+  if (itemIds.length === 0) return new Map();
+
+  const { data, error } = await supabase
+    .from('item_github_issues')
+    .select('item_id, repo_full_name, issue_url')
+    .in('item_id', itemIds);
+
+  if (error) {
+    throw createError('INTERNAL_ERROR', 500, error.message);
+  }
+
+  return buildIssueMetricsMap(data || []);
 }
 
 export function createQuazarItemService(supabase) {
@@ -732,10 +1083,14 @@ export function createQuazarItemService(supabase) {
 
     const projects = await listProjectsForBoard({ boardType, includeCompletedProjects: true });
     const projectMap = new Map(projects.map((project) => [project.id, project.title]));
+    const commentMetricsByItemId = await selectCommentMetricsForItems(supabase, [item.id]);
+    const issueMetricsByItemId = await selectIssueLinksForItems(supabase, [item.id]);
 
     return {
       ...item,
       project_title: projectMap.get(item.project_id) || '',
+      ...(commentMetricsByItemId.get(item.id) || {}),
+      ...(issueMetricsByItemId.get(item.id) || {}),
     };
   };
 
@@ -860,8 +1215,14 @@ export function createQuazarItemService(supabase) {
           const projectMap = new Map(projects.map((project) => [project.id, project.title]));
           const allowedProjectIds = new Set(projects.map((project) => project.id));
           const items = await selectItemsForBoard(supabase, boardType, projectId);
+          const itemIds = items.map((item) => item.id).filter(Boolean);
+          const commentMetricsByItemId = await selectCommentMetricsForItems(supabase, itemIds);
+          const issueMetricsByItemId = await selectIssueLinksForItems(supabase, itemIds);
 
-          return items
+          return enrichItemsWithActivity(items, {
+            commentMetricsByItemId,
+            issueMetricsByItemId,
+          })
             .filter((item) => item.project_id && allowedProjectIds.has(item.project_id))
             .filter((item) => matchesSearchQuery(item, query))
             .filter((item) => matchesStatus(item, status))
@@ -897,7 +1258,7 @@ export function createQuazarItemService(supabase) {
             .update(updates)
             .eq('board_type', boardType)
             .eq('id', itemId)
-            .select('id, title, description, status, priority, tags, project_id, created_at, board_type')
+            .select('id, title, description, status, priority, tags, assignees, assignee_user_ids, project_id, page_type, start_date, end_date, is_ticket, ticket_key, ticket_number, github_linked_branch_name, github_linked_branch_url, github_branch_source, created_at, updated_at, board_type')
             .maybeSingle();
 
           if (error) {
@@ -905,6 +1266,99 @@ export function createQuazarItemService(supabase) {
           }
 
           return hydrateProjectTitle(boardType, data || null);
+        },
+      });
+    },
+
+    async getProjectActivity(payload) {
+      return getQuazarProjectActivity({
+        payload,
+        getProject: async ({ boardType, projectId }) => getProjectById(supabase, boardType, projectId),
+        listItems: async ({ boardType, projectId }) => {
+          const items = await selectItemsForBoard(supabase, boardType, projectId);
+          return items.filter((item) => !item.page_type || item.page_type === 'task');
+        },
+        listCommentMetrics: async (itemIds) => selectCommentMetricsForItems(supabase, itemIds),
+        listIssueMetrics: async (itemIds) => selectIssueLinksForItems(supabase, itemIds),
+      });
+    },
+
+    async listComments(payload) {
+      return createQuazarItemCommentLookup({
+        payload,
+        getItem: async ({ boardType, itemId }) => getItemById(supabase, boardType, itemId),
+        listComments: async ({ itemId }) => selectCommentsForItem(supabase, itemId),
+      });
+    },
+
+    async createComment(payload) {
+      return createQuazarComment({
+        payload,
+        getItem: async ({ boardType, itemId }) => getItemById(supabase, boardType, itemId),
+        insertComment: async ({ itemId, content, tags, authorName }) => {
+          const { data, error } = await supabase
+            .from('comments')
+            .insert([{
+              item_id: itemId,
+              user_id: null,
+              content,
+              tags,
+              source: 'mcp',
+              source_metadata: {
+                author_name: authorName,
+                created_via: 'mcp',
+              },
+            }])
+            .select('id, item_id, user_id, content, tags, source, source_url, source_metadata, created_at, updated_at, profiles (name, department)')
+            .single();
+
+          if (error) {
+            throw createError('INTERNAL_ERROR', 500, error.message);
+          }
+
+          return data;
+        },
+      });
+    },
+
+    async updateComment(payload) {
+      return createQuazarCommentUpdate({
+        payload,
+        getItem: async ({ boardType, itemId }) => getItemById(supabase, boardType, itemId),
+        getComment: async ({ itemId, commentId }) => getCommentById(supabase, itemId, commentId),
+        updateComment: async ({ itemId, commentId, patch }) => {
+          const { data, error } = await supabase
+            .from('comments')
+            .update(patch)
+            .eq('item_id', itemId)
+            .eq('id', commentId)
+            .select('id, item_id, user_id, content, tags, source, source_url, source_metadata, created_at, updated_at, profiles (name, department)')
+            .maybeSingle();
+
+          if (error) {
+            throw createError('INTERNAL_ERROR', 500, error.message);
+          }
+
+          return data || null;
+        },
+      });
+    },
+
+    async deleteComment(payload) {
+      return deleteQuazarComment({
+        payload,
+        getItem: async ({ boardType, itemId }) => getItemById(supabase, boardType, itemId),
+        getComment: async ({ itemId, commentId }) => getCommentById(supabase, itemId, commentId),
+        deleteComment: async ({ itemId, commentId }) => {
+          const { error } = await supabase
+            .from('comments')
+            .delete()
+            .eq('item_id', itemId)
+            .eq('id', commentId);
+
+          if (error) {
+            throw createError('INTERNAL_ERROR', 500, error.message);
+          }
         },
       });
     },

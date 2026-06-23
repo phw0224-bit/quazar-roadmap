@@ -1,6 +1,6 @@
 ---
 name: quazar-workflow
-description: Use when working in the Quazar roadmap workspace and the user asks for a natural-language work-management flow such as finding or creating a section/project, drafting a development item, creating a linked GitHub issue or branch, or asking whether to check out the branch after the workflow completes.
+description: Use when working in the Quazar roadmap workspace and the user asks for a natural-language work-management flow such as finding or creating a section/project, drafting a development item, appending a work-log comment, reviewing a member project, creating a linked GitHub issue or branch, or asking whether to check out the branch after the workflow completes.
 ---
 
 # Quazar Workflow
@@ -24,9 +24,10 @@ Do not compress the whole request into one opaque MCP call.
 Always do this:
 1. Resolve context from the user's natural language.
 2. Build a dry-run plan first.
-3. Show the item draft and ask for the user's opinion.
+3. If the flow mutates data, show the draft and ask for the user's opinion first.
 4. Execute MCP steps only after the user approves or revises the draft.
-5. Ask `해당 브랜치로 체크아웃하시겠습니까?` after branch creation if checkout guidance exists.
+5. For read-only review/report requests, skip mutation approval and return the structured summary.
+6. Ask `해당 브랜치로 체크아웃하시겠습니까?` after branch creation if checkout guidance exists.
 
 ## Use This Flow
 
@@ -34,6 +35,8 @@ Use this skill when the request looks like:
 - "DPP 쪽에 Pinata IPFS 작업 만들고 이슈/브랜치까지"
 - "개발팀 보드에서 박형우 프로젝트 찾고 없으면 만들고 아이템 만들어줘"
 - "이 작업을 Quazar 아이템으로 만들고 GitHub issue랑 branch도 연결해줘"
+- "박형우 프로젝트에서 이번 주 한 작업 정리해줘"
+- "item-123 댓글에 오늘 진행 내용 남겨줘"
 
 Do not use this skill for:
 - Single atomic MCP actions the user already specified precisely
@@ -67,8 +70,10 @@ Before mutating anything, produce a dry-run plan.
 The dry-run should:
 - resolve section candidates
 - resolve project candidates
-- build an item draft using the `개발` template
-- mark the draft as review-required before any create call
+- choose between item creation, comment append, or read-only summary
+- build an item draft using the `개발` template when a new item is the right target
+- build a comment draft using the repo comment template when a comment append is the right target
+- mark the draft as review-required before any mutating call
 - identify whether GitHub issue creation and branch creation are intended
 - identify whether `repoFullName` is explicit or should fall back to workspace git remote
 
@@ -78,7 +83,7 @@ If a section is missing, do not auto-create it silently. State that the section 
 
 If a project is missing, do not invent one silently. Ask whether to create it under the resolved section.
 
-Even when section and project resolution are complete, do not create the item immediately. Show the item draft first and ask the user whether to proceed or what to change.
+Even when section and project resolution are complete, do not create or mutate immediately. Show the item/comment draft first and ask the user whether to proceed or what to change.
 
 ## MCP Tool Order
 
@@ -88,10 +93,12 @@ Use MCP as an atomic toolbox in this order:
 2. `create_quazar_section` only if the user confirms creation
 3. `list_quazar_projects`
 4. `create_quazar_project` only if needed and confirmed
-5. `create_quazar_item`
-6. `create_quazar_item_github_issue`
-7. `create_quazar_item_github_branch`
-8. `get_quazar_item_github_branch` if branch detail confirmation is needed
+5. `get_quazar_project_activity` when the request is review/report oriented
+6. `create_quazar_item`
+7. `create_quazar_item_comment`
+8. `create_quazar_item_github_issue`
+9. `create_quazar_item_github_branch`
+10. `get_quazar_item_github_branch` if branch detail confirmation is needed
 
 Prefer exact resolution before creation:
 - section: exact normalized title match
@@ -150,9 +157,9 @@ After branch creation:
 When handling a user request with this skill, keep the response sequence tight:
 
 1. Dry-run summary
-2. Item draft review request
+2. Item/comment draft review request when mutation is involved
 3. Missing or ambiguous choices, if any
-4. Execution result after approval
+4. Execution result after approval, or read-only summary result
 5. Final checkout question if branch info exists
 
 Do not hide the plan. The user should always be able to see what will be created before mutation starts.

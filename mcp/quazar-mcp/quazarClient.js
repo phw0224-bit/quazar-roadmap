@@ -230,6 +230,93 @@ export async function getQuazarItemViaApi(
   );
 }
 
+export async function listQuazarItemCommentsViaApi(
+  { baseUrl, token, fetchImpl = fetch },
+  payload,
+) {
+  const params = new URLSearchParams({
+    boardType: payload.boardType,
+  });
+
+  return requestJson(
+    { baseUrl, token, fetchImpl },
+    `/api/mcp/items/${encodeURIComponent(payload.itemId)}/comments?${params.toString()}`,
+    {
+      method: 'GET',
+    }
+  );
+}
+
+export async function createQuazarItemCommentViaApi(
+  { baseUrl, token, fetchImpl = fetch },
+  payload,
+) {
+  const body = {
+    boardType: payload.boardType,
+    content: payload.content,
+    tags: Array.isArray(payload.tags) ? payload.tags : [],
+    authorName: typeof payload.authorName === 'string' ? payload.authorName : '',
+  };
+
+  return requestJson(
+    { baseUrl, token, fetchImpl },
+    `/api/mcp/items/${encodeURIComponent(payload.itemId)}/comments`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    }
+  );
+}
+
+export async function updateQuazarItemCommentViaApi(
+  { baseUrl, token, fetchImpl = fetch },
+  payload,
+) {
+  const body = {
+    boardType: payload.boardType,
+  };
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'content')) {
+    body.content = payload.content;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'tags')) {
+    body.tags = payload.tags;
+  }
+
+  return requestJson(
+    { baseUrl, token, fetchImpl },
+    `/api/mcp/items/${encodeURIComponent(payload.itemId)}/comments/${encodeURIComponent(payload.commentId)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    }
+  );
+}
+
+export async function deleteQuazarItemCommentViaApi(
+  { baseUrl, token, fetchImpl = fetch },
+  payload,
+) {
+  const params = new URLSearchParams({
+    boardType: payload.boardType,
+  });
+
+  return requestJson(
+    { baseUrl, token, fetchImpl },
+    `/api/mcp/items/${encodeURIComponent(payload.itemId)}/comments/${encodeURIComponent(payload.commentId)}?${params.toString()}`,
+    {
+      method: 'DELETE',
+    }
+  );
+}
+
 export async function getQuazarProjectViaApi(
   { baseUrl, token, fetchImpl = fetch },
   payload,
@@ -241,6 +328,23 @@ export async function getQuazarProjectViaApi(
   return requestJson(
     { baseUrl, token, fetchImpl },
     `/api/mcp/projects/${encodeURIComponent(payload.projectId)}?${params.toString()}`,
+    {
+      method: 'GET',
+    }
+  );
+}
+
+export async function getQuazarProjectActivityViaApi(
+  { baseUrl, token, fetchImpl = fetch },
+  payload,
+) {
+  const params = new URLSearchParams({
+    boardType: payload.boardType,
+  });
+
+  return requestJson(
+    { baseUrl, token, fetchImpl },
+    `/api/mcp/projects/${encodeURIComponent(payload.projectId)}/activity?${params.toString()}`,
     {
       method: 'GET',
     }

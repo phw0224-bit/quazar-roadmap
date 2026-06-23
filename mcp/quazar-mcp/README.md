@@ -12,7 +12,12 @@
 - MCP 툴 `resolve_quazar_project` 노출
 - MCP 툴 `search_quazar_items` 노출
 - MCP 툴 `get_quazar_project` 노출
+- MCP 툴 `get_quazar_project_activity` 노출
 - MCP 툴 `get_quazar_item` 노출
+- MCP 툴 `list_quazar_item_comments` 노출
+- MCP 툴 `create_quazar_item_comment` 노출
+- MCP 툴 `update_quazar_item_comment` 노출
+- MCP 툴 `delete_quazar_item_comment` 노출
 - MCP 툴 `update_quazar_project` 노출
 - MCP 툴 `update_quazar_item` 노출
 - MCP 툴 `create_quazar_item_github_issue` 노출
@@ -26,8 +31,13 @@
 - Quazar 내부 API `GET /api/mcp/projects` 호출
 - Quazar 내부 API `GET /api/mcp/projects/resolve` 호출
 - Quazar 내부 API `GET /api/mcp/projects/:projectId` 호출
+- Quazar 내부 API `GET /api/mcp/projects/:projectId/activity` 호출
 - Quazar 내부 API `GET /api/mcp/items` 호출
 - Quazar 내부 API `GET /api/mcp/items/:itemId` 호출
+- Quazar 내부 API `GET /api/mcp/items/:itemId/comments` 호출
+- Quazar 내부 API `POST /api/mcp/items/:itemId/comments` 호출
+- Quazar 내부 API `PATCH /api/mcp/items/:itemId/comments/:commentId` 호출
+- Quazar 내부 API `DELETE /api/mcp/items/:itemId/comments/:commentId` 호출
 - Quazar 내부 API `PATCH /api/mcp/projects/:projectId` 호출
 - Quazar 내부 API `PATCH /api/mcp/items/:itemId` 호출
 - 결과를 MCP `content` + `structuredContent`로 반환
@@ -105,6 +115,8 @@ MCP_SHARED_TOKEN=shared-secret QUAZAR_API_BASE_URL=http://localhost:3001 npm sta
   - `개발팀 보드에서 박형우 프로젝트를 정확히 resolve 해줘`
 - 프로젝트 상세 확인:
   - `AI팀의 project-123 프로젝트 정보 보여줘`
+- 프로젝트 활동 확인:
+  - `개발팀의 project-123 프로젝트에 현재 어떤 아이템들이 있는지 활동 기준으로 보여줘`
 - 프로젝트 수정:
   - `지원팀의 project-77 제목을 "CS 운영 개선"으로 바꾸고 완료 상태를 true로 바꿔줘`
 - 아이템 검색:
@@ -115,6 +127,16 @@ MCP_SHARED_TOKEN=shared-secret QUAZAR_API_BASE_URL=http://localhost:3001 npm sta
   - `개발팀의 "온보딩 개선" 프로젝트에 제목 "MCP 테스트", description "로컬 연결 확인", 태그 test,mcp 로 아이템 만들어줘`
 - 아이템 수정:
   - `지원팀의 item-77 상태를 done으로 바꾸고 tags를 ops,faq로 덮어써줘`
+- 댓글 목록:
+  - `개발팀의 item-123 댓글 목록 보여줘`
+- 댓글 만들기:
+  - `개발팀의 item-123에 "이건 MCP에서 남긴 댓글입니다" 댓글 추가해줘`
+- 댓글 수정:
+  - `개발팀의 item-123에서 comment-456 댓글 내용을 최신 내용으로 바꿔줘`
+- 댓글 삭제:
+  - `개발팀의 item-123에서 comment-456 댓글 삭제해줘`
+- 프로젝트 요약용 조회:
+  - `박형우 프로젝트의 작업 이력을 티켓 포함해서 보여줘`
 - 아이템 GitHub 이슈 생성:
   - `item-123으로 GitHub 이슈 만들어줘. repo는 비우고 현재 프로젝트 git remote 기준으로 해줘`
 - 아이템 GitHub 브랜치 생성:

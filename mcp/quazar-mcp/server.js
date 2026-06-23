@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
+import process from 'node:process';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { fileURLToPath } from 'url';
@@ -10,16 +11,21 @@ import {
   createQuazarSectionViaApi,
   createQuazarItemGitHubBranchViaApi,
   createQuazarItemGitHubIssueViaApi,
+  createQuazarItemCommentViaApi,
   createQuazarProjectViaApi,
   createQuazarItemViaApi,
+  deleteQuazarItemCommentViaApi,
+  getQuazarProjectActivityViaApi,
   getQuazarProjectViaApi,
   getQuazarItemViaApi,
   getQuazarItemGitHubBranchViaApi,
+  listQuazarItemCommentsViaApi,
   listQuazarSectionsViaApi,
   listQuazarProjectsViaApi,
   resolveQuazarSectionViaApi,
   resolveQuazarProjectViaApi,
   searchQuazarItemsViaApi,
+  updateQuazarItemCommentViaApi,
   updateQuazarProjectViaApi,
   updateQuazarItemViaApi,
 } from './quazarClient.js';
@@ -165,6 +171,54 @@ export async function runGetQuazarItemTool(args, { getItem }) {
   };
 }
 
+export async function runListQuazarItemCommentsTool(args, { listComments }) {
+  const result = await listComments(args);
+  const commentLines = result.comments.map((comment) => `- ${comment.authorName}: ${comment.content}`);
+
+  return {
+    content: [{
+      type: 'text',
+      text: commentLines.length > 0
+        ? `Found ${result.count} comments on Quazar item ${result.itemId}:\n${commentLines.join('\n')}`
+        : `No comments found on Quazar item ${result.itemId}.`,
+    }],
+    structuredContent: result,
+  };
+}
+
+export async function runCreateQuazarItemCommentTool(args, { createComment }) {
+  const result = await createComment(args);
+  return {
+    content: [{
+      type: 'text',
+      text: `Created Quazar comment ${result.commentId} on item ${result.itemId}.`,
+    }],
+    structuredContent: result,
+  };
+}
+
+export async function runUpdateQuazarItemCommentTool(args, { updateComment }) {
+  const result = await updateComment(args);
+  return {
+    content: [{
+      type: 'text',
+      text: `Updated Quazar comment ${result.commentId} on item ${result.itemId}.`,
+    }],
+    structuredContent: result,
+  };
+}
+
+export async function runDeleteQuazarItemCommentTool(args, { deleteComment }) {
+  const result = await deleteComment(args);
+  return {
+    content: [{
+      type: 'text',
+      text: `Deleted Quazar comment ${result.commentId} from item ${result.itemId}.`,
+    }],
+    structuredContent: result,
+  };
+}
+
 export async function runUpdateQuazarItemTool(args, { updateItem }) {
   const result = await updateItem(args);
   return {
@@ -182,6 +236,21 @@ export async function runGetQuazarProjectTool(args, { getProject }) {
     content: [{
       type: 'text',
       text: `Quazar project ${result.projectId}: ${result.title} (${result.boardType}, completed: ${result.isCompleted}).`,
+    }],
+    structuredContent: result,
+  };
+}
+
+export async function runGetQuazarProjectActivityTool(args, { getProjectActivity }) {
+  const result = await getProjectActivity(args);
+  const itemLines = result.items.map((item) => `- ${item.title}${item.ticketKey ? ` [${item.ticketKey}]` : ''}`);
+
+  return {
+    content: [{
+      type: 'text',
+      text: itemLines.length > 0
+        ? `Quazar project ${result.project.projectId} has ${result.count} items:\n${itemLines.join('\n')}`
+        : `Quazar project ${result.project.projectId} does not have any items yet.`,
     }],
     structuredContent: result,
   };
@@ -334,8 +403,13 @@ export function createQuazarMcpServer({
   resolveSection,
   createProject,
   getProject,
+  getProjectActivity,
   updateProject,
   createItem,
+  listComments,
+  createComment,
+  updateComment,
+  deleteComment,
   listSections,
   listProjects,
   resolveProject,
@@ -349,7 +423,7 @@ export function createQuazarMcpServer({
 }) {
   const server = new McpServer({
     name: 'quazar-item-mcp',
-    version: '1.7.0',
+    version: '1.8.0',
   });
 
   server.registerTool('create_quazar_item', {
@@ -446,6 +520,7 @@ export function createQuazarMcpServer({
     inputSchema: {
       boardType: z.enum(['main', '개발팀', 'AI팀', '지원팀']).describe('Quazar board type'),
       title: z.string().min(1).describe('Project title'),
+      tags: z.array(z.string()).optional().describe('Optional project tags'),
       sectionId: z.string().optional().nullable().describe('Optional target section id'),
       sectionName: z.string().optional().describe('Optional target section title resolved by exact normalized match'),
     },
@@ -454,11 +529,13 @@ export function createQuazarMcpServer({
       status: z.string(),
       projectId: z.string(),
       title: z.string(),
+      tags: z.array(z.string()).optional(),
       isCompleted: z.boolean(),
       sectionId: z.string().nullable(),
       boardType: z.string(),
       orderIndex: z.number().int().nullable(),
       createdAt: z.string().nullable(),
+      updatedAt: z.string().nullable().optional(),
     },
   }, async (args) => runCreateQuazarProjectTool(args, { createProject }));
 
@@ -535,8 +612,21 @@ export function createQuazarMcpServer({
         itemStatus: z.string(),
         priority: z.string(),
         tags: z.array(z.string()),
+        assignees: z.array(z.string()).optional(),
         projectId: z.string().nullable(),
         projectTitle: z.string(),
+        pageType: z.string().nullable().optional(),
+        startDate: z.string().nullable().optional(),
+        endDate: z.string().nullable().optional(),
+        ticketKey: z.string().nullable().optional(),
+        ticketNumber: z.number().int().nullable().optional(),
+        hasLinkedIssue: z.boolean().optional(),
+        linkedIssueCount: z.number().int().optional(),
+        hasLinkedBranch: z.boolean().optional(),
+        linkedBranchName: z.string().nullable().optional(),
+        commentCount: z.number().int().optional(),
+        latestCommentAt: z.string().nullable().optional(),
+        updatedAt: z.string().nullable().optional(),
       })),
     },
   }, async (args) => runSearchQuazarItemsTool(args, { searchItems }));
@@ -557,12 +647,138 @@ export function createQuazarMcpServer({
       itemStatus: z.string(),
       priority: z.string(),
       tags: z.array(z.string()),
+      assignees: z.array(z.string()).optional(),
+      assigneeUserIds: z.array(z.string()).optional(),
       projectId: z.string().nullable(),
       projectTitle: z.string(),
+      pageType: z.string().nullable().optional(),
+      startDate: z.string().nullable().optional(),
+      endDate: z.string().nullable().optional(),
+      isTicket: z.boolean().optional(),
+      ticketKey: z.string().nullable().optional(),
+      ticketNumber: z.number().int().nullable().optional(),
+      hasLinkedIssue: z.boolean().optional(),
+      linkedIssueCount: z.number().int().optional(),
+      linkedIssueRepoFullName: z.string().nullable().optional(),
+      linkedIssueUrl: z.string().nullable().optional(),
+      hasLinkedBranch: z.boolean().optional(),
+      linkedBranchName: z.string().nullable().optional(),
+      linkedBranchUrl: z.string().nullable().optional(),
+      linkedBranchSource: z.string().nullable().optional(),
+      commentCount: z.number().int().optional(),
+      latestCommentAt: z.string().nullable().optional(),
       boardType: z.string(),
       createdAt: z.string().nullable(),
+      updatedAt: z.string().nullable().optional(),
     },
   }, async (args) => runGetQuazarItemTool(args, { getItem }));
+
+  server.registerTool('list_quazar_item_comments', {
+    title: 'List Quazar Item Comments',
+    description: 'List comments for one Quazar item.',
+    inputSchema: {
+      boardType: z.enum(['main', '개발팀', 'AI팀', '지원팀']).describe('Quazar board type'),
+      itemId: z.string().min(1).describe('Quazar item id'),
+    },
+    outputSchema: {
+      ok: z.boolean(),
+      status: z.string(),
+      boardType: z.string(),
+      itemId: z.string(),
+      count: z.number().int(),
+      comments: z.array(z.object({
+        commentId: z.string(),
+        itemId: z.string(),
+        boardType: z.string(),
+        content: z.string(),
+        tags: z.array(z.string()),
+        source: z.string(),
+        sourceUrl: z.string().nullable(),
+        sourceMetadata: z.any().nullable(),
+        authorUserId: z.string().nullable(),
+        authorName: z.string(),
+        authorDepartment: z.string(),
+        createdAt: z.string().nullable(),
+        updatedAt: z.string().nullable(),
+      })),
+    },
+  }, async (args) => runListQuazarItemCommentsTool(args, { listComments }));
+
+  server.registerTool('create_quazar_item_comment', {
+    title: 'Create Quazar Item Comment',
+    description: 'Create a comment on one Quazar item.',
+    inputSchema: {
+      boardType: z.enum(['main', '개발팀', 'AI팀', '지원팀']).describe('Quazar board type'),
+      itemId: z.string().min(1).describe('Quazar item id'),
+      content: z.string().min(1).describe('Comment content'),
+      tags: z.array(z.string()).optional().describe('Optional comment tags'),
+      authorName: z.string().optional().describe('Optional display name stored in comment metadata'),
+    },
+    outputSchema: {
+      ok: z.boolean(),
+      status: z.string(),
+      commentId: z.string(),
+      itemId: z.string(),
+      boardType: z.string(),
+      content: z.string(),
+      tags: z.array(z.string()),
+      source: z.string(),
+      sourceUrl: z.string().nullable(),
+      sourceMetadata: z.any().nullable(),
+      authorUserId: z.string().nullable(),
+      authorName: z.string(),
+      authorDepartment: z.string(),
+      createdAt: z.string().nullable(),
+      updatedAt: z.string().nullable(),
+    },
+  }, async (args) => runCreateQuazarItemCommentTool(args, { createComment }));
+
+  server.registerTool('update_quazar_item_comment', {
+    title: 'Update Quazar Item Comment',
+    description: 'Update mutable Quazar comment fields: content and tags.',
+    inputSchema: {
+      boardType: z.enum(['main', '개발팀', 'AI팀', '지원팀']).describe('Quazar board type'),
+      itemId: z.string().min(1).describe('Quazar item id'),
+      commentId: z.string().min(1).describe('Quazar comment id'),
+      content: z.string().optional().describe('Optional replacement comment content'),
+      tags: z.array(z.string()).optional().describe('Optional replacement tags'),
+    },
+    outputSchema: {
+      ok: z.boolean(),
+      status: z.string(),
+      commentId: z.string(),
+      itemId: z.string(),
+      boardType: z.string(),
+      content: z.string(),
+      tags: z.array(z.string()),
+      source: z.string(),
+      sourceUrl: z.string().nullable(),
+      sourceMetadata: z.any().nullable(),
+      authorUserId: z.string().nullable(),
+      authorName: z.string(),
+      authorDepartment: z.string(),
+      createdAt: z.string().nullable(),
+      updatedAt: z.string().nullable(),
+    },
+  }, async (args) => runUpdateQuazarItemCommentTool(args, { updateComment }));
+
+  server.registerTool('delete_quazar_item_comment', {
+    title: 'Delete Quazar Item Comment',
+    description: 'Delete one mutable Quazar item comment.',
+    inputSchema: {
+      boardType: z.enum(['main', '개발팀', 'AI팀', '지원팀']).describe('Quazar board type'),
+      itemId: z.string().min(1).describe('Quazar item id'),
+      commentId: z.string().min(1).describe('Quazar comment id'),
+    },
+    outputSchema: {
+      ok: z.boolean(),
+      status: z.string(),
+      boardType: z.string(),
+      itemId: z.string(),
+      commentId: z.string(),
+      deleted: z.boolean(),
+    },
+  }, async (args) => runDeleteQuazarItemCommentTool(args, { deleteComment }));
 
   server.registerTool('get_quazar_project', {
     title: 'Get Quazar Project',
@@ -576,13 +792,64 @@ export function createQuazarMcpServer({
       status: z.string(),
       projectId: z.string(),
       title: z.string(),
+      tags: z.array(z.string()).optional(),
       isCompleted: z.boolean(),
       sectionId: z.string().nullable(),
       boardType: z.string(),
       orderIndex: z.number().int().nullable(),
       createdAt: z.string().nullable(),
+      updatedAt: z.string().nullable().optional(),
     },
   }, async (args) => runGetQuazarProjectTool(args, { getProject }));
+
+  server.registerTool('get_quazar_project_activity', {
+    title: 'Get Quazar Project Activity',
+    description: 'Get one Quazar project with its current item activity summaries.',
+    inputSchema: {
+      boardType: z.enum(['main', '개발팀', 'AI팀', '지원팀']).describe('Quazar board type'),
+      projectId: z.string().min(1).describe('Quazar project id'),
+    },
+    outputSchema: {
+      ok: z.boolean(),
+      status: z.string(),
+      boardType: z.string(),
+      project: z.object({
+        projectId: z.string(),
+        title: z.string(),
+        tags: z.array(z.string()).optional(),
+        isCompleted: z.boolean(),
+        sectionId: z.string().nullable(),
+        boardType: z.string(),
+        orderIndex: z.number().int().nullable(),
+        createdAt: z.string().nullable(),
+        updatedAt: z.string().nullable().optional(),
+      }),
+      count: z.number().int(),
+      items: z.array(z.object({
+        itemId: z.string(),
+        title: z.string(),
+        description: z.string(),
+        itemStatus: z.string(),
+        priority: z.string(),
+        tags: z.array(z.string()),
+        assignees: z.array(z.string()).optional(),
+        projectId: z.string().nullable(),
+        projectTitle: z.string(),
+        pageType: z.string().nullable().optional(),
+        startDate: z.string().nullable().optional(),
+        endDate: z.string().nullable().optional(),
+        ticketKey: z.string().nullable().optional(),
+        ticketNumber: z.number().int().nullable().optional(),
+        hasLinkedIssue: z.boolean().optional(),
+        linkedIssueCount: z.number().int().optional(),
+        hasLinkedBranch: z.boolean().optional(),
+        linkedBranchName: z.string().nullable().optional(),
+        commentCount: z.number().int().optional(),
+        latestCommentAt: z.string().nullable().optional(),
+        updatedAt: z.string().nullable().optional(),
+      })),
+    },
+  }, async (args) => runGetQuazarProjectActivityTool(args, { getProjectActivity }));
 
   server.registerTool('update_quazar_item', {
     title: 'Update Quazar Item',
@@ -604,10 +871,29 @@ export function createQuazarMcpServer({
       itemStatus: z.string(),
       priority: z.string(),
       tags: z.array(z.string()),
+      assignees: z.array(z.string()).optional(),
+      assigneeUserIds: z.array(z.string()).optional(),
       projectId: z.string().nullable(),
       projectTitle: z.string(),
+      pageType: z.string().nullable().optional(),
+      startDate: z.string().nullable().optional(),
+      endDate: z.string().nullable().optional(),
+      isTicket: z.boolean().optional(),
+      ticketKey: z.string().nullable().optional(),
+      ticketNumber: z.number().int().nullable().optional(),
+      hasLinkedIssue: z.boolean().optional(),
+      linkedIssueCount: z.number().int().optional(),
+      linkedIssueRepoFullName: z.string().nullable().optional(),
+      linkedIssueUrl: z.string().nullable().optional(),
+      hasLinkedBranch: z.boolean().optional(),
+      linkedBranchName: z.string().nullable().optional(),
+      linkedBranchUrl: z.string().nullable().optional(),
+      linkedBranchSource: z.string().nullable().optional(),
+      commentCount: z.number().int().optional(),
+      latestCommentAt: z.string().nullable().optional(),
       boardType: z.string(),
       createdAt: z.string().nullable(),
+      updatedAt: z.string().nullable().optional(),
     },
   }, async (args) => runUpdateQuazarItemTool(args, { updateItem }));
 
@@ -618,6 +904,7 @@ export function createQuazarMcpServer({
       boardType: z.enum(['main', '개발팀', 'AI팀', '지원팀']).describe('Quazar board type'),
       projectId: z.string().min(1).describe('Quazar project id'),
       title: z.string().optional().describe('Optional replacement title'),
+      tags: z.array(z.string()).optional().describe('Optional replacement tags'),
       isCompleted: z.boolean().optional().describe('Optional completion state'),
     },
     outputSchema: {
@@ -625,11 +912,13 @@ export function createQuazarMcpServer({
       status: z.string(),
       projectId: z.string(),
       title: z.string(),
+      tags: z.array(z.string()).optional(),
       isCompleted: z.boolean(),
       sectionId: z.string().nullable(),
       boardType: z.string(),
       orderIndex: z.number().int().nullable(),
       createdAt: z.string().nullable(),
+      updatedAt: z.string().nullable().optional(),
     },
   }, async (args) => runUpdateQuazarProjectTool(args, { updateProject }));
 
@@ -721,8 +1010,13 @@ export async function main() {
     resolveSection: (payload) => resolveQuazarSectionViaApi({ baseUrl, token }, payload),
     createProject: (payload) => createQuazarProjectViaApi({ baseUrl, token }, payload),
     getProject: (payload) => getQuazarProjectViaApi({ baseUrl, token }, payload),
+    getProjectActivity: (payload) => getQuazarProjectActivityViaApi({ baseUrl, token }, payload),
     updateProject: (payload) => updateQuazarProjectViaApi({ baseUrl, token }, payload),
     createItem: (payload) => createQuazarItemViaApi({ baseUrl, token }, payload),
+    listComments: (payload) => listQuazarItemCommentsViaApi({ baseUrl, token }, payload),
+    createComment: (payload) => createQuazarItemCommentViaApi({ baseUrl, token }, payload),
+    updateComment: (payload) => updateQuazarItemCommentViaApi({ baseUrl, token }, payload),
+    deleteComment: (payload) => deleteQuazarItemCommentViaApi({ baseUrl, token }, payload),
     listSections: (payload) => listQuazarSectionsViaApi({ baseUrl, token }, payload),
     listProjects: (payload) => listQuazarProjectsViaApi({ baseUrl, token }, payload),
     resolveProject: (payload) => resolveQuazarProjectViaApi({ baseUrl, token }, payload),

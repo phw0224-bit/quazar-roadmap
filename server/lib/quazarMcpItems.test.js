@@ -6,8 +6,12 @@ import {
   createQuazarSectionLookup,
   resolveQuazarSection,
   createQuazarItem,
+  createQuazarComment,
+  createQuazarCommentUpdate,
   createQuazarItemSearch,
+  createQuazarItemCommentLookup,
   createQuazarItemUpdate,
+  getQuazarProjectActivity,
   createQuazarProject,
   createQuazarProjectUpdate,
   createQuazarProjectLookup,
@@ -24,15 +28,21 @@ import {
   validateCreateQuazarSectionInput,
   validateResolveQuazarSectionInput,
   validateListQuazarSectionsInput,
+  validateCreateQuazarCommentInput,
   validateCreateQuazarItemInput,
   validateCreateQuazarProjectInput,
+  validateDeleteQuazarCommentInput,
   validateGetQuazarProjectInput,
   validateResolveQuazarProjectInput,
   validateGetQuazarItemInput,
+  validateListQuazarItemCommentsInput,
   validateSearchQuazarItemsInput,
+  validateUpdateQuazarCommentInput,
   validateUpdateQuazarItemInput,
   validateUpdateQuazarProjectInput,
   createQuazarItemService,
+  deleteQuazarComment,
+  formatQuazarCommentDetail,
 } from './quazarMcpItems.js';
 
 test('normalizeProjectName collapses whitespace and lowercases values', () => {
@@ -439,8 +449,20 @@ test('createQuazarItemSearch returns project-scoped summaries', async () => {
       itemStatus: 'todo',
       priority: 'high',
       tags: ['docs'],
+      assignees: [],
       projectId: 'project-a',
       projectTitle: '온보딩 개선',
+      pageType: null,
+      startDate: null,
+      endDate: null,
+      ticketKey: null,
+      ticketNumber: null,
+      hasLinkedIssue: false,
+      linkedIssueCount: 0,
+      hasLinkedBranch: false,
+      linkedBranchName: null,
+      commentCount: 0,
+      latestCommentAt: null,
       updatedAt: '2026-05-22T00:00:00.000Z',
     }],
   });
@@ -478,6 +500,74 @@ test('validateGetQuazarItemInput trims board type and item id', () => {
   );
 });
 
+test('validateListQuazarItemCommentsInput trims board type and item id', () => {
+  assert.deepEqual(
+    validateListQuazarItemCommentsInput({
+      boardType: ' 개발팀 ',
+      itemId: ' item-1 ',
+    }),
+    {
+      boardType: '개발팀',
+      itemId: 'item-1',
+    }
+  );
+});
+
+test('validateCreateQuazarCommentInput normalizes optional author and tags', () => {
+  assert.deepEqual(
+    validateCreateQuazarCommentInput({
+      boardType: '개발팀',
+      itemId: 'item-1',
+      content: ' 새 댓글 ',
+      tags: ['mcp', 'MCP'],
+      authorName: ' Codex ',
+    }),
+    {
+      boardType: '개발팀',
+      itemId: 'item-1',
+      content: '새 댓글',
+      tags: ['mcp'],
+      authorName: 'Codex',
+    }
+  );
+});
+
+test('validateUpdateQuazarCommentInput accepts partial updates', () => {
+  assert.deepEqual(
+    validateUpdateQuazarCommentInput({
+      boardType: '개발팀',
+      itemId: 'item-1',
+      commentId: 'comment-1',
+      content: '수정 댓글',
+      tags: [],
+    }),
+    {
+      boardType: '개발팀',
+      itemId: 'item-1',
+      commentId: 'comment-1',
+      patch: {
+        content: '수정 댓글',
+        tags: [],
+      },
+    }
+  );
+});
+
+test('validateDeleteQuazarCommentInput trims ids', () => {
+  assert.deepEqual(
+    validateDeleteQuazarCommentInput({
+      boardType: '개발팀',
+      itemId: ' item-1 ',
+      commentId: ' comment-1 ',
+    }),
+    {
+      boardType: '개발팀',
+      itemId: 'item-1',
+      commentId: 'comment-1',
+    }
+  );
+});
+
 test('formatQuazarItemDetail normalizes item shape', () => {
   assert.deepEqual(
     formatQuazarItemDetail({
@@ -499,13 +589,160 @@ test('formatQuazarItemDetail normalizes item shape', () => {
       itemStatus: 'todo',
       priority: '',
       tags: [],
+      assignees: [],
+      assigneeUserIds: [],
       projectId: 'project-a',
       projectTitle: '온보딩 개선',
+      pageType: null,
+      startDate: null,
+      endDate: null,
+      isTicket: false,
+      ticketKey: null,
+      ticketNumber: null,
+      hasLinkedIssue: false,
+      linkedIssueCount: 0,
+      linkedIssueRepoFullName: null,
+      linkedIssueUrl: null,
+      hasLinkedBranch: false,
+      linkedBranchName: null,
+      linkedBranchUrl: null,
+      linkedBranchSource: null,
+      commentCount: 0,
+      latestCommentAt: null,
       boardType: '개발팀',
       createdAt: '2026-05-20T00:00:00.000Z',
       updatedAt: '2026-05-21T00:00:00.000Z',
     }
   );
+});
+
+test('formatQuazarCommentDetail normalizes comment shape and author fallback', () => {
+  assert.deepEqual(
+    formatQuazarCommentDetail({
+      id: 'comment-1',
+      item_id: 'item-1',
+      user_id: null,
+      content: '댓글',
+      tags: null,
+      source: 'mcp',
+      source_url: null,
+      source_metadata: { author_name: 'Codex' },
+      profiles: null,
+      created_at: '2026-05-20T00:00:00.000Z',
+      updated_at: '2026-05-21T00:00:00.000Z',
+    }, '개발팀'),
+    {
+      commentId: 'comment-1',
+      itemId: 'item-1',
+      boardType: '개발팀',
+      content: '댓글',
+      tags: [],
+      source: 'mcp',
+      sourceUrl: null,
+      sourceMetadata: { author_name: 'Codex' },
+      authorUserId: null,
+      authorName: 'Codex',
+      authorDepartment: '',
+      createdAt: '2026-05-20T00:00:00.000Z',
+      updatedAt: '2026-05-21T00:00:00.000Z',
+    }
+  );
+});
+
+test('createQuazarItemCommentLookup returns formatted comments for one item', async () => {
+  const result = await createQuazarItemCommentLookup({
+    payload: {
+      boardType: '개발팀',
+      itemId: 'item-1',
+    },
+    getItem: async () => ({ id: 'item-1' }),
+    listComments: async ({ itemId }) => {
+      assert.equal(itemId, 'item-1');
+      return [{
+        id: 'comment-1',
+        item_id: 'item-1',
+        content: '첫 댓글',
+        tags: ['mcp'],
+        source: 'mcp',
+        source_metadata: { author_name: 'Codex' },
+      }];
+    },
+  });
+
+  assert.equal(result.count, 1);
+  assert.equal(result.comments[0].authorName, 'Codex');
+});
+
+test('createQuazarComment returns formatted created comment', async () => {
+  const result = await createQuazarComment({
+    payload: {
+      boardType: '개발팀',
+      itemId: 'item-1',
+      content: '새 댓글',
+      authorName: 'Codex',
+    },
+    getItem: async () => ({ id: 'item-1' }),
+    insertComment: async ({ itemId, content, tags, authorName }) => {
+      assert.deepEqual({ itemId, content, tags, authorName }, {
+        itemId: 'item-1',
+        content: '새 댓글',
+        tags: [],
+        authorName: 'Codex',
+      });
+      return {
+        id: 'comment-1',
+        item_id: 'item-1',
+        content: '새 댓글',
+        tags: [],
+        source: 'mcp',
+        source_metadata: { author_name: 'Codex' },
+      };
+    },
+  });
+
+  assert.equal(result.commentId, 'comment-1');
+  assert.equal(result.authorName, 'Codex');
+});
+
+test('createQuazarCommentUpdate rejects GitHub review comments', async () => {
+  await assert.rejects(
+    createQuazarCommentUpdate({
+      payload: {
+        boardType: '개발팀',
+        itemId: 'item-1',
+        commentId: 'comment-1',
+        content: '수정 댓글',
+      },
+      getItem: async () => ({ id: 'item-1' }),
+      getComment: async () => ({ id: 'comment-1', source: 'github_review' }),
+      updateComment: async () => {
+        throw new Error('should not update');
+      },
+    }),
+    (error) => error?.code === 'COMMENT_READ_ONLY'
+  );
+});
+
+test('deleteQuazarComment returns delete envelope for mutable comments', async () => {
+  const result = await deleteQuazarComment({
+    payload: {
+      boardType: '개발팀',
+      itemId: 'item-1',
+      commentId: 'comment-1',
+    },
+    getItem: async () => ({ id: 'item-1' }),
+    getComment: async () => ({ id: 'comment-1', source: 'mcp' }),
+    deleteComment: async ({ itemId, commentId }) => {
+      assert.deepEqual({ itemId, commentId }, { itemId: 'item-1', commentId: 'comment-1' });
+    },
+  });
+
+  assert.deepEqual(result, {
+    boardType: '개발팀',
+    itemId: 'item-1',
+    commentId: 'comment-1',
+    deleted: true,
+  });
 });
 
 test('validateUpdateQuazarItemInput accepts partial safe-core updates', () => {
@@ -584,12 +821,77 @@ test('createQuazarItemUpdate returns normalized updated item detail', async () =
     itemStatus: 'done',
     priority: 'medium',
     tags: [],
+    assignees: [],
+    assigneeUserIds: [],
     projectId: 'project-z',
     projectTitle: 'CS 운영',
+    pageType: null,
+    startDate: null,
+    endDate: null,
+    isTicket: false,
+    ticketKey: null,
+    ticketNumber: null,
+    hasLinkedIssue: false,
+    linkedIssueCount: 0,
+    linkedIssueRepoFullName: null,
+    linkedIssueUrl: null,
+    hasLinkedBranch: false,
+    linkedBranchName: null,
+    linkedBranchUrl: null,
+    linkedBranchSource: null,
+    commentCount: 0,
+    latestCommentAt: null,
     boardType: '지원팀',
     createdAt: '2026-05-20T00:00:00.000Z',
     updatedAt: '2026-05-22T00:00:00.000Z',
   });
+});
+
+test('getQuazarProjectActivity returns project detail with item summaries', async () => {
+  const result = await getQuazarProjectActivity({
+    payload: {
+      boardType: '개발팀',
+      projectId: 'project-phw',
+    },
+    getProject: async ({ boardType, projectId }) => {
+      assert.deepEqual({ boardType, projectId }, {
+        boardType: '개발팀',
+        projectId: 'project-phw',
+      });
+      return {
+        id: 'project-phw',
+        title: '박형우',
+        tags: ['개발'],
+        is_completed: false,
+        section_id: 'section-dpp',
+      };
+    },
+    listItems: async ({ boardType, projectId }) => {
+      assert.deepEqual({ boardType, projectId }, {
+        boardType: '개발팀',
+        projectId: 'project-phw',
+      });
+      return [{
+        id: 'item-1',
+        title: '업무',
+        description: '설명',
+        status: 'done',
+        priority: 'high',
+        tags: ['개발'],
+        assignees: ['박형우'],
+        project_id: 'project-phw',
+        project_title: '박형우',
+        ticket_key: 'QZR-DPPBE-1',
+      }];
+    },
+    listCommentMetrics: async () => new Map([['item-1', { comment_count: 2, latest_comment_at: '2026-06-23T00:00:00.000Z' }]]),
+    listIssueMetrics: async () => new Map([['item-1', { linked_issue_count: 1, has_linked_issue: true }]]),
+  });
+
+  assert.equal(result.project.projectId, 'project-phw');
+  assert.equal(result.count, 1);
+  assert.equal(result.items[0].ticketKey, 'QZR-DPPBE-1');
+  assert.equal(result.items[0].commentCount, 2);
 });
 
 test('validateCreateQuazarProjectInput applies defaults for optional fields', () => {
@@ -1018,7 +1320,7 @@ test('createQuazarItemService updateProject persists tags in update payload', as
 
       return {
         select(fields) {
-          assert.equal(fields, 'id, title, is_completed, section_id, order_index, created_at, board_type');
+          assert.equal(fields, 'id, title, tags, assignees, assignee_user_ids, is_completed, section_id, order_index, created_at, updated_at, board_type');
           return {
             eq(column, value) {
               assert.equal(column, 'board_type');

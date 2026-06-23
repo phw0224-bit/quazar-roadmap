@@ -205,6 +205,23 @@ export function createMcpProjectDetailHandler({ expectedToken, getProject }) {
   };
 }
 
+export function createMcpProjectActivityHandler({ expectedToken, getProjectActivity }) {
+  return async function handleMcpProjectActivity(req, res) {
+    if (!requireAuthorizedRequest(expectedToken, req, res)) return;
+
+    try {
+      const payload = {
+        boardType: typeof req.query?.boardType === 'string' ? req.query.boardType : '',
+        projectId: typeof req.params?.projectId === 'string' ? req.params.projectId : '',
+      };
+      const result = await getProjectActivity(payload);
+      return sendRouteSuccess(res, 'FOUND', result);
+    } catch (error) {
+      return sendRouteError(res, error, 'Failed to get Quazar project activity.');
+    }
+  };
+}
+
 export function createMcpProjectUpdateHandler({ expectedToken, updateProject }) {
   return async function handleMcpProjectUpdate(req, res) {
     if (!requireAuthorizedRequest(expectedToken, req, res)) return;
@@ -316,6 +333,87 @@ export function createMcpItemUpdateHandler({ expectedToken, updateItem }) {
   };
 }
 
+export function createMcpItemCommentsHandler({ expectedToken, listComments }) {
+  return async function handleMcpItemComments(req, res) {
+    if (!requireAuthorizedRequest(expectedToken, req, res)) return;
+
+    try {
+      const payload = {
+        boardType: typeof req.query?.boardType === 'string' ? req.query.boardType : '',
+        itemId: typeof req.params?.itemId === 'string' ? req.params.itemId : '',
+      };
+      const result = await listComments(payload);
+      return sendRouteSuccess(res, 'FOUND', result);
+    } catch (error) {
+      return sendRouteError(res, error, 'Failed to list Quazar item comments.');
+    }
+  };
+}
+
+export function createMcpItemCommentCreateHandler({ expectedToken, createComment }) {
+  return async function handleMcpItemCommentCreate(req, res) {
+    if (!requireAuthorizedRequest(expectedToken, req, res)) return;
+
+    try {
+      const payload = {
+        boardType: typeof req.body?.boardType === 'string' ? req.body.boardType : '',
+        itemId: typeof req.params?.itemId === 'string' ? req.params.itemId : '',
+        content: typeof req.body?.content === 'string' ? req.body.content : '',
+        tags: Array.isArray(req.body?.tags) ? req.body.tags : [],
+        authorName: typeof req.body?.authorName === 'string' ? req.body.authorName : '',
+      };
+      const result = await createComment(payload);
+      return sendRouteSuccess(res, 'CREATED', result);
+    } catch (error) {
+      return sendRouteError(res, error, 'Failed to create Quazar item comment.');
+    }
+  };
+}
+
+export function createMcpItemCommentUpdateHandler({ expectedToken, updateComment }) {
+  return async function handleMcpItemCommentUpdate(req, res) {
+    if (!requireAuthorizedRequest(expectedToken, req, res)) return;
+
+    try {
+      const payload = {
+        boardType: typeof req.body?.boardType === 'string' ? req.body.boardType : '',
+        itemId: typeof req.params?.itemId === 'string' ? req.params.itemId : '',
+        commentId: typeof req.params?.commentId === 'string' ? req.params.commentId : '',
+      };
+
+      if (Object.prototype.hasOwnProperty.call(req.body || {}, 'content')) {
+        payload.content = req.body.content;
+      }
+      if (Object.prototype.hasOwnProperty.call(req.body || {}, 'tags')) {
+        payload.tags = req.body.tags;
+      }
+
+      const result = await updateComment(payload);
+      return sendRouteSuccess(res, 'UPDATED', result);
+    } catch (error) {
+      return sendRouteError(res, error, 'Failed to update Quazar item comment.');
+    }
+  };
+}
+
+export function createMcpItemCommentDeleteHandler({ expectedToken, deleteComment }) {
+  return async function handleMcpItemCommentDelete(req, res) {
+    if (!requireAuthorizedRequest(expectedToken, req, res)) return;
+
+    try {
+      const payload = {
+        boardType: typeof req.query?.boardType === 'string' ? req.query.boardType : '',
+        itemId: typeof req.params?.itemId === 'string' ? req.params.itemId : '',
+        commentId: typeof req.params?.commentId === 'string' ? req.params.commentId : '',
+      };
+      const result = await deleteComment(payload);
+      return sendRouteSuccess(res, 'DELETED', result);
+    } catch (error) {
+      return sendRouteError(res, error, 'Failed to delete Quazar item comment.');
+    }
+  };
+}
+
 export const mcpRouter = Router();
 
 mcpRouter.get('/api/mcp/sections', createMcpSectionsHandler({
@@ -353,6 +451,11 @@ mcpRouter.get('/api/mcp/projects/:projectId', createMcpProjectDetailHandler({
   getProject: (payload) => getSharedService().getProject(payload),
 }));
 
+mcpRouter.get('/api/mcp/projects/:projectId/activity', createMcpProjectActivityHandler({
+  expectedToken: MCP_SHARED_TOKEN,
+  getProjectActivity: (payload) => getSharedService().getProjectActivity(payload),
+}));
+
 mcpRouter.patch('/api/mcp/projects/:projectId', createMcpProjectUpdateHandler({
   expectedToken: MCP_SHARED_TOKEN,
   updateProject: (payload) => getSharedService().updateProject(payload),
@@ -376,4 +479,24 @@ mcpRouter.post('/api/mcp/items', createMcpItemsHandler({
 mcpRouter.patch('/api/mcp/items/:itemId', createMcpItemUpdateHandler({
   expectedToken: MCP_SHARED_TOKEN,
   updateItem: (payload) => getSharedService().updateItem(payload),
+}));
+
+mcpRouter.get('/api/mcp/items/:itemId/comments', createMcpItemCommentsHandler({
+  expectedToken: MCP_SHARED_TOKEN,
+  listComments: (payload) => getSharedService().listComments(payload),
+}));
+
+mcpRouter.post('/api/mcp/items/:itemId/comments', createMcpItemCommentCreateHandler({
+  expectedToken: MCP_SHARED_TOKEN,
+  createComment: (payload) => getSharedService().createComment(payload),
+}));
+
+mcpRouter.patch('/api/mcp/items/:itemId/comments/:commentId', createMcpItemCommentUpdateHandler({
+  expectedToken: MCP_SHARED_TOKEN,
+  updateComment: (payload) => getSharedService().updateComment(payload),
+}));
+
+mcpRouter.delete('/api/mcp/items/:itemId/comments/:commentId', createMcpItemCommentDeleteHandler({
+  expectedToken: MCP_SHARED_TOKEN,
+  deleteComment: (payload) => getSharedService().deleteComment(payload),
 }));

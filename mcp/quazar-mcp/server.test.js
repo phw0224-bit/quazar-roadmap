@@ -9,9 +9,12 @@ import {
   buildSuggestedCheckoutCommands,
   inferRepoFullNameFromGitRemote,
   isDirectExecution,
+  runCreateQuazarItemCommentTool,
   runCreateQuazarItemGitHubBranchTool,
   runCreateQuazarItemGitHubIssueTool,
   runCreateQuazarProjectTool,
+  runDeleteQuazarItemCommentTool,
+  runGetQuazarProjectActivityTool,
   runResolveQuazarProjectTool,
   runResolveQuazarSectionTool,
   runCreateQuazarSectionTool,
@@ -19,9 +22,11 @@ import {
   runGetQuazarProjectTool,
   runGetQuazarItemGitHubBranchTool,
   runGetQuazarItemTool,
+  runListQuazarItemCommentsTool,
   runListQuazarProjectsTool,
   runListQuazarSectionsTool,
   runSearchQuazarItemsTool,
+  runUpdateQuazarItemCommentTool,
   runUpdateQuazarProjectTool,
   runUpdateQuazarItemTool,
 } from './server.js';
@@ -283,6 +288,120 @@ test('runGetQuazarItemTool returns detail payload and readable summary', async (
   assert.match(result.content[0].text, /LLM 개선/);
 });
 
+test('runListQuazarItemCommentsTool returns readable comment summaries', async () => {
+  const result = await runListQuazarItemCommentsTool({
+    boardType: '개발팀',
+    itemId: 'item-1',
+  }, {
+    listComments: async (payload) => {
+      assert.deepEqual(payload, {
+        boardType: '개발팀',
+        itemId: 'item-1',
+      });
+
+      return {
+        ok: true,
+        status: 'FOUND',
+        boardType: '개발팀',
+        itemId: 'item-1',
+        count: 1,
+        comments: [{
+          commentId: 'comment-1',
+          itemId: 'item-1',
+          authorName: 'Codex',
+          content: '첫 댓글',
+        }],
+      };
+    },
+  });
+
+  assert.equal(result.structuredContent.count, 1);
+  assert.match(result.content[0].text, /Codex/);
+  assert.match(result.content[0].text, /첫 댓글/);
+});
+
+test('runCreateQuazarItemCommentTool returns created comment payload', async () => {
+  const result = await runCreateQuazarItemCommentTool({
+    boardType: '개발팀',
+    itemId: 'item-1',
+    content: '새 댓글',
+  }, {
+    createComment: async (payload) => {
+      assert.deepEqual(payload, {
+        boardType: '개발팀',
+        itemId: 'item-1',
+        content: '새 댓글',
+      });
+
+      return {
+        ok: true,
+        status: 'CREATED',
+        commentId: 'comment-1',
+        itemId: 'item-1',
+      };
+    },
+  });
+
+  assert.equal(result.structuredContent.commentId, 'comment-1');
+  assert.match(result.content[0].text, /Created Quazar comment/);
+});
+
+test('runUpdateQuazarItemCommentTool returns updated comment payload', async () => {
+  const result = await runUpdateQuazarItemCommentTool({
+    boardType: '개발팀',
+    itemId: 'item-1',
+    commentId: 'comment-1',
+    content: '수정 댓글',
+  }, {
+    updateComment: async (payload) => {
+      assert.deepEqual(payload, {
+        boardType: '개발팀',
+        itemId: 'item-1',
+        commentId: 'comment-1',
+        content: '수정 댓글',
+      });
+
+      return {
+        ok: true,
+        status: 'UPDATED',
+        commentId: 'comment-1',
+        itemId: 'item-1',
+      };
+    },
+  });
+
+  assert.equal(result.structuredContent.status, 'UPDATED');
+  assert.match(result.content[0].text, /Updated Quazar comment/);
+});
+
+test('runDeleteQuazarItemCommentTool returns delete payload', async () => {
+  const result = await runDeleteQuazarItemCommentTool({
+    boardType: '개발팀',
+    itemId: 'item-1',
+    commentId: 'comment-1',
+  }, {
+    deleteComment: async (payload) => {
+      assert.deepEqual(payload, {
+        boardType: '개발팀',
+        itemId: 'item-1',
+        commentId: 'comment-1',
+      });
+
+      return {
+        ok: true,
+        status: 'DELETED',
+        boardType: '개발팀',
+        itemId: 'item-1',
+        commentId: 'comment-1',
+        deleted: true,
+      };
+    },
+  });
+
+  assert.equal(result.structuredContent.deleted, true);
+  assert.match(result.content[0].text, /Deleted Quazar comment/);
+});
+
 test('runUpdateQuazarItemTool returns updated item details', async () => {
   const result = await runUpdateQuazarItemTool({
     boardType: '지원팀',
@@ -366,6 +485,39 @@ test('runGetQuazarProjectTool returns detail payload and readable summary', asyn
   assert.equal(result.structuredContent.projectId, 'project-a');
   assert.equal(result.structuredContent.ok, true);
   assert.match(result.content[0].text, /LLM 개선/);
+});
+
+test('runGetQuazarProjectActivityTool returns project activity summaries', async () => {
+  const result = await runGetQuazarProjectActivityTool({
+    boardType: '개발팀',
+    projectId: 'project-a',
+  }, {
+    getProjectActivity: async (payload) => {
+      assert.deepEqual(payload, {
+        boardType: '개발팀',
+        projectId: 'project-a',
+      });
+
+      return {
+        ok: true,
+        status: 'FOUND',
+        boardType: '개발팀',
+        project: {
+          projectId: 'project-a',
+          title: '박형우',
+        },
+        count: 1,
+        items: [{
+          itemId: 'item-1',
+          title: '업무',
+          ticketKey: 'QZR-DPPBE-1',
+        }],
+      };
+    },
+  });
+
+  assert.equal(result.structuredContent.project.projectId, 'project-a');
+  assert.match(result.content[0].text, /QZR-DPPBE-1/);
 });
 
 test('runUpdateQuazarProjectTool returns updated project details', async () => {
@@ -652,7 +804,14 @@ test('project MCP server schema includes section tools and ok/status envelopes',
   assert.match(serverSource, /create_quazar_section/);
   assert.match(serverSource, /resolve_quazar_section/);
   assert.match(serverSource, /resolve_quazar_project/);
+  assert.match(serverSource, /get_quazar_project_activity/);
+  assert.match(serverSource, /list_quazar_item_comments/);
+  assert.match(serverSource, /create_quazar_item_comment/);
+  assert.match(serverSource, /update_quazar_item_comment/);
+  assert.match(serverSource, /delete_quazar_item_comment/);
   assert.match(serverSource, /sectionName/);
+  assert.match(serverSource, /create_quazar_project[\s\S]*tags: z\.array\(z\.string\(\)\)\.optional\(\)\.describe\('Optional project tags'\)/);
+  assert.match(serverSource, /update_quazar_project[\s\S]*tags: z\.array\(z\.string\(\)\)\.optional\(\)\.describe\('Optional replacement tags'\)/);
   assert.match(serverSource, /ok: z\.boolean\(\)/);
   assert.match(serverSource, /status: z\.string\(\)/);
 });
@@ -665,6 +824,11 @@ test('README documents section tools and checkout guidance', async () => {
   assert.match(readmeSource, /create_quazar_section/);
   assert.match(readmeSource, /resolve_quazar_section/);
   assert.match(readmeSource, /resolve_quazar_project/);
+  assert.match(readmeSource, /get_quazar_project_activity/);
+  assert.match(readmeSource, /list_quazar_item_comments/);
+  assert.match(readmeSource, /create_quazar_item_comment/);
+  assert.match(readmeSource, /update_quazar_item_comment/);
+  assert.match(readmeSource, /delete_quazar_item_comment/);
   assert.match(readmeSource, /sectionName/);
   assert.match(readmeSource, /suggestedCheckoutCommand/);
 });

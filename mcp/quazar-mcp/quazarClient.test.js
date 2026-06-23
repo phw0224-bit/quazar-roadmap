@@ -5,16 +5,21 @@ import {
   createQuazarSectionViaApi,
   createQuazarProjectViaApi,
   createQuazarItemViaApi,
+  createQuazarItemCommentViaApi,
   createQuazarItemGitHubBranchViaApi,
   createQuazarItemGitHubIssueViaApi,
+  deleteQuazarItemCommentViaApi,
+  getQuazarProjectActivityViaApi,
   getQuazarProjectViaApi,
   getQuazarItemViaApi,
   getQuazarItemGitHubBranchViaApi,
+  listQuazarItemCommentsViaApi,
   listQuazarSectionsViaApi,
   listQuazarProjectsViaApi,
   resolveQuazarSectionViaApi,
   resolveQuazarProjectViaApi,
   searchQuazarItemsViaApi,
+  updateQuazarItemCommentViaApi,
   updateQuazarProjectViaApi,
   updateQuazarItemViaApi,
 } from './quazarClient.js';
@@ -340,6 +345,128 @@ test('getQuazarItemViaApi requests item detail by board and id', async () => {
   assert.equal(calls[0].init.method, 'GET');
 });
 
+test('listQuazarItemCommentsViaApi requests item comments by board and id', async () => {
+  const calls = [];
+  const result = await listQuazarItemCommentsViaApi({
+    baseUrl: 'http://localhost:3001',
+    token: 'shared-secret',
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      return new Response(JSON.stringify({
+        ok: true,
+        status: 'FOUND',
+        itemId: 'item-1',
+        count: 1,
+        comments: [{ commentId: 'comment-1', content: '첫 댓글' }],
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+  }, {
+    boardType: 'AI팀',
+    itemId: 'item-1',
+  });
+
+  assert.equal(calls[0].url, 'http://localhost:3001/api/mcp/items/item-1/comments?boardType=AI%ED%8C%80');
+  assert.equal(calls[0].init.method, 'GET');
+  assert.equal(result.comments[0].commentId, 'comment-1');
+});
+
+test('createQuazarItemCommentViaApi posts normalized comment payload', async () => {
+  const calls = [];
+  await createQuazarItemCommentViaApi({
+    baseUrl: 'http://localhost:3001',
+    token: 'shared-secret',
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      return new Response(JSON.stringify({
+        ok: true,
+        status: 'CREATED',
+        commentId: 'comment-1',
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+  }, {
+    boardType: '개발팀',
+    itemId: 'item-1',
+    content: '새 댓글',
+    tags: ['mcp'],
+    authorName: 'Codex',
+  });
+
+  assert.equal(calls[0].url, 'http://localhost:3001/api/mcp/items/item-1/comments');
+  assert.equal(calls[0].init.method, 'POST');
+  assert.deepEqual(JSON.parse(calls[0].init.body), {
+    boardType: '개발팀',
+    content: '새 댓글',
+    tags: ['mcp'],
+    authorName: 'Codex',
+  });
+});
+
+test('updateQuazarItemCommentViaApi patches comment content and tags', async () => {
+  const calls = [];
+  await updateQuazarItemCommentViaApi({
+    baseUrl: 'http://localhost:3001',
+    token: 'shared-secret',
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      return new Response(JSON.stringify({
+        ok: true,
+        status: 'UPDATED',
+        commentId: 'comment-1',
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+  }, {
+    boardType: '개발팀',
+    itemId: 'item-1',
+    commentId: 'comment-1',
+    content: '수정 댓글',
+    tags: [],
+  });
+
+  assert.equal(calls[0].url, 'http://localhost:3001/api/mcp/items/item-1/comments/comment-1');
+  assert.equal(calls[0].init.method, 'PATCH');
+  assert.deepEqual(JSON.parse(calls[0].init.body), {
+    boardType: '개발팀',
+    content: '수정 댓글',
+    tags: [],
+  });
+});
+
+test('deleteQuazarItemCommentViaApi deletes comment with board scope query', async () => {
+  const calls = [];
+  await deleteQuazarItemCommentViaApi({
+    baseUrl: 'http://localhost:3001',
+    token: 'shared-secret',
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      return new Response(JSON.stringify({
+        ok: true,
+        status: 'DELETED',
+        commentId: 'comment-1',
+        deleted: true,
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+  }, {
+    boardType: '개발팀',
+    itemId: 'item-1',
+    commentId: 'comment-1',
+  });
+
+  assert.equal(calls[0].url, 'http://localhost:3001/api/mcp/items/item-1/comments/comment-1?boardType=%EA%B0%9C%EB%B0%9C%ED%8C%80');
+  assert.equal(calls[0].init.method, 'DELETE');
+});
+
 test('updateQuazarItemViaApi patches safe-core fields and forwards API errors', async () => {
   const calls = [];
   await assert.rejects(
@@ -476,6 +603,37 @@ test('getQuazarProjectViaApi requests project detail by board and id', async () 
     title: 'LLM 개선',
   });
   assert.equal(calls[0].url, 'http://localhost:3001/api/mcp/projects/project-a?boardType=AI%ED%8C%80');
+  assert.equal(calls[0].init.method, 'GET');
+});
+
+test('getQuazarProjectActivityViaApi requests project activity by board and id', async () => {
+  const calls = [];
+  const result = await getQuazarProjectActivityViaApi({
+    baseUrl: 'http://localhost:3001',
+    token: 'shared-secret',
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      return new Response(JSON.stringify({
+        ok: true,
+        status: 'FOUND',
+        project: { projectId: 'project-a', title: '박형우' },
+        count: 1,
+        items: [{ itemId: 'item-1', title: '업무' }],
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+  }, {
+    boardType: 'AI팀',
+    projectId: 'project-a',
+  });
+
+  assert.deepEqual(result.project, {
+    projectId: 'project-a',
+    title: '박형우',
+  });
+  assert.equal(calls[0].url, 'http://localhost:3001/api/mcp/projects/project-a/activity?boardType=AI%ED%8C%80');
   assert.equal(calls[0].init.method, 'GET');
 });
 

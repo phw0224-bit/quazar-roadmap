@@ -5,6 +5,11 @@ import {
   createMcpSectionCreateHandler,
   createMcpSectionResolveHandler,
   createMcpSectionsHandler,
+  createMcpItemCommentCreateHandler,
+  createMcpItemCommentDeleteHandler,
+  createMcpItemCommentsHandler,
+  createMcpItemCommentUpdateHandler,
+  createMcpProjectActivityHandler,
   createMcpProjectCreateHandler,
   createMcpProjectDetailHandler,
   createMcpProjectResolveHandler,
@@ -136,6 +141,143 @@ test('createMcpItemsHandler maps domain errors to JSON responses', async () => {
     code: 'PROJECT_AMBIGUOUS',
     message: 'Project match is ambiguous.',
     candidates: [{ id: 'project-a', title: '온보딩 개선' }],
+  });
+});
+
+test('createMcpItemCommentsHandler returns item comment list payload', async () => {
+  const res = createMockResponse();
+  const handler = createMcpItemCommentsHandler({
+    expectedToken: 'shared-secret',
+    listComments: async ({ boardType, itemId }) => {
+      assert.deepEqual({ boardType, itemId }, { boardType: '개발팀', itemId: 'item-1' });
+      return {
+        boardType,
+        itemId,
+        count: 1,
+        comments: [{
+          commentId: 'comment-1',
+          itemId,
+          boardType,
+          content: '첫 댓글',
+          tags: ['mcp'],
+          source: 'mcp',
+          authorName: 'Codex',
+        }],
+      };
+    },
+  });
+
+  await handler(
+    {
+      headers: { authorization: 'Bearer shared-secret' },
+      params: { itemId: 'item-1' },
+      query: { boardType: '개발팀' },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.status, 'FOUND');
+  assert.equal(res.body.count, 1);
+  assert.equal(res.body.comments[0].commentId, 'comment-1');
+});
+
+test('createMcpItemCommentCreateHandler normalizes create payload', async () => {
+  const res = createMockResponse();
+  const handler = createMcpItemCommentCreateHandler({
+    expectedToken: 'shared-secret',
+    createComment: async ({ boardType, itemId, content, tags, authorName }) => {
+      assert.deepEqual(
+        { boardType, itemId, content, tags, authorName },
+        {
+          boardType: '개발팀',
+          itemId: 'item-1',
+          content: '새 댓글',
+          tags: ['mcp'],
+          authorName: 'Codex',
+        }
+      );
+      return { commentId: 'comment-1', itemId, boardType, content, tags, authorName };
+    },
+  });
+
+  await handler(
+    {
+      headers: { authorization: 'Bearer shared-secret' },
+      params: { itemId: 'item-1' },
+      body: { boardType: '개발팀', content: '새 댓글', tags: ['mcp'], authorName: 'Codex' },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.status, 'CREATED');
+  assert.equal(res.body.commentId, 'comment-1');
+});
+
+test('createMcpItemCommentUpdateHandler forwards partial update payload', async () => {
+  const res = createMockResponse();
+  const handler = createMcpItemCommentUpdateHandler({
+    expectedToken: 'shared-secret',
+    updateComment: async ({ boardType, itemId, commentId, content, tags }) => {
+      assert.deepEqual(
+        { boardType, itemId, commentId, content, tags },
+        {
+          boardType: '개발팀',
+          itemId: 'item-1',
+          commentId: 'comment-1',
+          content: '수정 댓글',
+          tags: [],
+        }
+      );
+      return { commentId, itemId, boardType, content, tags };
+    },
+  });
+
+  await handler(
+    {
+      headers: { authorization: 'Bearer shared-secret' },
+      params: { itemId: 'item-1', commentId: 'comment-1' },
+      body: { boardType: '개발팀', content: '수정 댓글', tags: [] },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.status, 'UPDATED');
+  assert.equal(res.body.commentId, 'comment-1');
+});
+
+test('createMcpItemCommentDeleteHandler returns delete payload', async () => {
+  const res = createMockResponse();
+  const handler = createMcpItemCommentDeleteHandler({
+    expectedToken: 'shared-secret',
+    deleteComment: async ({ boardType, itemId, commentId }) => {
+      assert.deepEqual(
+        { boardType, itemId, commentId },
+        { boardType: '개발팀', itemId: 'item-1', commentId: 'comment-1' }
+      );
+      return { boardType, itemId, commentId, deleted: true };
+    },
+  });
+
+  await handler(
+    {
+      headers: { authorization: 'Bearer shared-secret' },
+      params: { itemId: 'item-1', commentId: 'comment-1' },
+      query: { boardType: '개발팀' },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, {
+    ok: true,
+    status: 'DELETED',
+    boardType: '개발팀',
+    itemId: 'item-1',
+    commentId: 'comment-1',
+    deleted: true,
   });
 });
 
@@ -562,6 +704,44 @@ test('createMcpProjectDetailHandler returns normalized project detail', async ()
     projectId: 'project-a',
     title: 'LLM 개선',
   });
+});
+
+test('createMcpProjectActivityHandler returns project activity payload', async () => {
+  const res = createMockResponse();
+  const handler = createMcpProjectActivityHandler({
+    expectedToken: 'shared-secret',
+    getProjectActivity: async ({ boardType, projectId }) => {
+      assert.deepEqual({ boardType, projectId }, { boardType: '개발팀', projectId: 'project-a' });
+      return {
+        boardType,
+        project: {
+          projectId,
+          title: '박형우',
+        },
+        count: 1,
+        items: [{
+          itemId: 'item-1',
+          title: '업무',
+          ticketKey: 'QZR-DPPBE-1',
+          commentCount: 2,
+        }],
+      };
+    },
+  });
+
+  await handler(
+    {
+      headers: { authorization: 'Bearer shared-secret' },
+      params: { projectId: 'project-a' },
+      query: { boardType: '개발팀' },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.status, 'FOUND');
+  assert.equal(res.body.project.title, '박형우');
+  assert.equal(res.body.items[0].ticketKey, 'QZR-DPPBE-1');
 });
 
 test('createMcpProjectUpdateHandler normalizes patch body and maps errors', async () => {
