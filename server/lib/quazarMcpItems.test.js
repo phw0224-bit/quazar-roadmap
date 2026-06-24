@@ -1320,7 +1320,7 @@ test('createQuazarItemService updateProject persists tags in update payload', as
 
       return {
         select(fields) {
-          assert.equal(fields, 'id, title, tags, assignees, assignee_user_ids, is_completed, section_id, order_index, created_at, updated_at, board_type');
+          assert.equal(fields, 'id, title, tags, assignees, assignee_user_ids, is_completed, section_id, order_index, created_at, board_type');
           return {
             eq(column, value) {
               assert.equal(column, 'board_type');

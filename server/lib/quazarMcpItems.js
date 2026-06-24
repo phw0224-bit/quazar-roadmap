@@ -923,6 +923,17 @@ function getItemsTable(boardType) {
   return boardType === 'main' ? 'roadmap_items' : 'items';
 }
 
+function getItemsSelectFields(boardType) {
+  const baseFields = 'id, title, description, status, priority, tags, assignees, assignee_user_ids, project_id, page_type, start_date, end_date, is_ticket, ticket_key, ticket_number, created_at, board_type';
+  return boardType === 'main'
+    ? baseFields
+    : `${baseFields}, github_linked_branch_name, github_linked_branch_url, github_branch_source`;
+}
+
+function getProjectSelectFields() {
+  return 'id, title, tags, assignees, assignee_user_ids, is_completed, section_id, order_index, created_at, board_type';
+}
+
 function getProjectOrderField(boardType) {
   return boardType === 'main' ? 'order_index' : 'order_index';
 }
@@ -963,7 +974,7 @@ async function selectSectionsForBoard(supabase, boardType) {
 async function getProjectById(supabase, boardType, projectId) {
   const { data, error } = await supabase
     .from(getProjectsTable(boardType))
-    .select('id, title, tags, assignees, assignee_user_ids, is_completed, section_id, order_index, created_at, updated_at, board_type')
+    .select(getProjectSelectFields())
     .eq('board_type', boardType)
     .eq('id', projectId)
     .maybeSingle();
@@ -978,7 +989,7 @@ async function getProjectById(supabase, boardType, projectId) {
 async function selectItemsForBoard(supabase, boardType, projectId = null) {
   let query = supabase
     .from(getItemsTable(boardType))
-    .select('id, title, description, status, priority, tags, assignees, assignee_user_ids, project_id, page_type, start_date, end_date, is_ticket, ticket_key, ticket_number, github_linked_branch_name, github_linked_branch_url, github_branch_source, created_at, updated_at, board_type')
+    .select(getItemsSelectFields(boardType))
     .eq('board_type', boardType)
     .order('created_at', { ascending: false, nullsFirst: false });
 
@@ -997,7 +1008,7 @@ async function selectItemsForBoard(supabase, boardType, projectId = null) {
 async function getItemById(supabase, boardType, itemId) {
   const { data, error } = await supabase
     .from(getItemsTable(boardType))
-    .select('id, title, description, status, priority, tags, assignees, assignee_user_ids, project_id, page_type, start_date, end_date, is_ticket, ticket_key, ticket_number, github_linked_branch_name, github_linked_branch_url, github_branch_source, created_at, updated_at, board_type')
+    .select(getItemsSelectFields(boardType))
     .eq('board_type', boardType)
     .eq('id', itemId)
     .maybeSingle();
@@ -1012,7 +1023,7 @@ async function getItemById(supabase, boardType, itemId) {
 async function selectCommentsForItem(supabase, itemId) {
   const { data, error } = await supabase
     .from('comments')
-    .select('id, item_id, user_id, content, tags, source, source_url, source_metadata, created_at, updated_at, profiles (name, department)')
+    .select('id, item_id, user_id, content, tags, source, source_url, source_metadata, created_at, profiles (name, department)')
     .eq('item_id', itemId)
     .order('created_at', { ascending: true });
 
@@ -1041,7 +1052,7 @@ async function selectCommentMetricsForItems(supabase, itemIds = []) {
 async function getCommentById(supabase, itemId, commentId) {
   const { data, error } = await supabase
     .from('comments')
-    .select('id, item_id, user_id, content, tags, source, source_url, source_metadata, created_at, updated_at, profiles (name, department)')
+    .select('id, item_id, user_id, content, tags, source, source_url, source_metadata, created_at, profiles (name, department)')
     .eq('item_id', itemId)
     .eq('id', commentId)
     .maybeSingle();
@@ -1258,7 +1269,7 @@ export function createQuazarItemService(supabase) {
             .update(updates)
             .eq('board_type', boardType)
             .eq('id', itemId)
-            .select('id, title, description, status, priority, tags, assignees, assignee_user_ids, project_id, page_type, start_date, end_date, is_ticket, ticket_key, ticket_number, github_linked_branch_name, github_linked_branch_url, github_branch_source, created_at, updated_at, board_type')
+            .select(getItemsSelectFields(boardType))
             .maybeSingle();
 
           if (error) {
@@ -1309,7 +1320,7 @@ export function createQuazarItemService(supabase) {
                 created_via: 'mcp',
               },
             }])
-            .select('id, item_id, user_id, content, tags, source, source_url, source_metadata, created_at, updated_at, profiles (name, department)')
+            .select('id, item_id, user_id, content, tags, source, source_url, source_metadata, created_at, profiles (name, department)')
             .single();
 
           if (error) {
@@ -1332,7 +1343,7 @@ export function createQuazarItemService(supabase) {
             .update(patch)
             .eq('item_id', itemId)
             .eq('id', commentId)
-            .select('id, item_id, user_id, content, tags, source, source_url, source_metadata, created_at, updated_at, profiles (name, department)')
+            .select('id, item_id, user_id, content, tags, source, source_url, source_metadata, created_at, profiles (name, department)')
             .maybeSingle();
 
           if (error) {
