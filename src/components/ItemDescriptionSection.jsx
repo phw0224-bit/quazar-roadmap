@@ -35,6 +35,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
   projectId,
   allItems = [],
   isReadOnly,
+  editingEnabled = false,
   entityContext = null,
   onEditingChange,
   onOpenDetail,
@@ -71,10 +72,11 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
   const isMemo = entityContext?.type === ENTITY_TYPES.MEMO;
   const isRequest = entityContext?.type === ENTITY_TYPES.REQUEST;
   const isProject = entityContext?.type === ENTITY_TYPES.PROJECT;
-  const isSplitMode = descriptionMode === 'split';
-  const isEditorMode = descriptionMode === 'live' || descriptionMode === 'split';
-  const showPreviewPane = isReadOnly || isSplitMode || descriptionMode === 'preview';
-  const showEditorPane = !isReadOnly && isEditorMode;
+  const effectiveDescriptionMode = editingEnabled ? descriptionMode : 'preview';
+  const isSplitMode = effectiveDescriptionMode === 'split';
+  const isEditorMode = effectiveDescriptionMode === 'live' || effectiveDescriptionMode === 'split';
+  const showPreviewPane = !editingEnabled || isReadOnly || isSplitMode || effectiveDescriptionMode === 'preview';
+  const showEditorPane = editingEnabled && !isReadOnly && isEditorMode;
 
   const getActiveDescriptionRoot = useCallback(() => {
     if (showPreviewPane && previewDescriptionRef.current) {
@@ -94,8 +96,8 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
   }, []);
 
   useEffect(() => {
-    onModeChange?.(descriptionMode);
-  }, [descriptionMode, onModeChange]);
+    onModeChange?.(effectiveDescriptionMode);
+  }, [effectiveDescriptionMode, onModeChange]);
 
   useEffect(() => {
     setDescriptionMode(getInitialDescriptionMode({
@@ -150,7 +152,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
     blocks.forEach((block, index) => {
       block.id = `ai-block-${index + 1}`;
     });
-  }, [description, descriptionMode, getActiveDescriptionRoot, showPreviewPane]);
+  }, [description, effectiveDescriptionMode, getActiveDescriptionRoot, showPreviewPane]);
 
   useEffect(() => () => {
     if (autosaveTimerRef.current) {
@@ -442,7 +444,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
           </div>
 
           <div className="flex items-center gap-2">
-            {!isReadOnly && (
+            {editingEnabled && !isReadOnly && (
               <span className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${
                 isAutosaving
                   ? 'border-sky-200 bg-sky-50 text-sky-600 dark:border-sky-800/40 dark:bg-sky-900/20 dark:text-sky-300'
@@ -460,13 +462,13 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
                     : '동기화 완료'}
               </span>
             )}
-            {!isReadOnly && (
+            {editingEnabled && !isReadOnly && (
               <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-border-subtle dark:bg-bg-elevated">
                 <button
                   type="button"
                   onClick={() => handleDescriptionModeChange('split')}
                   className={`rounded-lg px-2.5 py-1.5 text-[11px] font-black uppercase tracking-widest transition-colors ${
-                    descriptionMode === 'split'
+                    effectiveDescriptionMode === 'split'
                       ? 'bg-white text-gray-900 shadow-sm dark:bg-bg-base dark:text-text-primary'
                       : 'text-gray-500 dark:text-text-secondary'
                   }`}
@@ -477,7 +479,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
                   type="button"
                   onClick={() => handleDescriptionModeChange('live')}
                   className={`rounded-lg px-2.5 py-1.5 text-[11px] font-black uppercase tracking-widest transition-colors ${
-                    descriptionMode === 'live'
+                    effectiveDescriptionMode === 'live'
                       ? 'bg-white text-gray-900 shadow-sm dark:bg-bg-base dark:text-text-primary'
                       : 'text-gray-500 dark:text-text-secondary'
                   }`}
@@ -488,7 +490,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
                   type="button"
                   onClick={() => handleDescriptionModeChange('preview')}
                   className={`rounded-lg px-2.5 py-1.5 text-[11px] font-black uppercase tracking-widest transition-colors ${
-                    descriptionMode === 'preview'
+                    effectiveDescriptionMode === 'preview'
                       ? 'bg-white text-gray-900 shadow-sm dark:bg-bg-base dark:text-text-primary'
                       : 'text-gray-500 dark:text-text-secondary'
                   }`}
@@ -498,7 +500,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
               </div>
             )}
 
-            {description && !isReadOnly && !isMemo && (
+            {editingEnabled && description && !isReadOnly && !isMemo && (
               <button
                 type="button"
                 onClick={handleSummarize}
@@ -584,7 +586,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
                 key={`editor-${item.id}`}
                 content={description}
                 placeholder={descriptionPlaceholder}
-                height={isSplitMode ? 'auto' : '420px'}
+                height={isSplitMode ? '78vh' : '420px'}
                 compactToolbar={isSplitMode}
                 chromeLess={isSplitMode}
                 inlinePlaceholders={templateInlinePlaceholders}
@@ -594,7 +596,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
                   setDescription(next);
                 }}
                 editable={!isReadOnly}
-                mode={descriptionMode === 'live' ? 'live' : 'source'}
+                mode={effectiveDescriptionMode === 'live' ? 'live' : 'source'}
                 containerRef={editorDescriptionRef}
                 allItems={allItems}
                 itemId={item.id}
@@ -637,7 +639,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
                 onToggleTaskItem={handleToggleTaskItem}
                 resolveLinkPreview={resolveLinkPreview}
                 chromeLess={isSplitMode}
-                className={isSplitMode ? 'split-description-preview' : ''}
+                className={isSplitMode ? 'split-description-preview h-[78vh] overflow-y-auto' : ''}
               />
             </div>
           )}

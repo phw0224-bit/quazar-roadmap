@@ -824,7 +824,6 @@ input:focus, textarea:focus {
 
 .split-description-layout .cm-editor {
   font-size: 1.12rem;
-  height: auto !important;
 }
 
 .cm-live-preview-shell .cm-editor {
@@ -839,7 +838,6 @@ input:focus, textarea:focus {
 
 .split-description-layout .cm-scroller {
   line-height: 1.9;
-  overflow: visible !important;
 }
 
 .split-description-layout .cm-gutters {

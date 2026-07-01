@@ -18,7 +18,7 @@ import {
   Clock, Users, Building2, Tag, Link2, Plus, X,
   MessageSquare, Search, ArrowUpRight, AlignCenter, AlignJustify,
   Calendar, Flag, LayoutList, List, Github, ExternalLink, Send, CheckCircle2,
-  Share2, Copy, ClipboardList
+  Share2, Copy, ClipboardList, Pencil
 } from 'lucide-react';
 import CommentSection from './CommentSection';
 import ItemDescriptionSection from './ItemDescriptionSection';
@@ -95,6 +95,7 @@ function ItemDetailPanel({
   const [expandedSubGroups, setExpandedSubGroups] = useState(new Set());
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [isDescriptionEditMode, setIsDescriptionEditMode] = useState(false);
   const [titleInput, setTitleInput] = useState(item?.title || item?.content || '');
   const [isWideView, setIsWideView] = useState(false);
   const [isDescriptionSplitView, setIsDescriptionSplitView] = useState(false);
@@ -224,6 +225,7 @@ function ItemDetailPanel({
     setRelationSearchQuery('');
     setIsEditingTitle(false);
     setIsEditingDescription(false);
+    setIsDescriptionEditMode(false);
     setShowGitHubIssueCreator(false);
     setShowGitHubPullRequestCreator(false);
     setGitHubError('');
@@ -600,6 +602,21 @@ function ItemDetailPanel({
       return false;
     }
   };
+
+  const handleToggleDescriptionEditMode = useCallback(async () => {
+    if (isReadOnly) return;
+
+    if (isDescriptionEditMode) {
+      const titleSaved = await handleSaveTitle();
+      const descriptionSaved = await descriptionSectionRef.current?.flushPendingSave?.();
+
+      if (titleSaved === false || descriptionSaved === false) {
+        return;
+      }
+    }
+
+    setIsDescriptionEditMode((current) => !current);
+  }, [handleSaveTitle, isDescriptionEditMode, isReadOnly]);
 
   const handleClose = async () => {
     if (isReadOnly) {
@@ -1251,8 +1268,9 @@ function ItemDetailPanel({
                 projectId={itemProjectId}
                 allItems={allItems}
                 isReadOnly={isReadOnly}
+                editingEnabled={isDescriptionEditMode}
                 entityContext={entityContext}
-                onModeChange={(mode) => setIsDescriptionSplitView(mode === 'split')}
+                onModeChange={(mode) => setIsDescriptionSplitView(isDescriptionEditMode && mode === 'split')}
                 onEditingChange={setIsEditingDescription}
                 onOpenDetail={onOpenDetail}
                 onShowToast={onShowToast}
@@ -1297,6 +1315,16 @@ function ItemDetailPanel({
             >
               <Share2 size={17} strokeWidth={2.4} />
             </button>
+            {!isReadOnly && (
+              <button
+                type="button"
+                onClick={handleToggleDescriptionEditMode}
+                className={`${headerToggleButtonClass} ${isDescriptionEditMode ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-300' : 'text-gray-400 dark:text-text-tertiary hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
+                title={isDescriptionEditMode ? '수정 완료' : '본문 수정'}
+              >
+                {isDescriptionEditMode ? <CheckCircle2 size={17} strokeWidth={2.4} /> : <Pencil size={17} strokeWidth={2.4} />}
+              </button>
+            )}
             <button
               onClick={() => setIsWideView(v => !v)}
               className={`${headerToggleButtonClass} ${isWideView ? 'bg-brand-50 dark:bg-brand-800/20 text-brand-500 dark:text-brand-400' : 'text-gray-400 dark:text-text-tertiary hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
@@ -1304,45 +1332,49 @@ function ItemDetailPanel({
             >
               {isWideView ? <AlignCenter size={17} strokeWidth={2.4} /> : <AlignJustify size={17} strokeWidth={2.4} />}
             </button>
-            <button
-              onClick={() => {
-                if (isDocRailOpen && docRailTab === 'outline') {
-                  setIsDocRailOpen(false);
-                  return;
-                }
-                handleDocRailTabClick('outline');
-              }}
-              className={`${headerToggleButtonClass} ${isDocRailOpen && docRailTab === 'outline' ? 'bg-brand-50 dark:bg-brand-800/20 text-brand-500 dark:text-brand-400' : 'text-gray-400 dark:text-text-tertiary hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
-              title={isDocRailOpen && docRailTab === 'outline' ? '문서 레일 숨기기' : '목차 표시'}
-            >
-              <List size={17} strokeWidth={2.4} />
-            </button>
-            <button
-              onClick={() => {
-                if (isDocRailOpen && docRailTab === 'backlinks') {
-                  setIsDocRailOpen(false);
-                  return;
-                }
-                handleDocRailTabClick('backlinks');
-              }}
-              className={`${headerToggleButtonClass} ${isDocRailOpen && docRailTab === 'backlinks' ? 'bg-brand-50 dark:bg-brand-800/20 text-brand-500 dark:text-brand-400' : 'text-gray-400 dark:text-text-tertiary hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
-              title={isDocRailOpen && docRailTab === 'backlinks' ? '문서 레일 숨기기' : '백링크 표시'}
-            >
-              <Link2 size={17} strokeWidth={2.4} />
-            </button>
-            <button
-              onClick={() => {
-                if (isDocRailOpen && docRailTab === 'mentions') {
-                  setIsDocRailOpen(false);
-                  return;
-                }
-                handleDocRailTabClick('mentions');
-              }}
-              className={`${headerToggleButtonClass} ${isDocRailOpen && docRailTab === 'mentions' ? 'bg-brand-50 dark:bg-brand-800/20 text-brand-500 dark:text-brand-400' : 'text-gray-400 dark:text-text-tertiary hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
-              title={isDocRailOpen && docRailTab === 'mentions' ? '문서 레일 숨기기' : '언급 보기'}
-            >
-              <ClipboardList size={17} strokeWidth={2.4} />
-            </button>
+            {!isDescriptionEditMode && (
+              <>
+                <button
+                  onClick={() => {
+                    if (isDocRailOpen && docRailTab === 'outline') {
+                      setIsDocRailOpen(false);
+                      return;
+                    }
+                    handleDocRailTabClick('outline');
+                  }}
+                  className={`${headerToggleButtonClass} ${isDocRailOpen && docRailTab === 'outline' ? 'bg-brand-50 dark:bg-brand-800/20 text-brand-500 dark:text-brand-400' : 'text-gray-400 dark:text-text-tertiary hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
+                  title={isDocRailOpen && docRailTab === 'outline' ? '문서 레일 숨기기' : '목차 표시'}
+                >
+                  <List size={17} strokeWidth={2.4} />
+                </button>
+                <button
+                  onClick={() => {
+                    if (isDocRailOpen && docRailTab === 'backlinks') {
+                      setIsDocRailOpen(false);
+                      return;
+                    }
+                    handleDocRailTabClick('backlinks');
+                  }}
+                  className={`${headerToggleButtonClass} ${isDocRailOpen && docRailTab === 'backlinks' ? 'bg-brand-50 dark:bg-brand-800/20 text-brand-500 dark:text-brand-400' : 'text-gray-400 dark:text-text-tertiary hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
+                  title={isDocRailOpen && docRailTab === 'backlinks' ? '문서 레일 숨기기' : '백링크 표시'}
+                >
+                  <Link2 size={17} strokeWidth={2.4} />
+                </button>
+                <button
+                  onClick={() => {
+                    if (isDocRailOpen && docRailTab === 'mentions') {
+                      setIsDocRailOpen(false);
+                      return;
+                    }
+                    handleDocRailTabClick('mentions');
+                  }}
+                  className={`${headerToggleButtonClass} ${isDocRailOpen && docRailTab === 'mentions' ? 'bg-brand-50 dark:bg-brand-800/20 text-brand-500 dark:text-brand-400' : 'text-gray-400 dark:text-text-tertiary hover:bg-gray-100 dark:hover:bg-bg-hover hover:text-gray-900 dark:hover:text-text-primary'}`}
+                  title={isDocRailOpen && docRailTab === 'mentions' ? '문서 레일 숨기기' : '언급 보기'}
+                >
+                  <ClipboardList size={17} strokeWidth={2.4} />
+                </button>
+              </>
+            )}
             {!isReadOnly && (
               <button
                 onClick={() => {
@@ -1431,8 +1463,8 @@ function ItemDetailPanel({
             </span>
             {!isEditingTitle ? (
               <h1 
-                onClick={() => !isReadOnly && setIsEditingTitle(true)}
-                className={`text-display text-gray-900 dark:text-text-primary outline-none transition-all duration-200 ${!isReadOnly ? 'hover:bg-gray-50 dark:hover:bg-bg-hover cursor-pointer rounded-2xl p-2 -ml-2' : ''}`}
+                onClick={() => !isReadOnly && isDescriptionEditMode && setIsEditingTitle(true)}
+                className={`text-display text-gray-900 dark:text-text-primary outline-none transition-all duration-200 ${!isReadOnly && isDescriptionEditMode ? 'hover:bg-gray-50 dark:hover:bg-bg-hover cursor-pointer rounded-2xl p-2 -ml-2' : ''}`}
               >
                 {item.title || item.content}
               </h1>
@@ -2111,8 +2143,9 @@ function ItemDetailPanel({
             projectId={itemProjectId}
             allItems={allItems}
             isReadOnly={isReadOnly}
+            editingEnabled={isDescriptionEditMode}
             entityContext={entityContext}
-            onModeChange={(mode) => setIsDescriptionSplitView(mode === 'split')}
+            onModeChange={(mode) => setIsDescriptionSplitView(isDescriptionEditMode && mode === 'split')}
             onEditingChange={setIsEditingDescription}
             onOpenDetail={onOpenDetail}
             onShowToast={onShowToast}
@@ -2125,7 +2158,7 @@ function ItemDetailPanel({
           />
 
           {/* Project Items List (Only for project page_type) */}
-          {item.page_type === 'project' && phase?.items && phase.items.length > 0 && (
+          {!isDescriptionEditMode && item.page_type === 'project' && phase?.items && phase.items.length > 0 && (
             <div className="flex flex-col gap-6 pt-8 border-t border-gray-100 dark:border-border-subtle">
                <div className="flex items-center gap-3 border-b border-gray-100 dark:border-border-subtle pb-4">
                  <LayoutList size={18} className="text-gray-400" />
@@ -2180,7 +2213,7 @@ function ItemDetailPanel({
 
 
           {/* Comments Section - 메모일 때는 숨김 */}
-          {!isMemo && (
+          {!isMemo && !isDescriptionEditMode && (
             <div className="flex flex-col gap-10 pb-40">
               <div className="flex items-center gap-3 border-b border-gray-100 dark:border-border-subtle pb-4">
                 <MessageSquare size={18} className="text-gray-400" />
@@ -2200,7 +2233,7 @@ function ItemDetailPanel({
           )}
         </div>
       </div>
-      {isDocRailOpen && (
+      {isDocRailOpen && !isDescriptionEditMode && (
         <aside className="hidden w-80 flex-shrink-0 border-l border-gray-200 bg-gray-50/70 dark:border-border-subtle dark:bg-bg-elevated/40 xl:flex xl:flex-col">
           <div className="border-b border-gray-200 px-3 py-3 dark:border-border-subtle">
             <div className="flex items-center justify-between gap-2">
