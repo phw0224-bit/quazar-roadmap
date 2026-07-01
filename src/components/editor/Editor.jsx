@@ -55,6 +55,7 @@ import {
 function Editor({
   content,
   placeholder = '내용을 입력하세요...',
+  height = '420px',
   inlinePlaceholders = {},
   onChange,
   editable,
@@ -71,6 +72,8 @@ function Editor({
   onLinkExistingPage,
   editorViewRef: externalEditorViewRef,
   onUpdate: externalOnUpdate,
+  compactToolbar = false,
+  chromeLess = false,
   createPageLabel = '새 페이지',
   createPromptTitle = '하위 페이지 추가',
   createPromptPlaceholder = '페이지 제목을 입력하세요',
@@ -502,6 +505,7 @@ function Editor({
     >
       <EditorToolbar
         editable={editable}
+        compact={compactToolbar}
         commandMap={commandMap}
         runCommandById={runCommandById}
         insertBold={() => insertAroundSelection(editorViewRef.current, '**', '**')}
@@ -523,17 +527,19 @@ function Editor({
         }}
         className={`relative ${mode === 'live'
           ? 'overflow-visible cm-live-preview-shell bg-transparent'
-          : 'overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-border-subtle dark:bg-[#0f1115]'
+          : chromeLess
+            ? 'overflow-hidden bg-transparent'
+            : 'overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-border-subtle dark:bg-[#0f1115]'
         }`}
       >
         <CodeMirror
           value={content || ''}
-          height="420px"
+          height={height}
           basicSetup={{
-            lineNumbers: mode !== 'live',
+            lineNumbers: mode !== 'live' && !chromeLess,
             foldGutter: true,
-            highlightActiveLine: mode !== 'live',
-            highlightActiveLineGutter: mode !== 'live',
+            highlightActiveLine: mode !== 'live' && !chromeLess,
+            highlightActiveLineGutter: mode !== 'live' && !chromeLess,
           }}
           editable={editable}
           extensions={extensions}

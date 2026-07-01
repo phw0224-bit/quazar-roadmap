@@ -6,12 +6,12 @@
  */
 
 const DESCRIPTION_MODE_STORAGE_KEY = 'item-description-mode';
-const VALID_DESCRIPTION_MODES = new Set(['live', 'source', 'preview']);
+const VALID_DESCRIPTION_MODES = new Set(['live', 'split', 'preview']);
 
 /**
  * @description 상세 설명의 초기 보기 모드를 결정한다.
  * @param {Object} options - `{ isReadOnly }`
- * @returns {string} `'preview'|'live'`
+ * @returns {string} `'preview'|'live'|'split'`
  */
 export function getInitialDescriptionMode({ isReadOnly }) {
   if (isReadOnly) return 'preview';
@@ -21,9 +21,12 @@ export function getInitialDescriptionMode({ isReadOnly }) {
     if (VALID_DESCRIPTION_MODES.has(savedMode)) {
       return savedMode;
     }
+
+    if (window.matchMedia?.('(min-width: 1280px)').matches) {
+      return 'split';
+    }
   }
 
-  // 기본값을 항상 live로 설정
   return 'live';
 }
 

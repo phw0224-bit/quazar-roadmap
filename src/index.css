@@ -423,6 +423,41 @@ input:focus, textarea:focus {
   line-height: 1.65;
 }
 
+.split-description-preview {
+  font-size: 1.08rem;
+  line-height: 1.85;
+  color: rgba(236, 240, 236, 0.95);
+}
+
+.split-description-shell {
+  width: 100%;
+}
+
+.split-workbench {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.75rem;
+  background: linear-gradient(90deg, rgba(18, 21, 24, 0.98) 0%, rgba(18, 21, 24, 0.98) 50%, rgba(10, 33, 25, 0.98) 50%, rgba(10, 33, 25, 0.98) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.split-workbench-pane {
+  min-width: 0;
+}
+
+.split-workbench-editor {
+  background: rgba(18, 21, 24, 0.96);
+}
+
+.split-workbench-preview {
+  background: rgba(10, 33, 25, 0.96);
+}
+
+.split-workbench-divider {
+  width: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .markdown-preview :where(h1, h2, h3, h4, h5, h6) {
   margin: 1.1rem 0 0.55rem;
   line-height: 1.28;
@@ -462,6 +497,19 @@ input:focus, textarea:focus {
 .markdown-preview h1 { font-size: 1.5rem; }
 .markdown-preview h2 { font-size: 1.3rem; }
 .markdown-preview h3 { font-size: 1.15rem; }
+
+.split-description-preview h1 { font-size: 2.2rem; }
+.split-description-preview h2 { font-size: 1.7rem; }
+.split-description-preview h3 { font-size: 1.35rem; }
+
+.split-description-preview :where(h1, h2, h3, h4, h5, h6) {
+  color: #f4f6f4;
+}
+
+.split-description-preview :where(p, li, blockquote, td, th) {
+  font-size: 1.08rem;
+  color: rgba(224, 231, 224, 0.92);
+}
 
 .markdown-preview :where(p, ul, ol, blockquote, table, pre, hr) {
   margin: 0.7rem 0;
@@ -774,6 +822,11 @@ input:focus, textarea:focus {
   font-size: 0.95rem;
 }
 
+.split-description-layout .cm-editor {
+  font-size: 1.12rem;
+  height: auto !important;
+}
+
 .cm-live-preview-shell .cm-editor {
   font-size: 1rem;
   background: transparent;
@@ -782,6 +835,38 @@ input:focus, textarea:focus {
 .cm-scroller {
   font-family: var(--font-mono);
   line-height: 1.65;
+}
+
+.split-description-layout .cm-scroller {
+  line-height: 1.9;
+  overflow: visible !important;
+}
+
+.split-description-layout .cm-gutters {
+  min-width: 2.75rem;
+  font-size: 0.95rem;
+}
+
+.split-description-layout .cm-content {
+  padding: 0.85rem 0 2.5rem;
+}
+
+.split-description-layout .cm-line {
+  padding: 0.12rem 0;
+}
+
+.split-description-layout .cm-focused {
+  outline: none;
+}
+
+.split-description-layout .cm-editor .cm-scroller {
+  padding-right: 0.5rem;
+}
+
+.split-description-layout .cm-editor,
+.split-description-layout .cm-scroller,
+.split-description-layout .cm-content {
+  min-height: 0;
 }
 
 .cm-live-preview-shell .cm-scroller {

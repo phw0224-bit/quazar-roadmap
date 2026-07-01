@@ -45,6 +45,7 @@ export default function MarkdownPreview({
   onToggleTaskItem,
   resolveLinkPreview,
   className = '',
+  chromeLess = false,
 }) {
   const html = useMemo(() => {
     return renderMarkdownPreviewHTML(content || '');
@@ -161,7 +162,11 @@ export default function MarkdownPreview({
           localRef.current = node;
           assignRef(containerRef, node);
         }}
-      className={`detail-markdown markdown-preview rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-border-subtle dark:bg-bg-elevated ${className}`.trim()}
+      className={`detail-markdown markdown-preview ${
+        chromeLess
+          ? 'bg-transparent p-0 shadow-none border-none rounded-none'
+          : 'rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-border-subtle dark:bg-bg-elevated'
+      } ${className}`.trim()}
       onClick={(event) => {
         const headingAnchor = event.target.closest('[data-heading-anchor]');
         if (headingAnchor) {

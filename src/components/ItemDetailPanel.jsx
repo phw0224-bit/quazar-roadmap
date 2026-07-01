@@ -97,6 +97,7 @@ function ItemDetailPanel({
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [titleInput, setTitleInput] = useState(item?.title || item?.content || '');
   const [isWideView, setIsWideView] = useState(false);
+  const [isDescriptionSplitView, setIsDescriptionSplitView] = useState(false);
   const [isDocRailOpen, setIsDocRailOpen] = useState(true);
   const [docRailTab, setDocRailTab] = useState('outline');
   const [currentEditorOffset, setCurrentEditorOffset] = useState(0);
@@ -168,6 +169,7 @@ function ItemDetailPanel({
     : 'bg-sky-500';
   const assigneeCount = isRequest ? 0 : (item.assignees || []).length;
   const teamCount = isRequest ? (item.request_team ? 1 : 0) : (item.teams || []).length;
+  const useExpandedCanvas = isWideView || isDescriptionSplitView;
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const descriptionSectionRef = useRef(null);
   const headerIconButtonClass = 'p-1.5 rounded-lg text-gray-400 hover:text-gray-900 dark:text-text-tertiary dark:hover:text-text-primary hover:bg-gray-100 dark:hover:bg-bg-hover transition-colors cursor-pointer';
@@ -247,6 +249,7 @@ function ItemDetailPanel({
       number: item?.ticket_number ?? null,
     });
     setDocRailTab('outline');
+    setIsDescriptionSplitView(false);
   }, [item]);
 
   const handleRetryGitHubSync = useCallback(() => {
@@ -1249,6 +1252,7 @@ function ItemDetailPanel({
                 allItems={allItems}
                 isReadOnly={isReadOnly}
                 entityContext={entityContext}
+                onModeChange={(mode) => setIsDescriptionSplitView(mode === 'split')}
                 onEditingChange={setIsEditingDescription}
                 onOpenDetail={onOpenDetail}
                 onShowToast={onShowToast}
@@ -1418,7 +1422,7 @@ function ItemDetailPanel({
       <div className="flex flex-1 overflow-hidden">
         {/* 메인 스크롤 영역 */}
         <div className="flex-1 overflow-y-auto custom-scrollbar bg-white dark:bg-bg-base transition-colors duration-200">
-        <div className={`${isWideView ? 'px-24' : 'max-w-4xl mx-auto px-12'} py-16 flex flex-col gap-16 transition-all duration-300`}>
+        <div className={`${useExpandedCanvas ? 'w-full px-3 md:px-4 xl:px-5 2xl:px-6' : 'max-w-4xl mx-auto px-12'} py-16 flex flex-col gap-16 transition-all duration-300`}>
           
           {/* Title */}
           <div className="flex flex-col gap-4">
@@ -2104,10 +2108,11 @@ function ItemDetailPanel({
           <ItemDescriptionSection
             ref={descriptionSectionRef}
             item={item}
-                projectId={itemProjectId}
+            projectId={itemProjectId}
             allItems={allItems}
             isReadOnly={isReadOnly}
             entityContext={entityContext}
+            onModeChange={(mode) => setIsDescriptionSplitView(mode === 'split')}
             onEditingChange={setIsEditingDescription}
             onOpenDetail={onOpenDetail}
             onShowToast={onShowToast}

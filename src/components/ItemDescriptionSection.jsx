@@ -43,6 +43,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
   onAddChildPage,
   onAddProjectItem,
   onShowPrompt,
+  onModeChange,
   editorViewRef,
   onEditorUpdate,
 }, ref) {
@@ -59,7 +60,8 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
   const [isAutosaving, setIsAutosaving] = useState(false);
   const [hasPendingAutosave, setHasPendingAutosave] = useState(false);
   const linkCallbackRef = useRef(null);
-  const descriptionRef = useRef(null);
+  const editorDescriptionRef = useRef(null);
+  const previewDescriptionRef = useRef(null);
   const dirtyDescriptionRef = useRef(false);
   const lastItemIdRef = useRef(item?.id ?? null);
   const autosaveTimerRef = useRef(null);
@@ -69,12 +71,31 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
   const isMemo = entityContext?.type === ENTITY_TYPES.MEMO;
   const isRequest = entityContext?.type === ENTITY_TYPES.REQUEST;
   const isProject = entityContext?.type === ENTITY_TYPES.PROJECT;
-  const isEditorMode = descriptionMode === 'live' || descriptionMode === 'source';
+  const isSplitMode = descriptionMode === 'split';
+  const isEditorMode = descriptionMode === 'live' || descriptionMode === 'split';
+  const showPreviewPane = isReadOnly || isSplitMode || descriptionMode === 'preview';
+  const showEditorPane = !isReadOnly && isEditorMode;
+
+  const getActiveDescriptionRoot = useCallback(() => {
+    if (showPreviewPane && previewDescriptionRef.current) {
+      return previewDescriptionRef.current;
+    }
+
+    if (showEditorPane && editorDescriptionRef.current) {
+      return editorDescriptionRef.current;
+    }
+
+    return previewDescriptionRef.current || editorDescriptionRef.current || null;
+  }, [showEditorPane, showPreviewPane]);
 
   const handleDescriptionModeChange = useCallback((nextMode) => {
     setDescriptionMode(nextMode);
     persistDescriptionMode(nextMode);
   }, []);
+
+  useEffect(() => {
+    onModeChange?.(descriptionMode);
+  }, [descriptionMode, onModeChange]);
 
   useEffect(() => {
     setDescriptionMode(getInitialDescriptionMode({
@@ -113,22 +134,23 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
   }, [description, item?.ai_summary, item?.description, itemId]);
 
   useEffect(() => {
-    if (!descriptionRef.current) return;
+    const root = getActiveDescriptionRoot();
+    if (!root) return;
     const headings = extractHeadings(description);
-    const headingElements = descriptionRef.current.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    const headingElements = root.querySelectorAll('h1, h2, h3, h4, h5, h6');
     headingElements.forEach((heading, index) => {
       const offset = headings[index]?.offset;
       if (typeof offset === 'number') {
         heading.dataset.headingOffset = String(offset);
       }
     });
-    const blocks = descriptionMode === 'preview'
-      ? descriptionRef.current.querySelectorAll('h1, h2, h3, h4, p, li')
-      : descriptionRef.current.querySelectorAll('.cm-line');
+    const blocks = showPreviewPane
+      ? root.querySelectorAll('h1, h2, h3, h4, p, li')
+      : root.querySelectorAll('.cm-line');
     blocks.forEach((block, index) => {
       block.id = `ai-block-${index + 1}`;
     });
-  }, [description, descriptionMode]);
+  }, [description, descriptionMode, getActiveDescriptionRoot, showPreviewPane]);
 
   useEffect(() => () => {
     if (autosaveTimerRef.current) {
@@ -170,7 +192,6 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
   }, [item?.description, item.id, onShowToast, onUpdateItem, projectId]);
 
   useEffect(() => {
-    const showEditorPane = !isReadOnly && isEditorMode;
     if (!dirtyDescriptionRef.current) return undefined;
 
     const normalizedCurrent = normalizeDescriptionSource(description);
@@ -206,7 +227,6 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
   }, [description, isEditorMode, isReadOnly, item?.description, saveDescription]);
 
   useEffect(() => {
-    const showEditorPane = !isReadOnly && isEditorMode;
     onEditingChange?.(showEditorPane && isEditorFocused);
   }, [isEditorFocused, isEditorMode, isReadOnly, onEditingChange]);
 
@@ -251,7 +271,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
       return saveDescription(description);
     },
     scrollToHeading: (offset) => {
-      const root = descriptionRef.current;
+      const root = getActiveDescriptionRoot();
       if (!root) return false;
       const target = root.querySelector(`[data-heading-offset="${offset}"]`);
       if (!target) return false;
@@ -265,7 +285,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
       }, 1800);
       return true;
     },
-  }), [description, isReadOnly, item?.description, saveDescription]);
+  }), [description, getActiveDescriptionRoot, isReadOnly, item?.description, saveDescription]);
 
   const handleLinkExistingPage = useCallback((callback) => {
     linkCallbackRef.current = callback;
@@ -412,8 +432,8 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
 
   return (
     <>
-      <div className="flex flex-col gap-6">
-        <div className="flex items-center justify-between border-b border-gray-100 pb-4 dark:border-border-subtle">
+      <div className={`flex flex-col ${isSplitMode ? 'gap-3 split-description-layout split-description-shell' : 'gap-6'}`}>
+        <div className={`flex items-center justify-between ${isSplitMode ? 'pb-1' : 'border-b border-gray-100 pb-4 dark:border-border-subtle'}`}>
           <div className="flex items-center gap-3">
             <FileText size={18} className="text-gray-400" />
             <h3 className="text-[13px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-text-tertiary">
@@ -444,6 +464,17 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
               <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-border-subtle dark:bg-bg-elevated">
                 <button
                   type="button"
+                  onClick={() => handleDescriptionModeChange('split')}
+                  className={`rounded-lg px-2.5 py-1.5 text-[11px] font-black uppercase tracking-widest transition-colors ${
+                    descriptionMode === 'split'
+                      ? 'bg-white text-gray-900 shadow-sm dark:bg-bg-base dark:text-text-primary'
+                      : 'text-gray-500 dark:text-text-secondary'
+                  }`}
+                >
+                  <span className="inline-flex items-center gap-1.5"><Code2 size={12} />원문 | 미리보기</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => handleDescriptionModeChange('live')}
                   className={`rounded-lg px-2.5 py-1.5 text-[11px] font-black uppercase tracking-widest transition-colors ${
                     descriptionMode === 'live'
@@ -452,17 +483,6 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
                   }`}
                 >
                   <span className="inline-flex items-center gap-1.5"><LayoutTemplate size={12} />라이브</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDescriptionModeChange('source')}
-                  className={`rounded-lg px-2.5 py-1.5 text-[11px] font-black uppercase tracking-widest transition-colors ${
-                    descriptionMode === 'source'
-                      ? 'bg-white text-gray-900 shadow-sm dark:bg-bg-base dark:text-text-primary'
-                      : 'text-gray-500 dark:text-text-secondary'
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-1.5"><Code2 size={12} />원문</span>
                 </button>
                 <button
                   type="button"
@@ -492,7 +512,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
           </div>
         </div>
 
-        {summaryError && (
+        {summaryError && !isSplitMode && (
           <div className="flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-sm text-red-500 dark:border-red-900/30 dark:bg-red-900/20 dark:text-red-400">
             <span className="mt-0.5 shrink-0">⚠️</span>
             <div>
@@ -502,7 +522,7 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
           </div>
         )}
 
-        {aiSummary && (
+        {aiSummary && !isSplitMode && (
           <div className="overflow-hidden rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50/60 to-white dark:border-violet-900/40 dark:from-violet-950/20 dark:to-bg-base">
             <div className="flex items-center justify-between border-b border-violet-100 px-7 py-5 dark:border-violet-900/30">
               <div className="flex items-center gap-3">
@@ -548,47 +568,78 @@ const ItemDescriptionSection = forwardRef(function ItemDescriptionSection({
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4">
-          {(!isReadOnly && isEditorMode) && (
-            <MarkdownEditor
-              key={`editor-${item.id}`}
-              content={description}
-              placeholder={descriptionPlaceholder}
-              inlinePlaceholders={templateInlinePlaceholders}
-              onChange={(next) => {
-                dirtyDescriptionRef.current = true;
-                setHasPendingAutosave(true);
-                setDescription(next);
-              }}
-              editable={!isReadOnly}
-              mode={descriptionMode === 'live' ? 'live' : 'source'}
-              containerRef={descriptionRef}
-              allItems={allItems}
-              itemId={item.id}
-              onShowToast={onShowToast}
-              onFocus={() => setIsEditorFocused(true)}
-              onBlur={handleDescriptionBlur}
-              onEditorBlur={() => setIsEditorFocused(false)}
-              onAddChildPage={(isProject ? onAddProjectItem : onAddChildPage) ? handleCreateLinkedEntry : null}
-              onShowPrompt={onShowPrompt}
-              onLinkExistingPage={handleLinkExistingPage}
-              editorViewRef={editorViewRef}
-              onUpdate={onEditorUpdate}
-              createPageLabel={isProject ? '새 업무' : '새 페이지'}
-              createPromptTitle={isProject ? '새 업무 추가' : '하위 페이지 추가'}
-              createPromptPlaceholder={isProject ? '업무 제목을 입력하세요' : '페이지 제목을 입력하세요'}
-              createErrorPrefix={isProject ? '업무 생성 실패' : '하위 페이지 생성 실패'}
-            />
+        <div className={`grid grid-cols-1 gap-4 ${isSplitMode ? 'split-workbench xl:grid-cols-[minmax(0,1fr)_1px_minmax(0,1fr)] xl:gap-0' : ''}`}>
+          {showEditorPane && (
+            <div className={`min-w-0 ${isSplitMode ? 'split-workbench-pane split-workbench-editor px-6 py-5 xl:px-8' : ''}`}>
+              {isSplitMode && (
+                <div className="mb-3 flex items-center justify-between border-b border-white/8 pb-3">
+                  <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-text-secondary">
+                    <Code2 size={12} />
+                    <span>마크다운 원문</span>
+                  </div>
+                  <span className="text-[11px] text-gray-500 dark:text-text-tertiary">편집 가능</span>
+                </div>
+              )}
+              <MarkdownEditor
+                key={`editor-${item.id}`}
+                content={description}
+                placeholder={descriptionPlaceholder}
+                height={isSplitMode ? 'auto' : '420px'}
+                compactToolbar={isSplitMode}
+                chromeLess={isSplitMode}
+                inlinePlaceholders={templateInlinePlaceholders}
+                onChange={(next) => {
+                  dirtyDescriptionRef.current = true;
+                  setHasPendingAutosave(true);
+                  setDescription(next);
+                }}
+                editable={!isReadOnly}
+                mode={descriptionMode === 'live' ? 'live' : 'source'}
+                containerRef={editorDescriptionRef}
+                allItems={allItems}
+                itemId={item.id}
+                onShowToast={onShowToast}
+                onFocus={() => setIsEditorFocused(true)}
+                onBlur={handleDescriptionBlur}
+                onEditorBlur={() => setIsEditorFocused(false)}
+                onAddChildPage={(isProject ? onAddProjectItem : onAddChildPage) ? handleCreateLinkedEntry : null}
+                onShowPrompt={onShowPrompt}
+                onLinkExistingPage={handleLinkExistingPage}
+                editorViewRef={editorViewRef}
+                onUpdate={onEditorUpdate}
+                createPageLabel={isProject ? '새 업무' : '새 페이지'}
+                createPromptTitle={isProject ? '새 업무 추가' : '하위 페이지 추가'}
+                createPromptPlaceholder={isProject ? '업무 제목을 입력하세요' : '페이지 제목을 입력하세요'}
+                createErrorPrefix={isProject ? '업무 생성 실패' : '하위 페이지 생성 실패'}
+              />
+            </div>
           )}
 
-          {(isReadOnly || descriptionMode === 'preview') && (
-            <MarkdownPreview
-              content={description}
-              containerRef={descriptionRef}
-              onOpenLink={handleOpenLink}
-              onToggleTaskItem={handleToggleTaskItem}
-              resolveLinkPreview={resolveLinkPreview}
-            />
+          {isSplitMode && (
+            <div className="hidden xl:block split-workbench-divider" aria-hidden="true" />
+          )}
+
+          {showPreviewPane && (
+            <div className={`min-w-0 ${isSplitMode ? 'split-workbench-pane split-workbench-preview px-6 py-5 xl:px-10' : ''}`}>
+              {isSplitMode && !isReadOnly && (
+                <div className="mb-3 flex items-center justify-between border-b border-white/8 pb-3">
+                  <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-text-secondary">
+                    <Eye size={12} />
+                    <span>렌더 미리보기</span>
+                  </div>
+                  <span className="text-[11px] text-gray-500 dark:text-text-tertiary">읽기 전용</span>
+                </div>
+              )}
+              <MarkdownPreview
+                content={description}
+                containerRef={previewDescriptionRef}
+                onOpenLink={handleOpenLink}
+                onToggleTaskItem={handleToggleTaskItem}
+                resolveLinkPreview={resolveLinkPreview}
+                chromeLess={isSplitMode}
+                className={isSplitMode ? 'split-description-preview' : ''}
+              />
+            </div>
           )}
         </div>
       </div>

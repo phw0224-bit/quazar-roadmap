@@ -51,7 +51,7 @@ const TOOLBAR_GROUPS = [
   },
 ];
 
-function ToolbarButton({ title, label, onClick, children, disabled = false }) {
+function ToolbarButton({ title, label, onClick, children, disabled = false, compact = false }) {
   return (
     <button
       type="button"
@@ -59,10 +59,14 @@ function ToolbarButton({ title, label, onClick, children, disabled = false }) {
       title={title}
       disabled={disabled}
       aria-label={title}
-      className="inline-flex min-w-[72px] items-center gap-2 rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-left text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border-subtle dark:bg-bg-base dark:text-text-secondary dark:hover:bg-bg-hover dark:hover:text-text-primary"
+      className={`inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white text-left text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border-subtle dark:bg-bg-base dark:text-text-secondary dark:hover:bg-bg-hover dark:hover:text-text-primary ${
+        compact
+          ? 'min-w-0 px-2.5 py-1.5'
+          : 'min-w-[72px] px-2.5 py-2'
+      }`}
     >
       {children}
-      <span className="text-[11px] font-bold tracking-tight">{label}</span>
+      <span className={`${compact ? 'text-[10px]' : 'text-[11px]'} font-bold tracking-tight`}>{label}</span>
     </button>
   );
 }
@@ -83,22 +87,27 @@ function EditorToolbar({
   fileInputRef,
   onFileChange,
   onInsertDate,
+  compact = false,
 }) {
   if (!editable) return null;
 
   return (
-    <div className="relative rounded-2xl border border-gray-200 bg-gray-50 px-2 py-2 dark:border-border-subtle dark:bg-bg-elevated">
+    <div className={`relative rounded-2xl border border-gray-200 bg-gray-50 dark:border-border-subtle dark:bg-bg-elevated ${
+      compact ? 'px-2 py-2' : 'px-2 py-2'
+    }`}>
       <div className="flex flex-col gap-2">
         {TOOLBAR_GROUPS.map((group) => (
           <div key={group.title} className="flex flex-col gap-1">
-            <span className="px-1 text-[10px] font-black uppercase tracking-[0.18em] text-gray-400 dark:text-text-tertiary">
-              {group.title}
-            </span>
-            <div className="flex flex-wrap items-center gap-1.5">
+            {!compact && (
+              <span className="px-1 text-[10px] font-black uppercase tracking-[0.18em] text-gray-400 dark:text-text-tertiary">
+                {group.title}
+              </span>
+            )}
+            <div className={`flex flex-wrap items-center ${compact ? 'gap-1' : 'gap-1.5'}`}>
               {group.items.map((item) => {
                 if (item === 'bold') {
                   return (
-                    <ToolbarButton key={item} title="굵게" label="굵게" onClick={insertBold}>
+                    <ToolbarButton key={item} title="굵게" label="굵게" onClick={insertBold} compact={compact}>
                       <Bold size={15} />
                     </ToolbarButton>
                   );
@@ -107,7 +116,7 @@ function EditorToolbar({
                 if (item === 'date') {
                   if (!onInsertDate) return null;
                   return (
-                    <ToolbarButton key={item} title="오늘 날짜 삽입" label="날짜" onClick={onInsertDate}>
+                    <ToolbarButton key={item} title="오늘 날짜 삽입" label="날짜" onClick={onInsertDate} compact={compact}>
                       <Calendar size={15} />
                     </ToolbarButton>
                   );
@@ -128,6 +137,7 @@ function EditorToolbar({
                     label={command.label}
                     onClick={() => runCommandById(item)}
                     disabled={isDisabled}
+                    compact={compact}
                   >
                     <Icon size={15} />
                   </ToolbarButton>
